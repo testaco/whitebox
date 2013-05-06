@@ -1,5 +1,7 @@
 .. image:: https://raw.github.com/testaco/whitebox/master/docs/img/whitebox-logo.jpg
     :alt: Whitebox Logo
+    :align: center
+
 The Smart Software Radio Device
 ===============================
 
@@ -9,6 +11,7 @@ and a software defined radio with an open hardware and software license.
 Directory Structure
 -------------------
 
+* board: Schematics and diagrams for the Whitebox board
 * cmake: Toolchains and modules for cmake
 * docs: Documentation for the project
 * driver: The Kernel driver for the Whitebox radio board
