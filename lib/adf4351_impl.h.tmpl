@@ -1,0 +1,6 @@
+/* vim: set filetype=cpp: */
+
+uint32_t adf4351_pack(adf4351_t* rf, uint8_t addr);
+void adf4351_load(adf4351_t* rf, uint32_t data);
+double adf4351_actual_frequency(adf4351_t* rf);
+double adf4351_tune(adf4351_t* rf, double target_freq);

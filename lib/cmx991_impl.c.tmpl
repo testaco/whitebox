@@ -1,0 +1,19 @@
+/* vim: set filetype=cpp: */
+
+void cmx991_load(cmx991_t* rf, uint8_t addr, uint32_t data) {
+    switch(addr) {
+    #for $addr in [17, 18, 19, 20, 21, 22, 32, 33, 34, 35]
+    case $addr:
+        #for $reg in filter(lambda r: r.get_addr() == addr, $regs)
+        rf->$reg.get_name() = (data >> $reg.get_shift()) & $reg.get_mask();
+        #end for
+        break;
+    #end for
+    }
+}
+
+double cmx991_actual_frequency(cmx991_t* rf, double fref) {
+    double m = cmx991_get_m(rf);
+    double n = cmx991_get_n(rf);
+    return fref * (m / n);
+}

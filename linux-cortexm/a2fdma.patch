@@ -1,0 +1,25 @@
+index 664b75a..310bc4c 100644
+--- a/arch/arm/mach-a2f/fpga.c
++++ b/arch/arm/mach-a2f/fpga.c
+@@ -49,6 +49,21 @@ int a2f_fpga_dma_init(void)
+                FPGA_MASTER_ENABLE;
+        writel(v, &A2F_SYSREG->ahb_matrix_cr);
+ 
++    /*
++     * Reset the PDMA block.
++     */
++#define PERIPHERAL_DMA_SOFT_RESET (1<<5)
++    v = readl(&A2F_SYSREG->soft_rst_cr) |
++        PERIPHERAL_DMA_SOFT_RESET;
++    writel(v, &A2F_SYSREG->soft_rst_cr);
++
++    /*
++     * Take PDMA controller out of reset.
++     */
++    v = readl(&A2F_SYSREG->soft_rst_cr) &
++        ~PERIPHERAL_DMA_SOFT_RESET;
++    writel(v, &A2F_SYSREG->soft_rst_cr);
++
+ #define PROT_REGION_ENABLE     (1<<0)
+        v = readl(&A2F_SYSREG->fab_prot_base_cr) &
+                ~PROT_REGION_ENABLE;

@@ -1,0 +1,2 @@
+::sysinit:/etc/rc
+ttyS0::respawn:/bin/hush -i

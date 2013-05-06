@@ -1,0 +1,446 @@
+rtmp	1/ddp
+tcpmux	1/tcp
+tcpmux	1/udp
+nbp	2/ddp
+echo	4/ddp
+rje	5/tcp
+rje	5/udp
+zip	6/ddp
+echo	7/tcp
+echo	7/udp
+discard	9/tcp	sink null
+discard	9/udp	sink null
+systat	11/tcp	users
+systat	11/udp	users
+daytime	13/tcp
+daytime	13/udp
+netstat	15/tcp
+qotd	17/tcp	quote
+qotd	17/udp	quote
+msp	18/tcp
+msp	18/udp
+chargen	19/tcp	ttytst source
+chargen	19/udp	ttytst source
+ftp-data	20/tcp
+ftp-data	20/udp
+fsp	21/udp	fspd
+ftp	21/tcp
+ftp	21/udp
+ssh	22/tcp
+ssh	22/udp
+telnet	23/tcp
+telnet	23/udp
+smtp	25/tcp	mail
+smtp	25/udp	mail
+time	37/tcp	timserver
+time	37/udp	timserver
+rlp	39/tcp	resource
+rlp	39/udp	resource
+nameserver	42/tcp	name
+nameserver	42/udp	name
+nicname	43/tcp	whois
+nicname	43/udp	whois
+tacacs	49/tcp
+tacacs	49/udp
+re-mail-ck	50/tcp
+re-mail-ck	50/udp
+domain	53/tcp	nameserver
+domain	53/udp	nameserver
+whois++	63/tcp
+whois++	63/udp
+bootps	67/tcp
+bootps	67/udp
+bootpc	68/tcp
+bootpc	68/udp
+tftp	69/tcp
+tftp	69/udp
+gopher	70/tcp
+gopher	70/udp
+netrjs-1	71/tcp
+netrjs-1	71/udp
+netrjs-2	72/tcp
+netrjs-2	72/udp
+netrjs-3	73/tcp
+netrjs-3	73/udp
+netrjs-4	74/tcp
+netrjs-4	74/udp
+finger	79/tcp
+finger	79/udp
+http	80/tcp	www www-http
+http	80/udp	www www-http
+kerberos	88/tcp	kerberos5 krb5
+kerberos	88/udp	kerberos5 krb5
+supdup	95/tcp
+supdup	95/udp
+linuxconf	98/tcp
+hostname	101/tcp	hostnames
+hostname	101/udp	hostnames
+iso-tsap	102/tcp	tsap
+csnet-ns	105/tcp	cso
+csnet-ns	105/udp	cso
+poppassd	106/tcp
+poppassd	106/udp
+rtelnet	107/tcp
+rtelnet	107/udp
+pop2	109/tcp	pop-2 postoffice
+pop2	109/udp	pop-2
+pop3	110/tcp	pop-3
+pop3	110/udp	pop-3
+sunrpc	111/tcp	portmapper
+sunrpc	111/udp	portmapper
+auth	113/tcp	authentication tap ident
+auth	113/udp	authentication tap ident
+sftp	115/tcp
+sftp	115/udp
+uucp-path	117/tcp
+uucp-path	117/udp
+nntp	119/tcp	readnews untp
+nntp	119/udp	readnews untp
+ntp	123/tcp
+ntp	123/udp
+netbios-ns	137/tcp
+netbios-ns	137/udp
+netbios-dgm	138/tcp
+netbios-dgm	138/udp
+netbios-ssn	139/tcp
+netbios-ssn	139/udp
+imap	143/tcp	imap2
+imap	143/udp	imap2
+snmp	161/tcp
+snmp	161/udp
+snmptrap	162/udp	snmp-trap
+cmip-man	163/tcp
+cmip-man	163/udp
+cmip-agent	164/tcp
+smip-agent	164/udp
+mailq	174/tcp
+mailq	174/udp
+xdmcp	177/tcp
+xdmcp	177/udp
+nextstep	178/tcp	NeXTStep NextStep
+nextstep	178/udp	NeXTStep NextStep
+bgp	179/tcp
+bgp	179/udp
+prospero	191/tcp
+prospero	191/udp
+irc	194/tcp
+irc	194/udp
+smux	199/tcp
+smux	199/udp
+at-rtmp	201/tcp
+at-rtmp	201/udp
+at-nbp	202/tcp
+at-nbp	202/udp
+at-echo	204/tcp
+at-echo	204/udp
+at-zis	206/tcp
+at-zis	206/udp
+qmtp	209/tcp
+qmtp	209/udp
+z39.50	210/tcp	z3950 wais
+z39.50	210/udp	z3950 wais
+ipx	213/tcp
+ipx	213/udp
+imap3	220/tcp
+imap3	220/udp
+link	245/tcp	ttylink
+link	245/udp	ttylink
+rsvp_tunnel	363/tcp
+rsvp_tunnel	363/udp
+rpc2portmap	369/tcp
+rpc2portmap	369/udp
+codaauth2	370/tcp
+codaauth2	370/udp
+ulistproc	372/tcp	ulistserv
+ulistproc	372/udp	ulistserv
+ldap	389/tcp
+ldap	389/udp
+svrloc	427/tcp
+svrloc	427/udp
+mobileip-agent	434/tcp
+mobileip-agent	434/udp
+mobilip-mn	435/tcp
+mobilip-mn	435/udp
+https	443/tcp
+https	443/udp
+snpp	444/tcp
+snpp	444/udp
+microsoft-ds	445/tcp
+microsoft-ds	445/udp
+kpasswd	464/tcp	kpwd
+kpasswd	464/udp	kpwd
+smtps	465/tcp
+photuris	468/tcp
+photuris	468/udp
+saft	487/tcp
+saft	487/udp
+gss-http	488/tcp
+gss-http	488/udp
+pim-rp-disc	496/tcp
+pim-rp-disc	496/udp
+isakmp	500/tcp
+isakmp	500/udp
+biff	512/udp	comsat
+exec	512/tcp
+login	513/tcp
+who	513/udp	whod
+shell	514/tcp	cmd
+syslog	514/udp
+printer	515/tcp	spooler
+printer	515/udp	spooler
+talk	517/udp
+ntalk	518/udp
+utime	519/tcp	unixtime
+utime	519/udp	unixtime
+efs	520/tcp
+router	520/udp	route routed
+ripng	521/tcp
+ripng	521/udp
+timed	525/tcp	timeserver
+timed	525/udp	timeserver
+tempo	526/tcp	newdate
+courier	530/tcp	rpc
+conference	531/tcp	chat
+netnews	532/tcp	readnews
+netwall	533/udp
+iiop	535/tcp
+iiop	535/udp
+gdomap	538/tcp
+gdomap	538/udp
+uucp	540/tcp	uucpd
+klogin	543/tcp
+kshell	544/tcp	krcmd
+dhcpv6-client	546/tcp
+dhcpv6-client	546/udp
+dhcpv6-server	547/tcp
+dhcpv6-server	547/udp
+afpovertcp	548/tcp
+afpovertcp	548/udp
+rtsp	554/tcp
+rtsp	554/udp
+remotefs	556/tcp	rfs_server rfs
+nntps	563/tcp
+nntps	563/udp
+whoami	565/tcp
+whoami	565/udp
+submission	587/tcp	msa
+submission	587/udp	msa
+npmp-local	610/tcp	dqs313_qmaster
+npmp-local	610/udp	dqs313_qmaster
+npmp-gui	611/tcp	dqs313_execd
+npmp-gui	611/udp	dqs313_execd
+hmmp-ind	612/tcp	dqs313_intercell
+hmmp-ind	612/udp	dqs313_intercell
+gii	616/tcp
+ldaps	636/tcp
+ldaps	636/udp
+acap	674/tcp
+acap	674/udp
+ha-cluster	694/tcp
+ha-cluster	694/udp
+kerberos-adm	749/tcp
+kerberos-iv	750/tcp	kerberos4 kerberos-sec kdc
+kerberos-iv	750/udp	kerberos4 kerberos-sec kdc
+kerberos_master	751/tcp
+kerberos_master	751/udp
+passwd_server	752/udp
+krb5_prop	754/tcp
+krbupdate	760/tcp	kreg
+webster	765/tcp
+webster	765/udp
+phonebook	767/tcp
+phonebook	767/udp
+omirr	808/tcp	omirrd
+omirr	808/udp	omirrd
+supfilesrv	871/tcp
+rsync	873/tcp
+rsync	873/udp
+swat	901/tcp
+telnets	992/tcp
+telnets	992/udp
+imaps	993/tcp
+imaps	993/udp
+ircs	994/tcp
+ircs	994/udp
+pop3s	995/tcp
+pop3s	995/udp
+socks	1080/tcp
+socks	1080/udp
+kpop	1109/tcp
+supfiledbg	1127/tcp
+skkserv	1178/tcp
+rmtcfg	1236/tcp
+h323hostcallsc	1300/tcp
+h323hostcallsc	1300/udp
+xtel	1313/tcp
+ms-sql-s	1433/tcp
+ms-sql-s	1433/udp
+ms-sql-m	1434/tcp
+ms-sql-m	1434/udp
+ica	1494/tcp
+ica	1494/udp
+wins	1512/tcp
+wins	1512/udp
+ingreslock	1524/tcp
+ingreslock	1524/udp
+prospero-np	1525/tcp
+prospero-np	1525/udp
+support	1529/tcp
+support	1529/tcp	prmsd gnatsd
+datametrics	1645/tcp	old-radius
+datametrics	1645/udp	old-radius
+sa-msg-port	1646/tcp	old-radacct
+sa-msg-port	1646/udp	old-radacct
+kermit	1649/tcp
+kermit	1649/udp
+l2tp	1701/tcp
+l2tp	1701/udp
+h323gatedisc	1718/tcp
+h323gatedisc	1718/udp
+h323gatestat	1719/tcp
+h323gatestat	1719/udp
+h323hostcall	1720/tcp
+h323hostcall	1720/udp
+tftp-mcast	1758/tcp
+tftp-mcast	1758/udp
+hello	1788/tcp
+hello	1788/udp
+radius	1812/tcp
+radius	1812/udp
+radius-acct	1813/tcp	radacct
+radius-acct	1813/udp	radacct
+mtp	1911/tcp
+mtp	1911/udp
+hsrp	1985/tcp
+hsrp	1985/udp
+licensedaemon	1986/tcp
+licensedaemon	1986/udp
+gdp-port	1997/tcp
+gdp-port	1997/udp
+cfinger	2003/tcp
+nfs	2049/tcp	nfsd
+nfs	2049/udp	nfsd
+knetd	2053/tcp
+zephyr-srv	2102/tcp
+zephyr-srv	2102/udp
+zephyr-clt	2103/tcp
+zephyr-clt	2103/udp
+zephyr-hm	2104/tcp
+zephyr-hm	2104/udp
+eklogin	2105/tcp
+ninstall	2150/tcp
+ninstall	2150/udp
+cvspserver	2401/tcp
+cvspserver	2401/udp
+venus	2430/tcp
+venus	2430/udp
+venus-se	2431/tcp
+venus-se	2431/udp
+codasrv	2432/tcp
+codasrv	2432/udp
+codasrv-se	2433/tcp
+codasrv-se	2433/udp
+zebrasrv	2600/tcp
+zebra	2601/tcp
+ripd	2602/tcp
+ripngd	2603/tcp
+ospfd	2604/tcp
+bgpd	2605/tcp
+ospf6d	2606/tcp
+corbaloc	2809/tcp
+afbackup	2988/tcp
+afbackup	2988/udp
+squid	3128/tcp
+icpv2	3130/tcp
+icpv2	3130/udp
+mysql	3306/tcp
+mysql	3306/udp
+trnsprntproxy	3346/tcp
+trnsprntproxy	3346/udp
+prsvp	3455/tcp
+prsvp	3455/udp
+rwhois	4321/tcp
+rwhois	4321/udp
+krb524	4444/tcp
+krb524	4444/udp
+fax	4557/tcp
+hylafax	4559/tcp
+rfe	5002/tcp
+rfe	5002/udp
+sgi-dgl	5232/tcp
+sgi-dgl	5232/udp
+cfengine	5308/tcp
+cfengine	5308/udp
+noclog	5354/tcp
+noclog	5354/udp
+hostmon	5355/tcp
+hostmon	5355/udp
+postgres	5432/tcp
+postgres	5432/udp
+cvsup	5999/tcp	CVSup
+cvsup	5999/udp	CVSup
+x11	6000/tcp	X
+ircd	6667/tcp
+ircd	6667/udp
+afs3-fileserver	7000/tcp
+afs3-fileserver	7000/udp
+afs3-callback	7001/tcp
+afs3-callback	7001/udp
+afs3-prserver	7002/tcp
+afs3-prserver	7002/udp
+afs3-vlserver	7003/tcp
+afs3-vlserver	7003/udp
+afs3-kaserver	7004/tcp
+afs3-kaserver	7004/udp
+afs3-volser	7005/tcp
+afs3-volser	7005/udp
+afs3-errors	7006/tcp
+afs3-errors	7006/udp
+afs3-bos	7007/tcp
+afs3-bos	7007/udp
+afs3-update	7008/tcp
+afs3-update	7008/udp
+afs3-rmtsys	7009/tcp
+afs3-rmtsys	7009/udp
+xfs	7100/tcp
+tircproxy	7666/tcp
+des	8000/tcp
+des3	8001/tcp
+http-alt	8008/tcp
+http-alt	8008/udp
+webcache	8080/tcp
+webcache	8080/udp
+tproxy	8081/tcp
+tproxy	8081/udp
+dungeon	8798/tcp
+advent4	8898/tcp
+jetdirect	9100/tcp	laserjet hplj
+mandelspawn	9359/udp	mandelbrot
+sd	9876/tcp
+sd	9876/udp
+amanda	10080/tcp
+amanda	10080/udp
+kamanda	10081/tcp
+kamanda	10081/udp
+amandaidx	10082/tcp
+amidxtape	10083/tcp
+h323callsigalt	11720/tcp
+h323callsigalt	11720/udp
+isdnlog	20011/tcp
+isdnlog	20011/udp
+vboxd	20012/tcp
+vboxd	20012/udp
+binkp	24554/tcp
+binkp	24554/udp
+quake	26000/tcp
+quake	26000/udp
+wnn6-ds	26208/tcp
+wnn6-ds	26208/udp
+asp	27374/tcp
+asp	27374/udp
+traceroute	33434/tcp
+traceroute	33434/udp
+tfido	60177/tcp
+tfido	60177/udp
+fido	60179/tcp
+fido	60179/udp

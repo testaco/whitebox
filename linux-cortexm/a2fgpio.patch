@@ -1,0 +1,313 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2d1406a..7ed0274 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -774,6 +774,7 @@ config ARCH_A2F
+ 	bool "Actel A2F (SmartFusion) SoC"
+ 	depends on !MMU
+ 	select ARM_CORTEXM3
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	help
+ 	  This enables support for the Actel A2F (SmartFusion) SoC
+ 
+diff --git a/arch/arm/mach-a2f/Makefile b/arch/arm/mach-a2f/Makefile
+index 401a411..707a870 100644
+--- a/arch/arm/mach-a2f/Makefile
++++ b/arch/arm/mach-a2f/Makefile
+@@ -9,3 +9,5 @@ obj-$(CONFIG_CORE10100)		+= eth.o
+ obj-$(CONFIG_SPI_A2F)		+= spi.o
+ obj-$(CONFIG_I2C_A2F)		+= i2c.o
+ obj-$(CONFIG_MTD_PHYSMAP)	+= flash.o
++obj-$(CONFIG_GPIOLIB)		+= gpio.o
++
+diff --git a/arch/arm/mach-a2f/a2f_platform.c b/arch/arm/mach-a2f/a2f_platform.c
+index c1318a5..e9978c6 100644
+--- a/arch/arm/mach-a2f/a2f_platform.c
++++ b/arch/arm/mach-a2f/a2f_platform.c
+@@ -55,6 +55,7 @@
+ #include <mach/spi.h>
+ #include <mach/i2c.h>
+ #include <mach/flash.h>
++#include <mach/gpio.h>
+ 
+ /*
+  * Define a particular platform (board)
+@@ -228,4 +229,11 @@ static void __init a2f_init(void)
+  	 */
+ 	a2f_flash_init();
+ #endif
++
++#if defined(CONFIG_GPIOLIB)
++	/*
++	 * Configure GPIO
++	 */
++	m2s_gpio_init();
++#endif
+ }
+diff --git a/arch/arm/mach-a2f/gpio.c b/arch/arm/mach-a2f/gpio.c
+new file mode 100644
+index 0000000..edb8f5b
+--- /dev/null
++++ b/arch/arm/mach-a2f/gpio.c
+@@ -0,0 +1,212 @@
++/*
++ * (C) Copyright 2013
++ * Emcraft Systems, <www.emcraft.com>
++ * Vladimir Skvortsov <vskvortsov@emcraft.com>
++ *
++ * See file CREDITS for list of people who contributed to this
++ * project.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++#include <linux/init.h>
++#include <linux/spinlock.h>
++
++#include <asm/io.h>
++
++#include <mach/gpio.h>
++
++/*
++ * GPIO registers map
++ */
++#define MSS_GPIO_CFG		0x40013000
++#define MSS_GPIO_IRQ		0x40013080
++#define MSS_GPIO_IN		0x40013084
++#define MSS_GPIO_OUT		0x40013088
++
++/* 
++ * Define the CONFIG_FPGA_GPIO_BASE_ADDR macro to the address 
++ * that is assigned to the CoreGPIO IP by Libero.
++ */
++// #define CONFIG_FPGA_GPIO_BASE_ADDR	0x40050200
++#define FPGA_GPIO_CFG		CONFIG_FPGA_GPIO_BASE_ADDR
++#define FPGA_GPIO_IRQ		(FPGA_GPIO_CFG + 0x80)
++#define FPGA_GPIO_IN		(FPGA_GPIO_CFG + 0x90)
++#define FPGA_GPIO_OUT		(FPGA_GPIO_CFG + 0xa0)
++#define FPGA_GPIO_BASE 32
++
++#define M2S_GPIO_CFG(base, port) ((base) + ((port) << 2))
++
++/*
++ * GPIO configuration register bits
++ */
++#define M2S_GPIO_OUT_REG_EN		(1 << 0)
++#define M2S_GPIO_IN_REG_EN		(1 << 1)
++#define M2S_GPIO_OUT_BUF_EN		(1 << 2)
++#define M2S_GPIO_INT_EN			(1 << 3)
++
++#define M2S_GPIO_INT_TYPE_MSK	(7 << 5)
++#define M2S_GPIO_INT_TYPE_LH	(0 << 5)	/* Level High */
++#define M2S_GPIO_INT_TYPE_LL	(1 << 5)	/* Level Low */
++#define M2S_GPIO_INT_TYPE_EP	(2 << 5)	/* Edge Positive */
++#define M2S_GPIO_INT_TYPE_EN	(3 << 5)	/* Edge Negotive */
++#define M2S_GPIO_INT_TYPE_EB	(4 << 5)	/* Edge Both */
++
++struct m2s_gpio_chip {
++	struct gpio_chip chip;
++	u32 gpio_cfg;
++	u32 gpio_irq;
++	u32 gpio_in;
++	u32 gpio_out;
++	spinlock_t lock;
++};
++
++/*
++ * Get the current state of a GPIO input pin
++ */
++static int m2s_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
++{
++	struct m2s_gpio_chip *m2s_chip
++		= container_of(chip, struct m2s_gpio_chip, chip);
++	return (readl(m2s_chip->gpio_in) >> gpio) & 1;
++}
++
++/*
++ * Change the direction of a GPIO pin to input
++ */
++static int m2s_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
++{
++	struct m2s_gpio_chip *m2s_chip
++		= container_of(chip, struct m2s_gpio_chip, chip);
++	u32 gpio_cfg;
++	unsigned long f;
++
++	spin_lock_irqsave(&m2s_chip->lock, f);
++
++	gpio_cfg = readl(M2S_GPIO_CFG(m2s_chip->gpio_cfg, gpio));
++	gpio_cfg |= M2S_GPIO_IN_REG_EN;
++	gpio_cfg &= ~(M2S_GPIO_OUT_REG_EN | M2S_GPIO_OUT_BUF_EN);
++	writel(gpio_cfg, M2S_GPIO_CFG(m2s_chip->gpio_cfg, gpio));
++
++	spin_unlock_irqrestore(&m2s_chip->lock, f);
++
++	return 0;
++}
++
++/*
++ * Set the state of a GPIO output pin
++ */
++static void m2s_gpio_set_value_locked(
++	struct m2s_gpio_chip *m2s_chip, unsigned gpio, int value)
++{
++	u32 gpio_out = readl(m2s_chip->gpio_out);
++	if (value) {
++		gpio_out |=  1 << gpio;
++	} else {
++		gpio_out &=  ~(1 << gpio);
++	}
++	writel(gpio_out, m2s_chip->gpio_out);
++}
++
++static void m2s_gpio_set_value(
++	struct gpio_chip *chip, unsigned gpio, int value)
++{
++	struct m2s_gpio_chip *m2s_chip
++		= container_of(chip, struct m2s_gpio_chip, chip);
++	unsigned long f;
++
++	spin_lock_irqsave(&m2s_chip->lock, f);
++
++	m2s_gpio_set_value_locked(m2s_chip, gpio, value);
++
++	spin_unlock_irqrestore(&m2s_chip->lock, f);
++}
++
++/*
++ * Change the direction of a GPIO pin to output and
++ * set the level on this pin.
++ */
++static int m2s_gpio_direction_output(
++	struct gpio_chip *chip, unsigned gpio, int level)
++{
++	struct m2s_gpio_chip *m2s_chip
++		= container_of(chip, struct m2s_gpio_chip, chip);
++	u32 gpio_cfg;
++	unsigned long f;
++
++	spin_lock_irqsave(&m2s_chip->lock, f);
++
++	gpio_cfg = readl(M2S_GPIO_CFG(m2s_chip->gpio_cfg, gpio));
++	gpio_cfg |= M2S_GPIO_OUT_REG_EN | M2S_GPIO_OUT_BUF_EN;
++	gpio_cfg &= ~(M2S_GPIO_IN_REG_EN);
++	writel(0, M2S_GPIO_CFG(m2s_chip->gpio_cfg, gpio));
++	m2s_gpio_set_value_locked(m2s_chip, gpio, level);
++	writel(gpio_cfg, M2S_GPIO_CFG(m2s_chip->gpio_cfg, gpio));
++
++	spin_unlock_irqrestore(&m2s_chip->lock, f);
++
++	return 0;
++}
++
++static struct m2s_gpio_chip mss_gpio_chip = {
++	.chip = {
++		.label				= "mss_gpio",
++		.direction_input	= m2s_gpio_direction_input,
++		.get				= m2s_gpio_get_value,
++		.direction_output	= m2s_gpio_direction_output,
++		.set				= m2s_gpio_set_value,
++		.base				= 0,
++		.ngpio				= 32,
++		.can_sleep			= 0,
++	},
++	.gpio_cfg = MSS_GPIO_CFG,
++	.gpio_irq = MSS_GPIO_IRQ,
++	.gpio_in = MSS_GPIO_IN,
++	.gpio_out = MSS_GPIO_OUT,
++	.lock = SPIN_LOCK_UNLOCKED,
++};
++
++#if defined (CONFIG_FPGA_GPIO_BASE_ADDR)
++static struct m2s_gpio_chip fpga_gpio_chip = {
++	.chip = {
++		.label				= "fpga_gpio",
++		.direction_input	= m2s_gpio_direction_input,
++		.get				= m2s_gpio_get_value,
++		.direction_output	= m2s_gpio_direction_output,
++		.set				= m2s_gpio_set_value,
++		.base				= FPGA_GPIO_BASE,
++		.ngpio				= 32,
++		.can_sleep			= 0,
++	},
++	.gpio_cfg = FPGA_GPIO_CFG,
++	.gpio_irq = FPGA_GPIO_IRQ,
++	.gpio_in = FPGA_GPIO_IN,
++	.gpio_out = FPGA_GPIO_OUT,
++	.lock = SPIN_LOCK_UNLOCKED,
++};
++#endif
++
++void __init m2s_gpio_init(void)
++{
++	if (gpiochip_add(&mss_gpio_chip.chip) < 0) {
++		pr_err("%s: gpiochip_add failed.\n", __func__);
++	}
++
++#if defined (CONFIG_FPGA_GPIO_BASE_ADDR)
++	if (gpiochip_add(&fpga_gpio_chip.chip) < 0) {
++		pr_err("%s: gpiochip_add failed.\n", __func__);
++	}
++#endif
++}
+diff --git a/arch/arm/mach-a2f/include/mach/gpio.h b/arch/arm/mach-a2f/include/mach/gpio.h
+new file mode 100644
+index 0000000..8b5b7ce
+--- /dev/null
++++ b/arch/arm/mach-a2f/include/mach/gpio.h
+@@ -0,0 +1,43 @@
++/*
++ * (C) Copyright 2013
++ * Emcraft Systems, <www.emcraft.com>
++ * Alexander Potashev <aspotashev@emcraft.com>
++ * Vladimir Skvortsov <vskvortsov@emcraft.com>
++ *
++ * See file CREDITS for list of people who contributed to this
++ * project.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++
++#ifndef _MACH_A2F_GPIO_H_
++#define _MACH_A2F_GPIO_H_
++
++/* 32 MSS and 32 CORE GPIOs */
++#define ARCH_NR_GPIOS		(32 + 32)
++
++#if defined(CONFIG_GPIOLIB)
++#define gpio_get_value	__gpio_get_value
++#define gpio_set_value	__gpio_set_value
++#define gpio_to_irq	__gpio_to_irq
++#define gpio_cansleep	__gpio_cansleep
++
++#include <asm-generic/gpio.h>
++#endif /* CONFIG_GPIOLIB */
++
++void __init m2s_gpio_init(void);
++
++#endif /* _MACH_KINETIS_GPIO_H_ */

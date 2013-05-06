@@ -1,0 +1,4 @@
+obj-m := fluidsp.o
+fluidsp-y := fluidsp_impl.o fluidsp_info.o fluidsp_driver.o
+
+#obj-m := radioctl.o
