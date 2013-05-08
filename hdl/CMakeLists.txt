@@ -49,3 +49,7 @@ add_custom_command(
 add_custom_target(hdl
     DEPENDS signalgenerator.v exciter.v fluidsp_controller.v
 )
+
+add_subdirectory(constraint)
+
+add_dependencies(hdl constraints)
