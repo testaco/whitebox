@@ -43,8 +43,12 @@ target_link_libraries(test_cmx991 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_radio test_radio.c)
 target_link_libraries(test_radio ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(app app.c)
+target_link_libraries(app ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 install(TARGETS
 	whitebox
+    app
     test_adf4351
     test_cmx991
     test_radio
