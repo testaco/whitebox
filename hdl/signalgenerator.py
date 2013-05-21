@@ -44,7 +44,9 @@ HALF_CLOCK = CYCLES_PER_SAMPLE / 2
 print "CYCLES_PER_SAMPLE: ", CYCLES_PER_SAMPLE
 
 # ROM signal samples
-SAMPLES = tuple([int(ceil(cos(i)*127)+128) for i in frange(0, 2*pi, step=(2*pi)/NUM_SAMPLES)])
+RESOLUTION_IN_BITS = 10
+HALF = 2 ** (RESOLUTION_IN_BITS - 1)
+SAMPLES = tuple([int(ceil(cos(i)*(HALF-1))+HALF) for i in frange(0, 2*pi, step=(2*pi)/NUM_SAMPLES)])
 
 # For testing
 i_samples = []
@@ -122,7 +124,7 @@ def get_signals():
     system_clock = Signal(bool(0))
     transmit_enable = Signal(bool(1))
     select = Signal(bool(1))
-    dac_data = Signal(intbv(0, 0, 256))
+    dac_data = Signal(intbv(0, 0, 2**RESOLUTION_IN_BITS))
     dac_clock = Signal(bool(0))
     return resetn, system_clock, transmit_enable, select, dac_data, dac_clock, SAMPLES
 
@@ -140,7 +142,7 @@ def main_simulate():
     inst = test_signalgenerator(*get_signals())
     sim = Simulation(inst)
     #sim.run(SYSTEM_CLOCK_PERIOD_IN_NS * 1000)
-    sim.run(.0001*1e9)  # run for 1ms
+    sim.run(.01*1e9)  # run for 1ms
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(i_samples_times, i_samples, q_samples_times, q_samples)

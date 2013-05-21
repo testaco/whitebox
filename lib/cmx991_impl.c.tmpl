@@ -1,5 +1,19 @@
 /* vim: set filetype=cpp: */
 
+uint8_t cmx991_pack(cmx991_t* rf, uint8_t addr) {
+    uint8_t reg = 0;
+    switch(addr) {
+    #for $addr in [17, 18, 19, 20, 21, 22, 32, 33, 34, 35]
+    case $addr:
+        #for $reg in filter(lambda r: r.get_addr() == addr, $regs)
+        reg |= ((uint8_t)(rf->$reg.get_name()) & $reg.get_mask()) << $reg.get_shift();
+        #end for
+        break;
+    #end for
+    }
+    return reg;
+}
+
 void cmx991_load(cmx991_t* rf, uint8_t addr, uint32_t data) {
     switch(addr) {
     #for $addr in [17, 18, 19, 20, 21, 22, 32, 33, 34, 35]
@@ -12,8 +26,142 @@ void cmx991_load(cmx991_t* rf, uint8_t addr, uint32_t data) {
     }
 }
 
-double cmx991_actual_frequency(cmx991_t* rf, double fref) {
-    double m = cmx991_get_m(rf);
-    double n = cmx991_get_n(rf);
-    return fref * (m / n);
+\#include <stdio.h>
+double cmx991_pll_actual_frequency(cmx991_t* rf, double fref) {
+    double m = (double)cmx991_get_m(rf);
+    double n = (double)cmx991_get_n(rf);
+    return (fref * (n / m));
+}
+
+\#include <math.h>
+int cmx991_pll_enable(cmx991_t* rf, double fref, double fdes) {
+    int m, n;
+    double smallest_abs = 100.0; // Must be less than 100Hz off from fdes
+    double actual = 0.0;
+    double cur_abs = 0.0;
+    int err = -1;
+    cmx991_t tmp;
+    cmx991_copy(rf, &tmp);
+
+    // General Control Register
+    rf->vco_nr = VCO_NR_HIGH_Q;
+    if (fdes > 75e6) {
+        rf->ifh = IFH_GT_75MHZ;
+    } else {
+        rf->ifh = IFH_LT_75MHZ;
+    }
+
+    // PLL M/N Dividers
+#define MAX_M 4096
+#define MAX_N 16384
+    for (m = 100; m < MAX_M; ++m) {
+        for (n = m; n < MAX_N; ++n) {
+            cmx991_set_m(&tmp, m);
+            cmx991_set_n(&tmp, n);
+            actual = cmx991_pll_actual_frequency(&tmp, fref);
+            cur_abs = fabs(fdes - actual);
+            if (cur_abs < smallest_abs) {
+                err = 0;
+                cmx991_copy(&tmp, rf);
+                smallest_abs = cur_abs;
+            }
+            if (smallest_abs < 1.0) // Less than 1Hz, we're good to go!
+                break;
+        }
+    }
+
+    // Enable the PLL
+    if (!err) {
+        rf->pll = PLL_ENABLED;
+        rf->ld_synth = LD_SYNTH_UNLOCKED;
+        rf->charge_pump = CHARGE_PUMP_ENABLE;
+    }
+
+    return err;
+}
+
+void cmx991_pll_disable(cmx991_t* rf) {
+    rf->pll = PLL_DISABLED;
+    rf->charge_pump = CHARGE_PUMP_HIGH_IMPEDANCE;
+}
+
+int cmx991_pll_locked(cmx991_t* rf) {
+    return (rf->ld_synth == LD_SYNTH_LOCKED);
+}
+
+void cmx991_resume(cmx991_t* rf) {
+    // General Control Register
+    rf->en_bias = EN_BIAS_POWER_UP;
+    rf->vco_buf_en = VCO_BUF_EN_POWER_UP;
+    rf->vco_nr_en = VCO_NR_EN_POWER_UP;
+
+    // Rx Control Register
+    rf->vbias = VBIAS_POWER_UP;
+}
+
+void cmx991_shutdown(cmx991_t* rf) {
+    // General Control Register
+    rf->en_bias = EN_BIAS_POWER_DOWN;
+    rf->vco_buf_en = VCO_BUF_EN_POWER_DOWN;
+    rf->vco_nr_en = VCO_NR_EN_POWER_DOWN;
+
+    // Rx Control Register
+    rf->mix_pwr = MIX_PWR_POWER_DOWN;
+    rf->iq_pwr = IQ_PWR_POWER_DOWN;
+    rf->vbias = VBIAS_POWER_DOWN;
+
+    // Tx Control Register
+    rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
+}
+
+void cmx991_suspend(cmx991_t* rf) {
+    // General Control Register
+    rf->en_bias = EN_BIAS_POWER_DOWN;
+
+    // Rx Control Register
+    rf->mix_pwr = MIX_PWR_POWER_DOWN;
+    rf->iq_pwr = IQ_PWR_POWER_DOWN;
+    rf->vbias = VBIAS_POWER_DOWN;
+
+    // Tx Control Register
+    rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
+}
+
+void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
+        hi_lo_t hi_lo, tx_rf_div_t tx_rf_div, tx_if_div_t tx_if_div,
+        gain_t gain) {
+    rf->tx_mix_pwr = TX_MIX_PWR_POWER_UP;
+    rf->iq_mod_pwr = IQ_MOD_PWR_POWER_UP;
+
+    if (fdes > 600e6) {
+        rf->freq = FREQ_GT_600MHZ;
+    } else {
+        rf->freq = FREQ_LT_600MHZ;
+    }
+
+    rf->iq_out = IQ_OUT_RFOUT;
+
+    rf->if_filter = if_filter;
+    rf->hi_lo = hi_lo;
+    rf->tx_rf_div = tx_rf_div;
+    rf->tx_if_div = tx_if_div;
+    rf->gain = gain;
+}
+
+void cmx991_rx_tune(cmx991_t* rf, div_t div, mix_out_t mix_out,
+        iq_filter_t iq_filter, vga_t vga) {
+    rf->rx_mode = RX_MODE_IQ;    
+
+    rf->mix_pwr = MIX_PWR_POWER_UP;
+    rf->iq_pwr = IQ_PWR_POWER_UP;
+    rf->vbias = VBIAS_POWER_UP;
+
+    rf->div = div;
+    rf->mix_out = mix_out;
+    rf->iq_filter = iq_filter;
+    rf->vga = vga;
+}
+
+void cmx991_rx_calibrate(cmx991_t* rf) {
+    rf->cal_en = CAL_EN_ENABLE;
 }

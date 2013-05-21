@@ -19,7 +19,7 @@ add_custom_target(whitebox_doxygen_docs
 find_package(Sphinx REQUIRED)
 
 if(NOT DEFINED SPHINX_THEME)
-    set(SPHINX_THEME haiku)
+    set(SPHINX_THEME default)
 endif()
 
 if(NOT DEFINED SPHINX_THEME_DIR)

@@ -10,7 +10,7 @@ configure_file(Kbuild Kbuild
     COPYONLY
 )
 
-set(DRIVER_SOURCES fluidsp.h fluidsp_impl.c fluidsp_info.c fluidsp_driver.c)
+set(DRIVER_SOURCES fluidsp.h fluidsp_impl.c fluidsp_info.c fluidsp_driver.c radioctl.c)
 
 foreach (DRIVER_SOURCE ${DRIVER_SOURCES})
     configure_file(${DRIVER_SOURCE} ${DRIVER_SOURCE}

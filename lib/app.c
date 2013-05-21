@@ -13,28 +13,29 @@
 #include <sys/stat.h>
 
 #include "adf4351.h"
+#include "cmx991.h"
 
 /*
  * These whitebox pin to Linux kernel GPIO mappings are derived from the
- * Whitebox Libero SmartDesign.
- */
-#define ADC_S2       0
-#define ADC_S1       1
-#define ADC_DFS      2
-#define DAC_EN       3
-#define DAC_PD       4
-#define DAC_CS       5
-#define RADIO_RESETN 6
-#define RADIO_CDATA  7
-#define RADIO_SCLK   8
-#define RADIO_RDATA  9
-#define RADIO_CSN    10
-#define VCO_CLK      11
-#define VCO_DATA     12
-#define VCO_LE       13
-#define VCO_CE       14
-#define VCO_PDB      15
-#define VCO_LD       16
+ * Whitebox Libero SmartDesign.  */
+#define FPGA_GPIO_BASE 32
+#define ADC_S2       (FPGA_GPIO_BASE+3)
+#define ADC_S1       (FPGA_GPIO_BASE+4)
+#define ADC_DFS      (FPGA_GPIO_BASE+5)
+#define DAC_EN       (FPGA_GPIO_BASE+6)
+#define DAC_PD       (FPGA_GPIO_BASE+7)
+#define DAC_CS       (FPGA_GPIO_BASE+8)
+#define RADIO_RESETN (FPGA_GPIO_BASE+9)
+#define RADIO_CDATA  (FPGA_GPIO_BASE+10)
+#define RADIO_SCLK   (FPGA_GPIO_BASE+11)
+#define RADIO_RDATA  (FPGA_GPIO_BASE+12)
+#define RADIO_CSN    (FPGA_GPIO_BASE+13)
+#define VCO_CLK      (FPGA_GPIO_BASE+14)
+#define VCO_DATA     (FPGA_GPIO_BASE+15)
+#define VCO_LE       (FPGA_GPIO_BASE+16)
+#define VCO_CE       (FPGA_GPIO_BASE+17)
+#define VCO_PDB      (FPGA_GPIO_BASE+18)
+#define VCO_LD       (FPGA_GPIO_BASE+19)
 
 #define GPIO_OUTPUT_MODE (0 << 0)
 #define GPIO_INPUT_MODE  (1 << 0)
@@ -127,21 +128,28 @@ uint8_t radio_rd1(uint8_t address) {
 }
 
 void radio_init() {
+    puts("radio_init");
     GPIO_config(RADIO_CSN, GPIO_OUTPUT_MODE);
     GPIO_config(RADIO_SCLK, GPIO_OUTPUT_MODE);
     GPIO_config(RADIO_CDATA, GPIO_OUTPUT_MODE);
     GPIO_config(RADIO_RDATA, GPIO_INPUT_MODE);
+    GPIO_config(RADIO_RESETN, GPIO_OUTPUT_MODE);
+    radio_wr1(0x10, 0x00);
 }
 
 void radio_power_down() {
-    GPIO_set_output(VCO_CE, 0);
+    puts("radio_power_down");
+    GPIO_set_output(RADIO_RESETN, 0);
 }
 
 void radio_power_up() {
+    puts("radio_power_up");
+    GPIO_set_output(RADIO_RESETN, 1);
     radio_wr1(0x10, 0x00);
 }
 
 void vco_init() {
+    puts("vco_init");
     GPIO_config(VCO_LE, GPIO_OUTPUT_MODE);
     GPIO_config(VCO_CE, GPIO_OUTPUT_MODE);
     GPIO_config(VCO_PDB, GPIO_OUTPUT_MODE);
@@ -150,11 +158,13 @@ void vco_init() {
 }
 
 void vco_power_down() {
+    puts("vco_power_down");
     GPIO_set_output(VCO_CE, 0);
     GPIO_set_output(VCO_PDB, 0);
 }
 
 void vco_power_up() {
+    puts("vco_power_up");
     GPIO_set_output(VCO_CE, 1);
     GPIO_set_output(VCO_PDB, 1);
 }
@@ -162,6 +172,7 @@ void vco_power_up() {
 
 void vco_dial(uint32_t data) {
     int i;
+    puts("vco_dial");
     // Setup
     GPIO_set_output(VCO_LE, 1);
     GPIO_set_output(VCO_CLK, 0);
@@ -185,28 +196,52 @@ void vco_dial(uint32_t data) {
 }
 
 void dac_init() {
+    puts("dac_init");
     GPIO_config(DAC_CS, GPIO_OUTPUT_MODE);
     GPIO_config(DAC_PD, GPIO_OUTPUT_MODE);
     GPIO_config(DAC_EN, GPIO_OUTPUT_MODE);
 }
 
 void dac_power_down() {
+    puts("dac_power_down");
     GPIO_set_output(DAC_PD, 1);
     GPIO_set_output(DAC_CS, 1);
 }
 
 void dac_power_up() {
+    puts("dac_power_up");
     GPIO_set_output(DAC_EN, 0);
     GPIO_set_output(DAC_PD, 0);
     GPIO_set_output(DAC_CS, 1);
 }
 
 void dac_tx() {
+    puts("dac_tx");
     GPIO_set_output(DAC_EN, 1);
     GPIO_set_output(DAC_CS, 0);
     sleep(10);
     GPIO_set_output(DAC_CS, 1);
     GPIO_set_output(DAC_EN, 0);
+}
+
+void adc_init() {
+    puts("adc_init");
+    GPIO_config(ADC_S1, GPIO_OUTPUT_MODE);
+    GPIO_config(ADC_S2, GPIO_OUTPUT_MODE);
+    GPIO_config(ADC_DFS, GPIO_OUTPUT_MODE);
+}
+
+void adc_power_down() {
+    puts("adc_power_down");
+    GPIO_set_output(ADC_S1, 0);
+    GPIO_set_output(ADC_S2, 0);
+}
+
+void adc_power_up() {
+    puts("adc_power_up");
+    GPIO_set_output(ADC_S1, 1);
+    GPIO_set_output(ADC_S2, 0);
+    GPIO_set_output(ADC_DFS, 1); // TWO's COMPLEMENT
 }
 
 int main(int argc, char **argv) {
@@ -215,21 +250,28 @@ int main(int argc, char **argv) {
 	int ret = -1;
 	int c, x;
 
+    cmx991_t cmx991;
+    cmx991_init(&cmx991);
+
     if (argc == 1) {
         fprintf(stderr, "You must submit a command!\n");
         ret = 1;
         goto Done;
     }
 
-    vco_init();
-    radio_init();
-    dac_init();
+    if(strcmp(argv[1], "init") == 0) {
+        vco_init();
+        radio_init();
+        dac_init();
+        adc_init();
+    }
 
     if(strcmp(argv[1], "power_down") == 0) {
         fprintf(stdout, "Powering down everything...\n");
         vco_power_down();
         radio_power_down();
         dac_power_down();
+        adc_power_down();
     }
 
     if(strcmp(argv[1], "power_up") == 0) {
@@ -237,6 +279,7 @@ int main(int argc, char **argv) {
         vco_power_up();
         radio_power_up();
         dac_power_up();
+        //adc_power_up();
     }
 
     if(strcmp(argv[1], "dial") == 0) {
@@ -258,28 +301,36 @@ int main(int argc, char **argv) {
 
     if(strcmp(argv[1], "tx_tune") == 0) {
         fprintf(stdout, "Reading to transmit...\n");
-        radio_wr1(0x11, 0x8f);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xe1));
-        radio_wr1(0x14, 0x50);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xe4));
-        radio_wr1(0x15, 0x14);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xe5));
-        radio_wr1(0x16, 0x00);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xe6));
-        radio_wr1(0x20, 0xc0);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xd0));
-        radio_wr1(0x21, 0xa0);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xd1));
-        radio_wr1(0x22, 0x08);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xd2));
-        radio_wr1(0x23, 0x07);
-        fprintf(stdout, "read %02x\n", radio_rd1(0xd3));
+        cmx991_resume(&cmx991);
+        if (cmx991_pll_enable(&cmx991, 19.2e6, 45.00e6) < 0) {
+            fprintf(stderr, "Error setting the pll\n");
+        }
+        cmx991_tx_tune(&cmx991, 198.00e6, IF_FILTER_BW_120MHZ, HI_LO_HIGHER,
+            TX_RF_DIV_BY_2, TX_IF_DIV_BY_2, GAIN_P0DB);
+        cmx991_print_to_file(&cmx991, stdout);
+
+        radio_wr1(0x11, cmx991_pack(&cmx991, 0x11));
+        fprintf(stdout, "read 0x11 %02x\n", radio_rd1(0xe1));
+        radio_wr1(0x14, cmx991_pack(&cmx991, 0x14));
+        fprintf(stdout, "read 0x14 %02x\n", radio_rd1(0xe4));
+        radio_wr1(0x15, cmx991_pack(&cmx991, 0x15));
+        fprintf(stdout, "read 0x15 %02x\n", radio_rd1(0xe5));
+        radio_wr1(0x16, cmx991_pack(&cmx991, 0x16));
+        fprintf(stdout, "read 0x16 %02x\n", radio_rd1(0xe6));
+        radio_wr1(0x20, cmx991_pack(&cmx991, 0x20));
+        fprintf(stdout, "read 0x20 %02x\n", radio_rd1(0xd0));
+        radio_wr1(0x21, cmx991_pack(&cmx991, 0x21));
+        fprintf(stdout, "read 0x21 %02x\n", radio_rd1(0xd1));
+        radio_wr1(0x22, cmx991_pack(&cmx991, 0x22));
+        fprintf(stdout, "read 0x22 %02x\n", radio_rd1(0xd2));
+        radio_wr1(0x23, cmx991_pack(&cmx991, 0x23));
+        fprintf(stdout, "read 0x23 %02x\n", radio_rd1(0xd3));
     }
 
     if(strcmp(argv[1], "tx") == 0) {
-        int locked_register = radio_rd1(0xd1);
-        if (!(locked_register & 0x40)) {
-            fprintf(stdout, "IF not locked!, %02x\n", locked_register);
+        cmx991_load(&cmx991, 0x21, radio_rd1(0xd1));
+        if (!cmx991_pll_locked(&cmx991)) {
+            fprintf(stdout, "IF not locked!\n");
         } else {
             fprintf(stdout, "Turning on dac...\n");
             dac_tx();

@@ -61,7 +61,7 @@ m_lsb                   32[0:7]     0
 ########################################################################
 ## PLL M Divider 1
 ########################################################################
-pll                     33[7]       0       disabled, endabled
+pll                     33[7]       0       disabled, enabled
 ld_synth                33[6]       0       unlocked, locked
 charge_pump             33[5]       0       high_impedance, enable
 m_msb                   33[0:4]     0
