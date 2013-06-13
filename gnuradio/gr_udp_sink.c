@@ -1,5 +1,3 @@
-#include "CMSIS/a2fxxxm3.h"
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -14,30 +12,52 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#define BUFLEN 736
 #define PORT 7653
-
-#include "TOPLEVEL_hw_platform.h"
-#include "drivers/CoreGPIO/core_gpio.h"
-#include "drivers/mss_pdma/mss_pdma.h"
 
 void err(char* str) {
     perror(str);
     exit(1);
 }
 
-int main(void) {
-    struct sockaddr_in my_addr, cli_addr;
-    int sockfd, i;
-    socklen_t slen=sizeof(cli_addr);
-    int16_t buf[BUFLEN];
+int main(int argc, char** argv) {
+    // Configuration
+    int c;
+    int32_t num_samples = 512;
+    int format_json = 0;
 
-    PDMA_init();
+    // UDP Socket
+    struct sockaddr_in my_addr, cli_addr;
+    int sockfd;
+    socklen_t slen=sizeof(cli_addr);
+
+    // Runtime
+    size_t len, offset, count;
+    char* framebuffer;
+    int cur_sample;
+
+    while ((c = getopt(argc, argv, "n:f:")) != -1) {
+        switch(c) {
+            case 'n':
+                num_samples = atoi(optarg);
+                break;
+            case 'f':
+                if (strcmp(optarg, "json") == 0) {
+                    format_json = 1;
+                }
+                break;
+        }
+    }
+
+    fprintf(stderr, "sizeof(short)=%d\n", sizeof(uint16_t));
+    fprintf(stderr, "numsamples=%d\n", num_samples);
+
+    len = num_samples * sizeof(int32_t);
+    framebuffer = malloc(len);
 
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         err("socket");
     } else {
-        printf("Server: socket() successful\n");
+        fprintf(stderr, "Server: socket() successful\n");
     }
 
     bzero(&my_addr, sizeof(my_addr));
@@ -48,31 +68,38 @@ int main(void) {
     if (bind(sockfd, (struct sockaddr*) &my_addr, sizeof(my_addr)) == -1) {
         err("bind");
     } else {
-        printf("Server: bind() successful\n");
+        fprintf(stderr, "Server: bind() successful\n");
     }
 
-    // Setup DMA
-    PDMA_configure(PDMA_CHANNEL_0,
-        PDMA_MEM_TO_MEM,
-        PDMA_LOW_PRIORITY | PDMA_HALFWORD_TRANSFER | PDMA_INC_SRC_TWO_BYTES,
-        PDMA_DEFAULT_WRITE_ADJ);
-
-    while(1) {
-        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr*) &cli_addr, &slen) == -1) {
+    offset = 0;
+    while(offset < len) {
+        if ((count = recvfrom(sockfd, framebuffer + offset, len - offset, 0, (struct sockaddr*) &cli_addr, &slen)) == -1) {
             err("recvfrom");
+        } else if (count == 0) {
+            err("connection closed");
         } else {
-            //int i;
-            //for (i = 0; i < BUFLEN/sizeof(int16_t); i+=2)
-            //    printf("%d %d\n", *(buf+i), *(buf+i+1));
-            //printf("\n\n");
-            PDMA_start(PDMA_CHANNEL_0, (uint32_t)buf, RADIO_0, BUFLEN);
-            uint32_t status;
-            do {
-                status = PDMA_status(PDMA_CHANNEL_0);
-            } while(status == 0);
+            offset += count;
         }
     }
-
     close(sockfd);
+    fprintf(stderr, "Server: Sample capture successful\n");
+
+    if (format_json)
+        printf("[");
+    for (offset = 0, cur_sample = 0; cur_sample < num_samples; offset += 2, cur_sample++) {
+        int16_t i = ((int16_t*)framebuffer)[offset];
+        int16_t q = ((int16_t*)framebuffer)[offset+1];
+        if (format_json) {
+            printf("[%d,%d]%c%c", i, q,
+                                  (cur_sample < num_samples - 1) ? ',' : ' ',
+                                  (cur_sample < num_samples - 1) ? '\n' : ' ');
+        } else {
+            printf("%d,%d%c", i, q,
+                              (cur_sample < num_samples - 1) ? '\n' : ' ');
+        }
+    }
+    if (format_json)
+        printf("]");
+
     return 0;
 }

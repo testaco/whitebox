@@ -52,4 +52,4 @@ add_custom_target(hdl
 
 add_subdirectory(constraint)
 
-add_dependencies(hdl constraints)
+add_dependencies(hdl constraint)

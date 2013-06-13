@@ -1,5 +1,10 @@
 /* vim: set filetype=cpp: */
 
+#define MIN_M 2 
+#define MAX_M 8191
+#define MIN_N 80
+#define MAX_N 32767
+
 uint8_t cmx991_pack(cmx991_t* rf, uint8_t addr) {
     uint8_t reg = 0;
     switch(addr) {
@@ -26,7 +31,6 @@ void cmx991_load(cmx991_t* rf, uint8_t addr, uint32_t data) {
     }
 }
 
-\#include <stdio.h>
 double cmx991_pll_actual_frequency(cmx991_t* rf, double fref) {
     double m = (double)cmx991_get_m(rf);
     double n = (double)cmx991_get_n(rf);
@@ -39,23 +43,22 @@ int cmx991_pll_enable(cmx991_t* rf, double fref, double fdes) {
     double smallest_abs = 100.0; // Must be less than 100Hz off from fdes
     double actual = 0.0;
     double cur_abs = 0.0;
+    int dividing_count = 0;
     int err = -1;
     cmx991_t tmp;
     cmx991_copy(rf, &tmp);
 
     // General Control Register
-    rf->vco_nr = VCO_NR_HIGH_Q;
+    tmp.vco_nr = VCO_NR_MID_HIGH_Q;
     if (fdes > 75e6) {
-        rf->ifh = IFH_GT_75MHZ;
+        tmp.ifh = IFH_GT_75MHZ;
     } else {
-        rf->ifh = IFH_LT_75MHZ;
+        tmp.ifh = IFH_LT_75MHZ;
     }
 
     // PLL M/N Dividers
-#define MAX_M 4096
-#define MAX_N 16384
-    for (m = 100; m < MAX_M; ++m) {
-        for (n = m; n < MAX_N; ++n) {
+    for (m = MIN_M; m < MAX_M; ++m) {
+        for (n = MIN_N; n < MAX_N; ++n) {
             cmx991_set_m(&tmp, m);
             cmx991_set_n(&tmp, n);
             actual = cmx991_pll_actual_frequency(&tmp, fref);
@@ -65,16 +68,53 @@ int cmx991_pll_enable(cmx991_t* rf, double fref, double fdes) {
                 cmx991_copy(&tmp, rf);
                 smallest_abs = cur_abs;
             }
-            if (smallest_abs < 1.0) // Less than 1Hz, we're good to go!
+            if (smallest_abs < 1.0) { // Less than 1Hz, we're good to go!
                 break;
+            }
         }
     }
 
     // Enable the PLL
     if (!err) {
+        cmx991_copy(&tmp, rf);
         rf->pll = PLL_ENABLED;
         rf->ld_synth = LD_SYNTH_UNLOCKED;
         rf->charge_pump = CHARGE_PUMP_ENABLE;
+    }
+
+    return err;
+}
+
+int cmx991_pll_enable_m_n(cmx991_t* rf, double fref, int m, int n) {
+    double fdes;
+    int err = 0;
+    cmx991_t tmp;
+    cmx991_copy(rf, &tmp);
+
+    // General Control Register
+    cmx991_set_m(&tmp, m);
+    cmx991_set_n(&tmp, n);
+    fdes = cmx991_pll_actual_frequency(&tmp, fref);
+
+    if (fdes < 40.0e6  || fdes > 400.0e6) {
+        err = 1;
+    } else {
+        err = 0;
+        tmp.vco_nr = VCO_NR_MID_HIGH_Q;
+
+        if (fdes > 75e6) {
+            tmp.ifh = IFH_GT_75MHZ;
+        } else {
+            tmp.ifh = IFH_LT_75MHZ;
+        }
+    }
+
+    tmp.pll = PLL_ENABLED;
+    tmp.ld_synth = LD_SYNTH_UNLOCKED;
+    tmp.charge_pump = CHARGE_PUMP_ENABLE;
+
+    if (!err) {
+        cmx991_copy(&tmp, rf);
     }
 
     return err;

@@ -35,9 +35,11 @@ add_subdirectory(linux-cortexm)
 
 add_subdirectory(hdl)
 
+add_subdirectory(driver)
+
 add_subdirectory(lib)
 
-add_subdirectory(driver)
+add_subdirectory(gnuradio)
 
 # MUST be after everything else has been generated
 add_subdirectory(docs)

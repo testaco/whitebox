@@ -155,6 +155,7 @@ void vco_init() {
     GPIO_config(VCO_PDB, GPIO_OUTPUT_MODE);
     GPIO_config(VCO_CLK, GPIO_OUTPUT_MODE);
     GPIO_config(VCO_DATA, GPIO_OUTPUT_MODE);
+    GPIO_config(VCO_LD, GPIO_INPUT_MODE);
 }
 
 void vco_power_down() {
@@ -167,6 +168,10 @@ void vco_power_up() {
     puts("vco_power_up");
     GPIO_set_output(VCO_CE, 1);
     GPIO_set_output(VCO_PDB, 1);
+}
+
+int rfpll_locked() {
+    return GPIO_get_input(VCO_LD);
 }
 
 
@@ -277,8 +282,8 @@ int main(int argc, char **argv) {
     if(strcmp(argv[1], "power_up") == 0) {
         fprintf(stdout, "Powering up everything...\n");
         vco_power_up();
-        radio_power_up();
         dac_power_up();
+        radio_power_up();
         //adc_power_up();
     }
 
@@ -288,6 +293,11 @@ int main(int argc, char **argv) {
         adf4351_t adf4351;
         adf4351_init(&adf4351);
         adf4351.charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
+        adf4351.muxout = MUXOUT_DLD;
+        adf4351.rf_output_enable = RF_OUTPUT_ENABLE_ENABLED;
+        adf4351.aux_output_power = AUX_OUTPUT_POWER_5DBM;
+        adf4351.aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
+        adf4351.aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
         adf4351_tune(&adf4351, 198.000e6);
         adf4351_print_to_file(&adf4351, stdout);
         vco_dial(adf4351_pack(&adf4351, 5));
@@ -300,17 +310,24 @@ int main(int argc, char **argv) {
     }
 
     if(strcmp(argv[1], "tx_tune") == 0) {
-        fprintf(stdout, "Reading to transmit...\n");
+        fprintf(stdout, "Resuming...\n");
         cmx991_resume(&cmx991);
-        if (cmx991_pll_enable(&cmx991, 19.2e6, 45.00e6) < 0) {
+        fprintf(stdout, "PLL on...\n");
+        if (cmx991_pll_enable(&cmx991, 19.2e6, 180.00e6) < 0) {
             fprintf(stderr, "Error setting the pll\n");
         }
+        fprintf(stdout, "TX Tune...\n");
         cmx991_tx_tune(&cmx991, 198.00e6, IF_FILTER_BW_120MHZ, HI_LO_HIGHER,
-            TX_RF_DIV_BY_2, TX_IF_DIV_BY_2, GAIN_P0DB);
+            TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P6DB);
+        cmx991.iq_out = IQ_OUT_IFOUT;
         cmx991_print_to_file(&cmx991, stdout);
 
         radio_wr1(0x11, cmx991_pack(&cmx991, 0x11));
         fprintf(stdout, "read 0x11 %02x\n", radio_rd1(0xe1));
+        radio_wr1(0x12, cmx991_pack(&cmx991, 0x12));
+        fprintf(stdout, "read 0x12 %02x\n", radio_rd1(0xe2));
+        radio_wr1(0x13, cmx991_pack(&cmx991, 0x13));
+        fprintf(stdout, "read 0x13 %02x\n", radio_rd1(0xe3));
         radio_wr1(0x14, cmx991_pack(&cmx991, 0x14));
         fprintf(stdout, "read 0x14 %02x\n", radio_rd1(0xe4));
         radio_wr1(0x15, cmx991_pack(&cmx991, 0x15));
@@ -325,6 +342,9 @@ int main(int argc, char **argv) {
         fprintf(stdout, "read 0x22 %02x\n", radio_rd1(0xd2));
         radio_wr1(0x23, cmx991_pack(&cmx991, 0x23));
         fprintf(stdout, "read 0x23 %02x\n", radio_rd1(0xd3));
+
+        fprintf(stdout, "Acutal PLL Frequency %0.2f\n",
+            cmx991_pll_actual_frequency(&cmx991, 19.2e6));
     }
 
     if(strcmp(argv[1], "tx") == 0) {
@@ -332,7 +352,7 @@ int main(int argc, char **argv) {
         if (!cmx991_pll_locked(&cmx991)) {
             fprintf(stdout, "IF not locked!\n");
         } else {
-            fprintf(stdout, "Turning on dac...\n");
+            fprintf(stdout, "IF locked, transmitting\n");
             dac_tx();
         }
     }

@@ -5,6 +5,7 @@ void cmx991_load(cmx991_t* rf, uint8_t addr, uint32_t data);
 
 double cmx991_pll_actual_frequency(cmx991_t* rf, double fref);
 int cmx991_pll_enable(cmx991_t* rf, double fref, double fdes);
+int cmx991_pll_enable_m_n(cmx991_t* rf, double fref, int m, int n);
 void cmx991_pll_disable(cmx991_t* rf);
 int cmx991_pll_locked(cmx991_t* rf);
 
