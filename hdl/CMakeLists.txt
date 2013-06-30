@@ -37,17 +37,11 @@ add_custom_command(
 add_custom_command(
     OUTPUT exciter.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/exciter.py
-    DEPENDS exciter.py
-) 
-
-add_custom_command(
-    OUTPUT fluidsp_controller.v
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fluidsp_controller.py
-    DEPENDS fluidsp_controller.py simulate_utils.py apb3_utils.py
+    DEPENDS exciter.py apb3_utils.py fifo.py
 ) 
 
 add_custom_target(hdl
-    DEPENDS signalgenerator.v exciter.v fluidsp_controller.v
+    DEPENDS signalgenerator.v exciter.v
 )
 
 add_subdirectory(constraint)

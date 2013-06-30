@@ -313,7 +313,7 @@ int main(int argc, char **argv) {
         fprintf(stdout, "Resuming...\n");
         cmx991_resume(&cmx991);
         fprintf(stdout, "PLL on...\n");
-        if (cmx991_pll_enable(&cmx991, 19.2e6, 180.00e6) < 0) {
+        if (cmx991_pll_enable_m_n(&cmx991, 19.2e6, 192, 1800) < 0) {
             fprintf(stderr, "Error setting the pll\n");
         }
         fprintf(stdout, "TX Tune...\n");

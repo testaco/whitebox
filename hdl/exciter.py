@@ -1,4 +1,5 @@
 """
+
 The exciter works like so:
     1. Sensors, like the 1-bit key, or the 10-bit adc from microphone
        even Memory!  Perhaps always memory?  It always comes at a bitrate.
@@ -20,167 +21,171 @@ The exciter works like so:
 
 """
 
-from myhdl import Signal, delay, always, always_comb, now, Simulation, intbv, instance, enum, traceSignals
+from myhdl import Signal, delay, always, always_comb, always_seq, now, \
+                  Simulation, intbv, instance, enum, traceSignals, \
+                  toVerilog, StopSimulation
 
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
+from fifo import fifo as FIFO
+from apb3_utils import Apb3Bus
 
-SYSTEM_CLOCK_FREQ = 10e6
-SYSTEM_CLOCK_PERIOD_IN_NS = int(1.0 / SYSTEM_CLOCK_FREQ * 1e9)
-print "SYSTEM_CLOCK_PERIOD_IN_NS: ", SYSTEM_CLOCK_PERIOD_IN_NS
+APB3_DURATION = int(1e9 / 10e6)
+SYSCLK_DURATION = int(1e9 / 20e6)
 
-def drive_system_clock(system_clock):
-    period = SYSTEM_CLOCK_PERIOD_IN_NS
-    low_time = int(period / 2)
-    high_time = period - low_time
+class OverrunError(Exception):
+    pass
 
-    @instance
-    def drive_system_clock():
-        while True:
-            yield delay(low_time)
-            system_clock.next = 1
-            yield delay(high_time)
-            system_clock.next = 0
+def exciter(
+        resetn,
+        system_clock,
+        pclk,
+        paddr,
+        psel,
+        penable,
+        pwrite,
+        pwdata,
+        pready,
+        prdata,
+        pslverr,
+        dac_clock,
+        dac_data):
 
-    return drive_system_clock
+    ####### FIFO ############
+    # Read
+    re = Signal(bool(False))
+    rclk = system_clock
+    Q = Signal(intbv(0)[32:])
 
-apb3_bus_states = enum('IDLE', 'SETUP', 'ACCESS')
+    # Write
+    we = Signal(bool(False))
+    wclk = pclk
+    data = Signal(intbv(0)[32:])
 
-def apb3_master_mock(ops, pclk, presetn, paddr, psel, penable, pwrite, pwdata, pready, prdata, pslverr):
-    apb3_fsm = Signal(apb3_bus_states.IDLE)
-    written = Signal(bool(0))
-    op_id = Signal(intbv(0, 0, len(ops)+1))
+    # Threshold
+    full = Signal(bool(False))
+    full.driven = 'wire'
+    afull = Signal(bool(False))
+    afull.driven = 'wire'
+    empty = Signal(bool(False))
+    empty.driven = 'wire'
+    aempty = Signal(bool(False))
+    aempty.driven = 'wire'
 
-    @always(pclk.posedge, presetn.negedge)
-    def state_machine():
-        if not presetn:
-            apb3_fsm.next = apb3_bus_states.IDLE
-            print 'RESET'
-            op_id.next = 0
-            psel.next = 0
-            penable.next = 0
-        elif apb3_fsm == apb3_bus_states.IDLE:
-            if op_id < len(ops):
-                apb3_fsm.next = apb3_bus_states.SETUP
-                psel.next = 1
-                pwrite.next = 1#not written
-                paddr.next = ops[op_id][0]
-                pwdata.next = ops[op_id][1]
-        elif apb3_fsm == apb3_bus_states.SETUP:
-            print 'SETUP'
-            apb3_fsm.next = apb3_bus_states.ACCESS
-            penable.next = 1
-        elif apb3_fsm == apb3_bus_states.ACCESS:
-            if pready:
-                print 'ACCESS'
-                psel.next = 0
-                penable.next = 0
-                print "write", pwdata, "read", prdata
-                apb3_fsm.next = apb3_bus_states.IDLE
-                #written.next ue
-                #pwrite.next = 0
-                op_id.next = op_id + 1
+    fifo_args = resetn, re, rclk, Q, we, wclk, data, full, afull, \
+        empty, aempty
+    fifo = FIFO(*fifo_args,
+        width=32,
+        depth=1024)
 
-    return state_machine
 
-def exciter(pclk, presetn, paddr, psel, penable, pwrite, pwdata, pready, prdata, pslverr, dac_clock, dac_data):
-    I = Signal(intbv(0, 0, 2**10))
-    Q = Signal(intbv(0, 0, 2**10))
-    I_const = Signal(intbv(0, 0, 2**10))
-    Q_const = Signal(intbv(0, 0, 2**10))
+    ######### RESAMPLER ###########
+
+    ######### INTERLEAVER #########
     in_phase = Signal(bool(0))
-    #register_file = [I_const, Q_const]
+    sample_i = Signal(intbv(0, 0, 2**10))
+    sample_q = Signal(intbv(0, 0, 2**10))
 
-    @always(pclk.posedge, presetn.negedge)
+    ########## STATE MACHINE ######
+    state_t = enum('IDLE', 'WRITE_SAMPLE', 'DONE',)
+    state = Signal(state_t.IDLE)
+
+    ############ TX EN ###########
+    txen = Signal(bool(0))
+
+    @always_seq(pclk.posedge, reset=resetn)
     def state_machine():
-        if not presetn:
-            print 'resetting'
-            pready.next = 1
-            pslverr.next = 0
-            prdata.next = 0;
+        if state == state_t.IDLE:
+            if penable and psel and pwrite:
+                if paddr[8:] == 0x00:
+                    state.next = state_t.WRITE_SAMPLE
+                    pready.next = 0
+                    we.next = 1
+                    data.next = pwdata
+                    if full:
+                        raise OverrunError
+                elif paddr[8:] == 0x01:
+                    print 'hi', pwdata
+                    txen.next = pwdata[0]
+            elif psel and not pwrite:
+                pass
 
-            I_const.next = 0
-            Q_const.next = 0
-        elif penable and psel and pwrite:
-            print 'paddr', paddr[8:0]
-            if paddr[8:0] == 0:
-                I_const.next = pwdata[16:6]
-                Q_const.next = pwdata[32:22]
-                pready.next = 1
-            elif paddr[8:0] == 1:
-                Q_const.next = pwdata[10:0]
-                pready.next = 1
-            else:
-                pready.next = 1
-                #pslverr.next = 1
-        elif psel and not pwrite:
-            #prdata.next = register_file[paddr]
-            prdata.next = 0xbeef
+        elif state == state_t.WRITE_SAMPLE:
+            we.next = 0
+            state.next = state_t.DONE
+            
+        elif state == state_t.DONE:
             pready.next = 1
-        else:
-            pready.next = 1
+            state.next = state_t.IDLE
 
-    @always(pclk.posedge)
-    def mode_machine():
-        if presetn and not in_phase:  # Update the sample out of phase, locking
-            I.next = I_const
-            Q.next = Q_const
+    @always(system_clock.posedge)
+    def resampler():
+        if txen:  # Update the sample out of phase, locking
+            if re:
+                sample_i.next = Q[9:]
+                sample_q.next = Q[32:23]
+            re.next = not re
 
-    @always(pclk.posedge)
-    def dac_buffer():
-        if presetn:
-            dac_data.next = I[10:2] if in_phase else Q[10:2]
+    @always(system_clock.posedge)
+    def interleaver():
+        if txen:
+            dac_data.next = sample_i[10:2] if in_phase else sample_q[10:2]
             dac_clock.next = not in_phase
             in_phase.next = not in_phase
 
-    return state_machine, mode_machine, dac_buffer
+    return fifo, state_machine, resampler, interleaver
 
-
-
-def main_simulate():
-    resetn = Signal(bool(1))
-    system_clock = Signal(bool(0))
-    paddr = Signal(intbv(0, 0, 2**32))
-    psel = Signal(bool(0))
-    penable = Signal(bool(0))
-    pwrite = Signal(bool(1))
-    pwdata = Signal(intbv(0, 0, 2**32))
-    pready = Signal(bool(0))
-    prdata = Signal(intbv(0, 0, 2**32))
-    pslverr = Signal(bool(0))
-    dac_clock = Signal(bool(0))
-    dac_data = Signal(intbv(0, 0, 2**8))
-
-    def testbench():
-        apb3_bus_signals = [system_clock, resetn, paddr, psel, penable, pwrite, pwdata, pready, prdata, pslverr]
-        clock = drive_system_clock(system_clock)
-        master = apb3_master_mock([(0x40050400, 0xffffffff), (0x40050400, 0xffff7fff)],  # Set I=MAX, Q=0, should be CW
-            *apb3_bus_signals)
-        slave = exciter(*(apb3_bus_signals + [dac_clock, dac_data]))
-        return clock, slave, master
-
-    traced_testbench = traceSignals(testbench)
-    sim = Simulation(traced_testbench)
-    sim.run(SYSTEM_CLOCK_PERIOD_IN_NS * 100)
-
-def main_generate():
-    from myhdl import toVerilog
-    resetn = Signal(bool(1))
-    system_clock = Signal(bool(0))
-    paddr = Signal(intbv(0, 0, 2**32))
-    psel = Signal(bool(0))
-    penable = Signal(bool(0))
-    pwrite = Signal(bool(1))
-    pwdata = Signal(intbv(0, 0, 2**32))
-    pready = Signal(bool(0))
-    prdata = Signal(intbv(0, 0, 2**32))
-    pslverr = Signal(bool(0))
-    dac_clock = Signal(bool(0))
-    dac_data = Signal(intbv(0, 0, 2**8))
-    apb3_bus_signals = [system_clock, resetn, paddr, psel, penable, pwrite, pwdata, pready, prdata, pslverr]
-    toVerilog(exciter, *(apb3_bus_signals + [dac_clock, dac_data]))
 
 if __name__ == '__main__':
-    main_simulate()
-    main_generate()
+    bus = Apb3Bus(duration=APB3_DURATION)
+    
+    sclk = Signal(bool(0))
+    dac_clock = Signal(bool(0))
+    dac_data = Signal(intbv(0)[10:])
+
+    signals = (bus.presetn,
+                sclk,
+                bus.pclk,
+                bus.paddr,
+                bus.psel,
+                bus.penable,
+                bus.pwrite,
+                bus.pwdata,
+                bus.pready,
+                bus.prdata,
+                bus.pslverr,
+                dac_clock,
+                dac_data)
+
+    @always(delay(SYSCLK_DURATION // 2))
+    def stimulus():
+        sclk.next = not sclk
+
+    def _sim():
+        sresetn = bus.presetn
+        bus_pclk = bus.pclk
+        bus_paddr = bus.paddr
+        bus_psel = bus.psel
+        bus_penable = bus.penable
+        bus_pwrite = bus.pwrite
+        bus_pwdata = bus.pwdata
+        bus_pready = bus.pready
+        bus_prdata = bus.prdata
+        bus_pslverr = bus.pslverr
+
+        e = exciter(*signals)
+
+        @instance
+        def __sim():
+            yield bus.reset()
+            for i in range(8):
+                yield bus.transmit(0x4000, i)
+            yield bus.transmit(0x4001, 0x01)
+            yield delay(APB3_DURATION*6)
+            raise StopSimulation
+
+
+        return __sim, e
+
+    s = Simulation(stimulus, traceSignals(_sim))
+    s.run()
+
+    toVerilog(exciter, *signals)

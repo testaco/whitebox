@@ -1,40 +1,110 @@
-from myhdl import Signal, enum, intbv, always
+from myhdl import ResetSignal, Signal, enum, intbv, always, delay
 
 apb3_bus_states = enum('IDLE', 'SETUP', 'ACCESS')
 
-def apb3_master_mock(ops, pclk, presetn, paddr, psel, penable, pwrite, pwdata, pready, prdata, pslverr):
-    apb3_fsm = Signal(apb3_bus_states.IDLE)
-    written = Signal(bool(0))
-    op_id = Signal(intbv(0, 0, len(ops)+1))
+class Apb3TimeoutError(Exception):
+    pass
 
-    @always(pclk.posedge, presetn.negedge)
-    def state_machine():
-        if not presetn:
-            apb3_fsm.next = apb3_bus_states.IDLE
-            print 'RESET'
-            op_id.next = 0
-            psel.next = 0
-            penable.next = 0
-        elif apb3_fsm == apb3_bus_states.IDLE:
-            if op_id < len(ops):
-                apb3_fsm.next = apb3_bus_states.SETUP
-                psel.next = 1
-                pwrite.next = 1#not written
-                paddr.next = ops[op_id][0]
-                pwdata.next = ops[op_id][1]
-        elif apb3_fsm == apb3_bus_states.SETUP:
-            print 'SETUP'
-            apb3_fsm.next = apb3_bus_states.ACCESS
-            penable.next = 1
-        elif apb3_fsm == apb3_bus_states.ACCESS:
-            if pready:
-                print 'ACCESS'
-                psel.next = 0
-                penable.next = 0
-                print "write", pwdata, "read", prdata
-                apb3_fsm.next = apb3_bus_states.IDLE
-                #written.next ue
-                #pwrite.next = 0
-                op_id.next = op_id + 1
+class Apb3Bus(object):
+    def __init__(self, *args, **kwargs):
+        #self.presetn = Signal(bool(1))
+        self.presetn = ResetSignal(0, 0, async=True)
+        self.pclk = Signal(bool(0))
+        self.paddr = Signal(intbv(0, 0, 2**32))
+        self.psel = Signal(bool(0))
+        self.penable = Signal(bool(0))
+        self.pwrite = Signal(bool(1))
+        self.pwdata = Signal(intbv(0, 0, 2**32))
+        self.pready = Signal(bool(0))
+        self.prdata = Signal(intbv(0, 0, 2**32))
+        self.pslverr = Signal(bool(0))
+        self.args = args
+        self.kwargs = kwargs
+        
+    def reset(self):
+        duration = self.kwargs['duration']
 
-    return state_machine
+        print '-- Resetting --'
+        self.presetn.next = False
+        yield delay(duration * 5)
+
+        print '-- Reset --'
+        self.presetn.next = True
+        yield delay(duration * 5)
+
+    def transmit(self, addr, data):
+        duration = self.kwargs['duration']
+        timeout = self.kwargs.get('timeout') or 5 * duration
+
+        print '-- Transmitting addr=%s data=%s --' % (hex(addr), hex(data))
+        print 'TX: start'
+        self.pclk.next = True
+        self.paddr.next = intbv(addr)
+        self.pwrite.next = True
+        self.psel.next = True
+        self.pwdata.next = intbv(data)
+        yield delay(duration // 2)
+
+        self.pclk.next = False
+        yield delay(duration // 2)
+
+        print 'TX: enable'
+        self.pclk.next = True
+        self.penable.next = True
+        yield delay(duration // 2)
+
+        timeout_count = 0
+        while not self.pready:
+            print 'TX: wait'
+            timeout_count += duration
+            if timeout_count > timeout:
+                raise Apb3TimeoutError
+            self.pclk.next = False
+            yield delay(duration // 2)
+            self.pclk.next = True
+            yield delay(duration // 2)
+
+        self.pclk.next = False
+        yield delay(duration // 2)
+
+        print 'TX: stop'
+        self.pclk.next = True
+        self.pwrite.next = False
+        self.psel.next = False
+        self.penable.next = False
+        yield delay(duration // 2)
+
+        self.pclk.next = False
+        yield delay(duration // 2)
+
+import unittest
+
+class TestApb3BusFunctionalModel(unittest.TestCase):
+    def test_simulate(self):
+        import myhdl
+        duration=1
+
+        def _sim():
+            bus = Apb3Bus(duration=duration)
+            bus_presetn = bus.presetn
+            bus_pclk = bus.pclk
+            bus_paddr = bus.paddr
+            bus_psel = bus.psel
+            bus_penable = bus.penable
+            bus_pwrite = bus.pwrite
+            bus_pwdata = bus.pwdata
+            bus_pready = bus.pready
+            bus_prdata = bus.prdata
+            bus_pslverr = bus.pslverr
+            
+            @myhdl.instance
+            def __sim():
+                yield bus.reset() 
+                yield bus.transmit(0x4000, 0x0110)
+            return __sim
+
+        s = myhdl.Simulation(myhdl.traceSignals(_sim))
+        s.run(10000)
+
+if __name__ == '__main__':
+    unittest.main()
