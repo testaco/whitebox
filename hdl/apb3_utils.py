@@ -77,6 +77,54 @@ class Apb3Bus(object):
         self.pclk.next = False
         yield delay(duration // 2)
 
+    def receive(self, addr, assert_equals=None):
+        duration = self.kwargs['duration']
+        timeout = self.kwargs.get('timeout') or 5 * duration
+
+        print '-- Receiving addr=%s --' % (hex(addr),)
+        print 'RX: start'
+        self.pclk.next = True
+        self.paddr.next = intbv(addr)
+        self.pwrite.next = False
+        self.psel.next = True
+        yield delay(duration // 2)
+
+        self.pclk.next = False
+        yield delay(duration // 2)
+
+        print 'RX: enable'
+        self.pclk.next = True
+        self.penable.next = True
+        yield delay(duration // 2)
+
+        timeout_count = 0
+        while not self.pready:
+            print 'RX: wait'
+            timeout_count += duration
+            if timeout_count > timeout:
+                raise Apb3TimeoutError
+            self.pclk.next = False
+            yield delay(duration // 2)
+            self.pclk.next = True
+            yield delay(duration // 2)
+
+        self.pclk.next = False
+        print 'RX: data=%s' % (hex(self.prdata),)
+        if assert_equals is not None:
+            assert self.prdata == assert_equals
+        yield delay(duration // 2)
+
+        print 'RX: stop'
+        self.pclk.next = True
+        self.pwrite.next = False
+        self.psel.next = False
+        self.penable.next = False
+        yield delay(duration // 2)
+
+        self.pclk.next = False
+        yield delay(duration // 2)
+
+
 import unittest
 
 class TestApb3BusFunctionalModel(unittest.TestCase):
@@ -101,6 +149,7 @@ class TestApb3BusFunctionalModel(unittest.TestCase):
             def __sim():
                 yield bus.reset() 
                 yield bus.transmit(0x4000, 0x0110)
+                yield bus.receive(0x4000)
             return __sim
 
         s = myhdl.Simulation(myhdl.traceSignals(_sim))

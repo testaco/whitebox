@@ -40,8 +40,14 @@ add_custom_command(
     DEPENDS exciter.py apb3_utils.py fifo.py
 ) 
 
+add_custom_command(
+    OUTPUT receiver.v
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/receiver.py
+    DEPENDS receiver.py apb3_utils.py fifo.py
+) 
+
 add_custom_target(hdl
-    DEPENDS signalgenerator.v exciter.v
+    DEPENDS signalgenerator.v exciter.v receiver.v
 )
 
 add_subdirectory(constraint)
