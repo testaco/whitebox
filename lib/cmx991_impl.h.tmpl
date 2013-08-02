@@ -17,5 +17,5 @@ void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
         hi_lo_t hi_lo, tx_rf_div_t tx_rf_div, tx_if_div_t tx_if_div,
         gain_t gain);
 void cmx991_rx_tune(cmx991_t* rf, div_t div, mix_out_t mix_out,
-        iq_filter_t iq_filter, vga_t vga);
+        if_in_t if_in, iq_filter_t iq_filter, vga_t vga);
 void cmx991_rx_calibrate(cmx991_t* rf);

@@ -189,7 +189,7 @@ void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
 }
 
 void cmx991_rx_tune(cmx991_t* rf, div_t div, mix_out_t mix_out,
-        iq_filter_t iq_filter, vga_t vga) {
+        if_in_t if_in, iq_filter_t iq_filter, vga_t vga) {
     rf->rx_mode = RX_MODE_IQ;    
 
     rf->mix_pwr = MIX_PWR_POWER_UP;
@@ -197,6 +197,7 @@ void cmx991_rx_tune(cmx991_t* rf, div_t div, mix_out_t mix_out,
     rf->vbias = VBIAS_POWER_UP;
 
     rf->div = div;
+    rf->if_in = if_in;
     rf->mix_out = mix_out;
     rf->iq_filter = iq_filter;
     rf->vga = vga;
