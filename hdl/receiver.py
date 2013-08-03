@@ -35,12 +35,12 @@ def receiver(
     ####### FIFO ############
     # Read
     re = Signal(bool(False))
-    rclk = system_clock
+    rclk = pclk
     Q = Signal(intbv(0)[32:])
 
     # Write
     we = Signal(bool(False))
-    wclk = pclk
+    wclk = system_clock
     data = Signal(intbv(0)[32:])
 
     # Threshold
@@ -55,16 +55,23 @@ def receiver(
 
     fifo_args = resetn, re, rclk, Q, we, wclk, data, full, afull, \
         empty, aempty
+    depth=1024
     fifo = FIFO(*fifo_args,
         width=32,
-        depth=124)
+        depth=depth,
+        threshold=depth/2)
+
+    ####### RESAMPLE ############
+    decim = Signal(intbv(1)[32:])
+    decim_counter = Signal(intbv(0)[32:])
 
     ########## STATE MACHINE ######
     state_t = enum('IDLE', 'READ_SAMPLE', 'DONE',)
     state = Signal(state_t.IDLE)
 
-    ############ TX EN ###########
     rxen = Signal(bool(0))
+    underrun = Signal(bool(False))
+    overrun = Signal(bool(False))
 
     @always_seq(pclk.posedge, reset=resetn)
     def state_machine():
@@ -73,15 +80,22 @@ def receiver(
                 if paddr[8:] == 0x00 and not pwrite:
                     pready.next = 0
                     re.next = 1
-                    if empty:
-                        raise UnderrunError
                     state.next = state_t.READ_SAMPLE
+                    if empty:
+                        underrun.next = True
 
                 elif paddr[8:] == 0x01:
                     if pwrite:
                         rxen.next = pwdata[0]
                     else:
-                        prdata.next = rxen
+                        prdata.next = concat(afull, aempty, underrun, overrun, rxen)
+                    state.next = state_t.DONE
+
+                elif paddr[8:] == 0x02:
+                    if pwrite:
+                        decim.next = pwdata
+                    else:
+                        prdata.next = decim
                     state.next = state_t.DONE
 
         elif state == state_t.READ_SAMPLE:
@@ -93,15 +107,21 @@ def receiver(
             pready.next = 1
             state.next = state_t.IDLE
 
-    @always(pclk.posedge)
+    @always(system_clock.posedge)
     def sampler():
         if rxen:
-            if full:
-                raise OverrunError
             adc_clock.next = not adc_clock
-            if not adc_clock:
-                data.next = concat(adc_i_data[16:], adc_q_data[16:])
-            we.next = not we
+            if adc_clock:
+                decim_counter.next = decim_counter + 1
+                if decim_counter == decim:
+                    decim_counter.next = 0
+                    data.next = concat(adc_i_data[16:], adc_q_data[16:])
+                    we.next = True
+            if full:
+                overrun.next = True
+            if we:
+                we.next = False
+
 
     return fifo, state_machine, sampler
 
@@ -166,6 +186,7 @@ if __name__ == '__main__':
         i_sample = Signal(bus.prdata[32:17])
         q_sample = Signal(bus.prdata[16:])
 
+        decim = 4
         r = receiver(*signals)
         isig = functional_stimulus(sresetn, sclk, adc_i_data, lambda Q: Q+1 if Q < 1023 else 0)
         qsig = functional_stimulus(sresetn, sclk, adc_q_data, lambda Q: Q+1 if Q < 1023 else 0)
@@ -175,12 +196,30 @@ if __name__ == '__main__':
         @instance
         def __sim():
             yield bus.reset()
-            yield bus.receive(0x4001, assert_equals=0)
+            yield bus.receive(0x4001)
+            assert bus.rdata & 0x0001 == 0
+            yield bus.transmit(0x4002, decim) # decim rate
+            yield bus.receive(0x4002)
+            assert bus.rdata == decim
             yield bus.transmit(0x4001, 1)
-            yield bus.receive(0x4001, assert_equals=1)
-            yield delay(APB3_DURATION*6)  # Fill in some data
-            for i in range(800):
-                yield bus.receive(0x4000)
+            yield bus.receive(0x4001)
+            assert bus.rdata & 0x0001 == 1
+            yield bus.delay(40)
+            for i in range(10000):
+                if bus.rdata & 0x0010:
+                    print '\n\n*************warning almost overrun'
+
+                if bus.rdata & 0x0008:
+                    print '\n\n*************warning almost underrun'
+                    yield bus.delay(40)
+                else:
+                    for j in range(128):
+                        yield bus.receive(0x4000)
+                yield bus.receive(0x4001)
+                if bus.rdata & 0x0002:
+                    raise OverrunError
+                if bus.rdata & 0x0004:
+                    raise UnderrunError
             raise StopSimulation
 
         return __sim, r, isig, qsig, scope

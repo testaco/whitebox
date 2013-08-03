@@ -54,27 +54,43 @@ def fifo(resetn,
             #print '++ fifo', _fifo
             if threshold and len(_fifo) >= threshold:
                 afull.next = True
+            else:
+                afull.next = False
             if depth and len(_fifo) >= depth:
                 full.next = True
+            else:
+                full.next = False
             if threshold and len(_fifo) <= threshold:
                 aempty.next = True
+            else:
+                aempty.next = False
             if len(_fifo) == 0:
                 empty.next = True
+            else:
+                empty.next = False
 
 
     @always(read_edge(rclk))
     def read():
         if re:
             Q.next = _fifo.pop()
-            #print '-- fifo', _fifo
+            print '-- fifo', len(_fifo)
             if threshold and len(_fifo) >= threshold:
                 afull.next = True
+            else:
+                afull.next = False
             if depth and len(_fifo) >= depth:
                 full.next = True
+            else:
+                full.next = False
             if threshold and len(_fifo) <= threshold:
                 aempty.next = True
+            else:
+                aempty.next = False
             if len(_fifo) == 0:
                 empty.next = True
+            else:
+                empty.next = False
 
     return instances()
 

@@ -110,8 +110,9 @@ class Apb3Bus(object):
 
         self.pclk.next = False
         print 'RX: data=%s' % (hex(self.prdata),)
+        self.rdata = self.prdata
         if assert_equals is not None:
-            assert self.prdata == assert_equals
+            assert self.prdata == assert_equals, 'Got %s, expected %s' % (hex(self.prdata), hex(assert_equals))
         yield delay(duration // 2)
 
         print 'RX: stop'
@@ -123,6 +124,14 @@ class Apb3Bus(object):
 
         self.pclk.next = False
         yield delay(duration // 2)
+
+    def delay(self, cycles):
+        duration = self.kwargs['duration']
+        for i in xrange(cycles):
+            self.pclk.next = True
+            yield delay(duration // 2)
+            self.pclk.next = False
+            yield delay(duration // 2)
 
 
 import unittest
