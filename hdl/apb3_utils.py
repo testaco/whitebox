@@ -25,11 +25,13 @@ class Apb3Bus(object):
         duration = self.kwargs['duration']
 
         print '-- Resetting --'
+        self.presetn.next = True
+        yield delay(duration)
         self.presetn.next = False
         yield delay(duration * 5)
+        self.presetn.next = True
 
         print '-- Reset --'
-        self.presetn.next = True
         yield delay(duration * 5)
 
     def transmit(self, addr, data):

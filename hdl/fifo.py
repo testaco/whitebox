@@ -39,20 +39,23 @@ def fifo(resetn,
     max_threshold = kwargs.get('max_threshold', None) 
     _fifo = []
 
+    size = Signal(intbv(0)[32:])
+
     @always(reset_edge(resetn))
     def reset():
         _fifo = []
         full.next = False
         afull.next = False
-        empty.next = False
-        aempty.next = False
+        empty.next = True
+        aempty.next = True
 
     @always(write_edge(wclk))
     def write():
         if write_active(we):
+            assert len(_fifo) == size
             _fifo.insert(0, int(data))
-            #print '++ fifo', _fifo
-            if threshold and len(_fifo) >= threshold:
+            size.next = size + 1
+            if threshold and len(_fifo) >= depth - threshold:
                 afull.next = True
             else:
                 afull.next = False
@@ -68,14 +71,17 @@ def fifo(resetn,
                 empty.next = True
             else:
                 empty.next = False
+
+            #print '++FIFO %s: size=%d, full=%d, empty=%d, afull=%d, aempty=%d' % (hex(data), size.next, full.next, empty.next, afull.next, aempty.next)
 
 
     @always(read_edge(rclk))
     def read():
-        if re:
+        if read_active(re):
+            assert len(_fifo) == size
             Q.next = _fifo.pop()
-            print '-- fifo', len(_fifo)
-            if threshold and len(_fifo) >= threshold:
+            size.next = size - 1
+            if threshold and len(_fifo) >= depth - threshold:
                 afull.next = True
             else:
                 afull.next = False
@@ -91,6 +97,8 @@ def fifo(resetn,
                 empty.next = True
             else:
                 empty.next = False
+
+            #print '--FIFO: size=%d, full=%d, empty=%d, afull=%d, aempty=%d' % (size.next, full.next, empty.next, afull.next, aempty.next)
 
     return instances()
 
