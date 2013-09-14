@@ -1,3 +1,10 @@
+"""
+
+APB3 Bus Functional Model
+=========================
+
+This is the APB3 bus functional model.
+"""
 from myhdl import ResetSignal, Signal, enum, intbv, always, delay
 
 apb3_bus_states = enum('IDLE', 'SETUP', 'ACCESS')
@@ -7,6 +14,7 @@ class Apb3TimeoutError(Exception):
 
 class Apb3Bus(object):
     def __init__(self, *args, **kwargs):
+        """Initialize the bus."""
         #self.presetn = Signal(bool(1))
         self.presetn = ResetSignal(0, 0, async=True)
         self.pclk = Signal(bool(0))
@@ -15,13 +23,14 @@ class Apb3Bus(object):
         self.penable = Signal(bool(0))
         self.pwrite = Signal(bool(1))
         self.pwdata = Signal(intbv(0, 0, 2**32))
-        self.pready = Signal(bool(0))
+        self.pready = Signal(bool(1))
         self.prdata = Signal(intbv(0, 0, 2**32))
         self.pslverr = Signal(bool(0))
         self.args = args
         self.kwargs = kwargs
         
     def reset(self):
+        """Reset."""
         duration = self.kwargs['duration']
 
         print '-- Resetting --'
@@ -35,6 +44,7 @@ class Apb3Bus(object):
         yield delay(duration * 5)
 
     def transmit(self, addr, data):
+        """Transmit from master to slave."""
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 
@@ -80,6 +90,7 @@ class Apb3Bus(object):
         yield delay(duration // 2)
 
     def receive(self, addr, assert_equals=None):
+        """Receive from slave to master."""
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 
@@ -128,6 +139,7 @@ class Apb3Bus(object):
         yield delay(duration // 2)
 
     def delay(self, cycles):
+        """Delay the bus a number of cycles."""
         duration = self.kwargs['duration']
         for i in xrange(cycles):
             self.pclk.next = True

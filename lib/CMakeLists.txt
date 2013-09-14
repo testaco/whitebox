@@ -16,6 +16,7 @@ set(WHITEBOX_SRCS
     adf4351.c
     cmx991.c
     radio.c
+    gpio.c
 )
 
 add_library(whitebox ${WHITEBOX_SRCS})
@@ -26,6 +27,7 @@ set(WHITEBOX_PUBLIC_HEADERS
     adf4351.h
     cmx991.h
     radio.h
+    gpio.h
 )
 
 install(FILES ${WHITEBOX_PUBLIC_HEADERS}
@@ -46,9 +48,17 @@ target_link_libraries(test_radio ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(app app.c)
 target_link_libraries(app ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(cw cw.c)
+target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
+
+add_executable(samples samples.c)
+target_link_libraries(samples ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 install(TARGETS
 	whitebox
     app
+    cw
+    samples
     test_adf4351
     test_cmx991
     test_radio

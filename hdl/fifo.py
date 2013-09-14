@@ -1,3 +1,9 @@
+"""
+FIFO
+====
+
+This is the fifo
+"""
 import random
 
 from myhdl import always
@@ -26,6 +32,12 @@ def fifo(resetn,
          empty,
          aempty,
          **kwargs):
+    """Main Fifo object.
+
+    This only works as a simulation; when it is transpiled into Verilog,
+    an auto-generated IP Core is used instead.  To see how to build the
+    the IP core yourself with Libero IDE, check out this video (TODO).
+    """
 
     width = kwargs['width']
     depth = kwargs['depth']
@@ -53,8 +65,10 @@ def fifo(resetn,
     def write():
         if write_active(we):
             assert len(_fifo) == size
-            _fifo.insert(0, int(data))
-            size.next = size + 1
+            if threshold and not full:
+                _fifo.insert(0, int(data))
+                size.next = size + 1
+
             if threshold and len(_fifo) >= depth - threshold:
                 afull.next = True
             else:
@@ -79,8 +93,12 @@ def fifo(resetn,
     def read():
         if read_active(re):
             assert len(_fifo) == size
-            Q.next = _fifo.pop()
-            size.next = size - 1
+            if empty:
+                Q.next = 0
+            else:
+                Q.next = _fifo.pop()
+                size.next = size - 1
+
             if threshold and len(_fifo) >= depth - threshold:
                 afull.next = True
             else:

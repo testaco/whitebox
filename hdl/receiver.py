@@ -1,4 +1,6 @@
 """
+Receiver
+========
 
 The recevier works like so:
 """
@@ -37,7 +39,25 @@ def receiver(
         pslverr,
         adc_clock,
         adc_i_data,
-        adc_q_data):
+        adc_q_data,
+        status_led):
+    """The receiver.
+
+    :param resetn: Reset
+    :param system_clock: The main fabric clock
+    :param pclk: The system bus clock
+    :param paddr: The bus assdress
+    :param psel: The bus slave select
+    :param penable: The bus slave enable line
+    :param pwrite: The bus read/write flag
+    :param pwdata: The bus write data
+    :param pready: The bus slave ready signal
+    :param prdata: The bus read data
+    :param pslverr: The bus slave error flag
+    :param adc_clock: The ADC clock
+    :param adc_i_data: The in-phase ADC data
+    :param adc_q_data: The out-of-phase ADC data
+    """
     ####### FIFO ############
     # Read
     re = Signal(bool(False))
@@ -91,14 +111,15 @@ def receiver(
                         re.next = 1
                         state.next = state_t.READ_SAMPLE
 
-                elif paddr[8:] == 0x01:
+                elif paddr[8:] == 0x04:
                     if pwrite:
                         rxen.next = pwdata[0]
+                        status_led.next = pwdata[0]
                     else:
                         prdata.next = concat(afull, aempty, underrun, overrun, rxen)
                     state.next = state_t.DONE
 
-                elif paddr[8:] == 0x02:
+                elif paddr[8:] == 0x08:
                     if pwrite:
                         decim.next = pwdata
                     else:
@@ -162,6 +183,7 @@ if __name__ == '__main__':
     adc_clock = Signal(bool(0))
     adc_i_data = Signal(intbv(0)[10:])
     adc_q_data = Signal(intbv(0)[10:])
+    status_led = Signal(bool(0))
 
     signals = (bus.presetn,
                 sclk,
@@ -176,7 +198,8 @@ if __name__ == '__main__':
                 bus.pslverr,
                 adc_clock,
                 adc_i_data,
-                adc_q_data)
+                adc_q_data,
+                status_led)
 
     @always(delay(SYSCLK_DURATION // 2))
     def stimulus():
@@ -210,23 +233,23 @@ if __name__ == '__main__':
         def __sim():
             fcw.next = FCW
             yield bus.reset()
-            yield bus.receive(0x4001)
-            assert bus.rdata & 0x0001 == 0
-            yield bus.transmit(0x4002, decim) # decim rate
-            yield bus.receive(0x4002)
+            yield bus.receive(0x4004)
+            assert bus.rdata & 0x0004 == 0
+            yield bus.transmit(0x4008, decim) # decim rate
+            yield bus.receive(0x4008)
             assert bus.rdata == decim
-            yield bus.transmit(0x4001, 1)
-            yield bus.receive(0x4001)
+            yield bus.transmit(0x4004, 1)
+            yield bus.receive(0x4004)
             assert bus.rdata & 0x0001 == 1
 
             # Wait for the buffer to pass being underrun
             t0 = now()
 
             while N < SAMPLES_TO_SIMULATE:
-                yield bus.receive(0x4001)
+                yield bus.receive(0x4004)
                 while bus.rdata & 0x0008:
                     yield bus.delay(BULK_SIZE*100)
-                    yield bus.receive(0x4001)
+                    yield bus.receive(0x4004)
 
                 if bus.rdata & 0x0002:
                     raise OverrunError

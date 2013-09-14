@@ -1,5 +1,5 @@
 if(NOT DEFINED INSTALL_ROOT)
-    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.9.0)
+    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
 endif()
 
 if(NOT DEFINED KERNELDIR)
@@ -26,12 +26,12 @@ configure_file(whitebox.busybox whitebox.busybox
     COPYONLY
 )
 
-add_custom_target(linux_patch
-    COMMAND patch -Np1 < ${CMAKE_CURRENT_SOURCE_DIR}/a2fgpio.patch
-    DEPENDS a2fgpio.patch
-    WORKING_DIRECTORY ${KERNELDIR}
-    VERBATIM
-)
+#add_custom_target(linux_patch
+#    COMMAND patch -Np1 < ${CMAKE_CURRENT_SOURCE_DIR}/a2fgpio.patch
+#    DEPENDS a2fgpio.patch
+#    WORKING_DIRECTORY ${KERNELDIR}
+#    VERBATIM
+#)
 
 macro(emcraft_build CMD)
     add_custom_target(${CMD}

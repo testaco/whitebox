@@ -14,6 +14,7 @@
 
 #include "adf4351.h"
 #include "cmx991.h"
+#include "gpio.h"
 
 /*
  * These whitebox pin to Linux kernel GPIO mappings are derived from the
@@ -36,52 +37,6 @@
 #define VCO_CE       (FPGA_GPIO_BASE+17)
 #define VCO_PDB      (FPGA_GPIO_BASE+18)
 #define VCO_LD       (FPGA_GPIO_BASE+19)
-
-#define GPIO_OUTPUT_MODE (0 << 0)
-#define GPIO_INPUT_MODE  (1 << 0)
-
-void GPIO_config(unsigned gpio, int inout) {
-    int fd;
-    char buf[512];
-
-    fd = open("/sys/class/gpio/export", O_WRONLY);
-    sprintf(buf, "%d", gpio);
-    write(fd, buf, strlen(buf));
-    close(fd);
-
-    sprintf(buf, "/sys/class/gpio/gpio%d/direction", gpio);
-    fd = open(buf, O_WRONLY);
-    if (inout == GPIO_OUTPUT_MODE)
-        write(fd, "out", 3);
-    else
-        write(fd, "in", 2);
-    close(fd);
-}
-
-void GPIO_set_output(unsigned gpio, unsigned value) {
-    int fd;
-    char buf[512];
-    sprintf(buf, "/sys/class/gpio/gpio%d/value", gpio);
-    fd = open(buf, O_WRONLY);
-    if (value)
-        write(fd, "1", 1);
-    else
-        write(fd, "0", 1);
-    close(fd);
-}
-
-int GPIO_get_input(unsigned gpio) {
-    char value;
-    int ret;
-    int fd;
-    char buf[512];
-    sprintf(buf, "/sys/class/gpio/gpio%d/value", gpio);
-    fd = open(buf, O_RDONLY);
-    read(fd, &value, 1);
-    ret = value == '0' ? 0 : 1;
-    close(fd);
-    return ret;
-}
 
 void radio_wr_byte(uint8_t byte) {
     int i, j;
@@ -197,7 +152,7 @@ void vco_power_up() {
     GPIO_set_output(VCO_PDB, 1);
 }
 
-int rfpll_locked() {
+int vco_pll_locked() {
     return GPIO_get_input(VCO_LD);
 }
 
@@ -233,10 +188,14 @@ void vco_set_frequency(float fdes) {
     adf4351_init(&adf4351);
     adf4351.charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
     adf4351.muxout = MUXOUT_DLD;
+    adf4351.ldp = LDP_6NS;
+    adf4351.ldf = LDF_INT_N;
+    //adf4351.output_power = OUTPUT_POWER_5DBM;
     adf4351.rf_output_enable = RF_OUTPUT_ENABLE_ENABLED;
     adf4351.aux_output_power = AUX_OUTPUT_POWER_5DBM;
     adf4351.aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
     adf4351.aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
+    adf4351.ld_pin_mode = LD_PIN_MODE_HIGH;
     adf4351_tune(&adf4351, fdes);
     adf4351_print_to_file(&adf4351, stdout);
     vco_dial(adf4351_pack(&adf4351, 5));
@@ -272,9 +231,12 @@ void dac_tx() {
     puts("dac_tx");
     GPIO_set_output(DAC_EN, 1);
     GPIO_set_output(DAC_CS, 0);
-    sleep(10);
-    GPIO_set_output(DAC_CS, 1);
-    GPIO_set_output(DAC_EN, 0);
+    (*((uint32_t volatile*)(0x4005040c)) = 40000000);
+    (*((uint32_t volatile*)(0x40050400+4)) = 0x40);
+    (*((uint32_t volatile*)(0x40050400+4)) = 0x41);
+    // TODO: fill up the transmit buffer
+    //GPIO_set_output(DAC_CS, 1);
+    //GPIO_set_output(DAC_EN, 0);
 }
 
 void adc_init() {
@@ -307,6 +269,36 @@ void adc_rx() {
     GPIO_set_output(ADC_S2, 0);
 }
 
+void exciter_init() {
+    uint32_t value; int i;
+
+    (*((uint32_t volatile*)(0x40050400+4)) = 0x20);
+    (value = *((uint32_t volatile*)(0x40050400+4)));
+    (value = *((uint32_t volatile*)(0x40050400+4)));
+    printf("Exciter Status: %x %c%c%c%c%c\n",
+        value,
+        value & 0x10 ? 'F': ' ',
+        value & 0x08 ? 'E' : ' ',
+        value & 0x04 ? 'U' : ' ',
+        value & 0x02 ? 'O' : ' ',
+        value & 0x01 ? 'X' : ' ');
+
+}
+
+void exciter_printf() {
+    uint32_t value; int i;
+    (value = *((uint32_t volatile*)(0x40050400+4)));
+    (value = *((uint32_t volatile*)(0x40050400+4)));
+    printf("Exciter Status: %x %c%c%c%c%c%c\n",
+        value,
+        value & 0x40 ? 'D': 'S',
+        value & 0x10 ? 'F': ' ',
+        value & 0x08 ? 'E' : ' ',
+        value & 0x04 ? 'U' : ' ',
+        value & 0x02 ? 'O' : ' ',
+        value & 0x01 ? 'X' : ' ');
+}
+
 int main(int argc, char **argv) {
 	char * app_name = argv[0];
 	char * dev_name = "/dev/whitebox";
@@ -327,6 +319,8 @@ int main(int argc, char **argv) {
         radio_init();
         dac_init();
         adc_init();
+        //printf("Value at register file location 4 %x", (*((uint32_t volatile*)(0x40050400+4))));
+        exciter_init();
     }
 
     if(strcmp(argv[1], "power_down") == 0) {
@@ -335,6 +329,7 @@ int main(int argc, char **argv) {
         radio_power_down();
         dac_power_down();
         adc_power_down();
+        (*((uint32_t volatile*)(0x40050400+4)) = 0x0); // TXEN=1
     }
 
     if(strcmp(argv[1], "power_up") == 0) {
@@ -347,7 +342,8 @@ int main(int argc, char **argv) {
 
     if(strcmp(argv[1], "dial") == 0) {
         fprintf(stdout, "Dialing VCO...\n");
-        vco_set_frequency(198.000e6);
+        vco_set_frequency(198.780e6);
+        //vco_set_frequency(100.000e6);
     }
 
     if(strcmp(argv[1], "tx_tune") == 0) {
@@ -358,7 +354,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Error setting the pll\n");
         }
         fprintf(stdout, "TX Tune...\n");
-        cmx991_tx_tune(&cmx991, 198.00e6, IF_FILTER_BW_120MHZ, HI_LO_HIGHER,
+        cmx991_tx_tune(&cmx991, 198.00e6, IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
             TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P6DB);
         //cmx991.iq_out = IQ_OUT_IFOUT;  // Send output to TX IFOUT pin.
         radio_command(&cmx991);
@@ -373,7 +369,12 @@ int main(int argc, char **argv) {
             fprintf(stdout, "IF not locked!\n");
         } else {
             fprintf(stdout, "IF locked, transmitting\n");
-            dac_tx();
+            if (!vco_pll_locked()) {
+                fprintf(stdout, "RF PLL not locked!\n");
+            } else {
+                fprintf(stdout, "RF locked, transmitting\n");
+                dac_tx();
+            }
         }
     }
 
@@ -406,6 +407,10 @@ int main(int argc, char **argv) {
         
         fprintf(stdout, "Done receiving, powering down\n");
         adc_power_down();
+    }
+
+    if (strcmp(argv[1], "print") == 0) {
+        exciter_printf();
     }
 
 	/*
