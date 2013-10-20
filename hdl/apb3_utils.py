@@ -15,7 +15,6 @@ class Apb3TimeoutError(Exception):
 class Apb3Bus(object):
     def __init__(self, *args, **kwargs):
         """Initialize the bus."""
-        #self.presetn = Signal(bool(1))
         self.presetn = ResetSignal(0, 0, async=True)
         self.pclk = Signal(bool(0))
         self.paddr = Signal(intbv(0, 0, 2**32))
@@ -28,28 +27,31 @@ class Apb3Bus(object):
         self.pslverr = Signal(bool(0))
         self.args = args
         self.kwargs = kwargs
+
+    def debug(self, msg):
+        if self.kwargs.get('verbose', False):
+            print msg
         
     def reset(self):
         """Reset."""
         duration = self.kwargs['duration']
 
-        print '-- Resetting --'
+        self.debug('-- Resetting --')
         self.presetn.next = True
         yield delay(duration)
         self.presetn.next = False
-        yield delay(duration * 5)
+        yield self.delay(5)
         self.presetn.next = True
 
-        print '-- Reset --'
-        yield delay(duration * 5)
+        self.debug('-- Reset --')
 
     def transmit(self, addr, data):
         """Transmit from master to slave."""
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 
-        print '-- Transmitting addr=%s data=%s --' % (hex(addr), hex(data))
-        print 'TX: start'
+        self.debug('-- Transmitting addr=%s data=%s --' % (hex(addr), hex(data)))
+        self.debug('TX: start')
         self.pclk.next = True
         self.paddr.next = intbv(addr)
         self.pwrite.next = True
@@ -60,14 +62,14 @@ class Apb3Bus(object):
         self.pclk.next = False
         yield delay(duration // 2)
 
-        print 'TX: enable'
+        self.debug('TX: enable')
         self.pclk.next = True
         self.penable.next = True
         yield delay(duration // 2)
 
         timeout_count = 0
         while not self.pready:
-            print 'TX: wait'
+            self.debug('TX: wait')
             timeout_count += duration
             if timeout_count > timeout:
                 raise Apb3TimeoutError
@@ -79,7 +81,7 @@ class Apb3Bus(object):
         self.pclk.next = False
         yield delay(duration // 2)
 
-        print 'TX: stop'
+        self.debug('TX: stop')
         self.pclk.next = True
         self.pwrite.next = False
         self.psel.next = False
@@ -94,8 +96,8 @@ class Apb3Bus(object):
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 
-        print '-- Receiving addr=%s --' % (hex(addr),)
-        print 'RX: start'
+        self.debug('-- Receiving addr=%s --' % (hex(addr),))
+        self.debug('RX: start')
         self.pclk.next = True
         self.paddr.next = intbv(addr)
         self.pwrite.next = False
@@ -105,14 +107,14 @@ class Apb3Bus(object):
         self.pclk.next = False
         yield delay(duration // 2)
 
-        print 'RX: enable'
+        self.debug('RX: enable')
         self.pclk.next = True
         self.penable.next = True
         yield delay(duration // 2)
 
         timeout_count = 0
         while not self.pready:
-            print 'RX: wait'
+            self.debug('RX: wait')
             timeout_count += duration
             if timeout_count > timeout:
                 raise Apb3TimeoutError
@@ -122,13 +124,13 @@ class Apb3Bus(object):
             yield delay(duration // 2)
 
         self.pclk.next = False
-        print 'RX: data=%s' % (hex(self.prdata),)
+        self.debug('RX: data=%s' % (hex(self.prdata),))
         self.rdata = self.prdata
         if assert_equals is not None:
             assert self.prdata == assert_equals, 'Got %s, expected %s' % (hex(self.prdata), hex(assert_equals))
         yield delay(duration // 2)
 
-        print 'RX: stop'
+        self.debug('RX: stop')
         self.pclk.next = True
         self.pwrite.next = False
         self.psel.next = False

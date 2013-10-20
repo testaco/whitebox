@@ -21,6 +21,7 @@ def frange(start, stop=None, step=1.0, delta=0.0000001):
 
 def dds(resetn,
         clock,
+        enable,
         output,
         frequency_control_word,
         **kwargs):
@@ -43,8 +44,10 @@ def dds(resetn,
     
     @always_seq(clock.posedge, reset=resetn)
     def synthesizer():
-        phase_accumulator.next = phase_accumulator + frequency_control_word
-        output.next = samples[phase_accumulator[pa_bitwidth:pa_bitwidth-lut_bitwidth]]
+        if enable:
+            phase_accumulator.next = phase_accumulator + frequency_control_word
+            output.next = samples[phase_accumulator[
+                pa_bitwidth:pa_bitwidth-lut_bitwidth+1]]
 
     return synthesizer
 

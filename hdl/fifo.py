@@ -12,6 +12,7 @@ from myhdl import instance, instances
 from myhdl import intbv
 from myhdl import Signal
 from myhdl import StopSimulation
+from myhdl import now
 import myhdl
 
 active_high = lambda s: s
@@ -31,6 +32,8 @@ def fifo(resetn,
          afull,
          empty,
          aempty,
+         afval,
+         aeval,
          **kwargs):
     """Main Fifo object.
 
@@ -49,9 +52,10 @@ def fifo(resetn,
     reset_edge = kwargs.get('reset_edge', negedge)
     threshold = kwargs.get('threshold', None)
     max_threshold = kwargs.get('max_threshold', None) 
-    _fifo = []
 
-    size = Signal(intbv(0)[32:])
+    _fifo = kwargs.get('load', [])
+
+    size = Signal(intbv(len(_fifo))[32:])
 
     @always(reset_edge(resetn))
     def reset():
@@ -64,59 +68,65 @@ def fifo(resetn,
     @always(write_edge(wclk))
     def write():
         if write_active(we):
-            assert len(_fifo) == size
-            if threshold and not full:
+            if not full:
                 _fifo.insert(0, int(data))
                 size.next = size + 1
 
-            if threshold and len(_fifo) >= depth - threshold:
+            #if threshold and len(_fifo) >= depth - threshold:
+            if len(_fifo) >= afval:
                 afull.next = True
             else:
                 afull.next = False
+
             if depth and len(_fifo) >= depth:
                 full.next = True
             else:
                 full.next = False
-            if threshold and len(_fifo) <= threshold:
+
+            #if threshold and len(_fifo) <= threshold:
+            if len(_fifo) <= aeval:
                 aempty.next = True
             else:
                 aempty.next = False
+
             if len(_fifo) == 0:
                 empty.next = True
             else:
                 empty.next = False
 
-            #print '++FIFO %s: size=%d, full=%d, empty=%d, afull=%d, aempty=%d' % (hex(data), size.next, full.next, empty.next, afull.next, aempty.next)
+            #print '++FIFO %s: size=%d(%d), full=%d, empty=%d, afull=%d, aempty=%d, afval=%d, aeval=%d, depth=%d' % (hex(data), size, len(_fifo), full, empty, afull, aempty, afval, aeval, depth)
 
 
     @always(read_edge(rclk))
     def read():
         if read_active(re):
-            assert len(_fifo) == size
-            if empty:
-                Q.next = 0
-            else:
+            if not empty:
                 Q.next = _fifo.pop()
                 size.next = size - 1
 
-            if threshold and len(_fifo) >= depth - threshold:
+            #if threshold and len(_fifo) >= depth - threshold:
+            if depth and len(_fifo) >= afval:
                 afull.next = True
             else:
                 afull.next = False
+
             if depth and len(_fifo) >= depth:
                 full.next = True
             else:
                 full.next = False
-            if threshold and len(_fifo) <= threshold:
+
+            #if threshold and len(_fifo) <= threshold:
+            if len(_fifo) <= aeval:
                 aempty.next = True
             else:
                 aempty.next = False
+
             if len(_fifo) == 0:
                 empty.next = True
             else:
                 empty.next = False
 
-            #print '--FIFO: size=%d, full=%d, empty=%d, afull=%d, aempty=%d' % (size.next, full.next, empty.next, afull.next, aempty.next)
+            #print '--FIFO %s: size=%d(%d), full=%d, empty=%d, afull=%d, aempty=%d, afval=%d, aeval=%d, depth=%d' % (hex(data), size, len(_fifo), full, empty, afull, aempty, afval, aeval, depth)
 
     return instances()
 
@@ -132,7 +142,9 @@ actel_fifo_${width}_${depth} actel_fifo_${width}_${depth}_0(
     .EMPTY(${empty}),
     .RESET(${resetn}),
     .AEMPTY(${aempty}),
-    .AFULL(${afull})
+    .AFULL(${afull}),
+    .AEVAL(${aeval}),
+    .AFVAL(${afval})
 );
 '''
 
@@ -147,6 +159,8 @@ def fifo_stimulus(reset,
          afull,
          empty,
          aempty,
+         afval,
+         aeval,
          width=None,
          depth=None,
          write_active=active_high,
@@ -167,13 +181,11 @@ def fifo_stimulus(reset,
     @instance
     def stimulus():
         for s in script:
-            print s
             yield delay(10)
             if (we):
                 we.next = False
                 wclk.next = False
             elif (re):
-                print Q, s
                 assert Q == s[1]
                 print 'all good in the hood'
                 re.next = False
@@ -207,6 +219,8 @@ def fifo_write(tx_data,
          afull,
          empty,
          aempty,
+         afval,
+         aeval,
          width=None,
          depth=None,
          write_active=active_high,
@@ -244,6 +258,8 @@ def fifo_read(
          afull,
          empty,
          aempty,
+         afval,
+         aeval,
          width=None,
          depth=None,
          write_active=active_high,
@@ -295,6 +311,9 @@ if __name__ == '__main__':
     afull = Signal(bool())
     empty = Signal(bool())
     aempty = Signal(bool())
+
+    afval = Signal(intbv(64))
+    aeval = Signal(intbv(2))
     
     def stimulus(*args, **kwargs):
         reset, re, rclk, Q, we, wclk, data, full, afull, empty, aempty = args
@@ -318,6 +337,8 @@ if __name__ == '__main__':
          afull,
          empty,
          aempty,
+         afval,
+         aeval,
     ]
 
     kwargs = dict(
