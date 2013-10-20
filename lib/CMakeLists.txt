@@ -13,6 +13,7 @@ add_custom_command(
 )
 
 set(WHITEBOX_SRCS
+    whitebox.c
     adf4351.c
     cmx991.c
     radio.c
@@ -24,6 +25,7 @@ target_link_libraries(whitebox ${CMAKE_REQUIRED_LIBRARIES})
 set_target_properties(whitebox PROPERTIES SOVERSION ${SOVERSION})
 
 set(WHITEBOX_PUBLIC_HEADERS
+    whitebox.h
     adf4351.h
     cmx991.h
     radio.h
@@ -34,7 +36,7 @@ install(FILES ${WHITEBOX_PUBLIC_HEADERS}
 	DESTINATION include/whitebox
 )
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/driver)
 
 add_executable(test_adf4351 test_adf4351.c)
 target_link_libraries(test_adf4351 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
@@ -54,11 +56,15 @@ target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
 add_executable(samples samples.c)
 target_link_libraries(samples ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(rfcat rfcat.c)
+target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 install(TARGETS
 	whitebox
     app
     cw
     samples
+    rfcat
     test_adf4351
     test_cmx991
     test_radio

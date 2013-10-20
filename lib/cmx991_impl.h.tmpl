@@ -1,7 +1,12 @@
 /* vim: set filetype=cpp: */
 
+struct whitebox_args;
+
 uint8_t cmx991_pack(cmx991_t* rf, uint8_t addr);
 void cmx991_load(cmx991_t* rf, uint8_t addr, uint32_t data);
+
+void cmx991_ioctl_get(cmx991_t* rf, struct whitebox_args* w);
+void cmx991_ioctl_set(cmx991_t* rf, struct whitebox_args* w);
 
 double cmx991_pll_actual_frequency(cmx991_t* rf, double fref);
 int cmx991_pll_enable(cmx991_t* rf, double fref, double fdes);
@@ -16,6 +21,6 @@ void cmx991_shutdown(cmx991_t* rf);
 void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
         hi_lo_t hi_lo, tx_rf_div_t tx_rf_div, tx_if_div_t tx_if_div,
         gain_t gain);
-void cmx991_rx_tune(cmx991_t* rf, div_t div, mix_out_t mix_out,
+void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div, mix_out_t mix_out,
         if_in_t if_in, iq_filter_t iq_filter, vga_t vga);
 void cmx991_rx_calibrate(cmx991_t* rf);

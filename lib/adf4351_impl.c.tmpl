@@ -27,6 +27,20 @@ void adf4351_load(adf4351_t* rf, uint32_t data) {
     }
 }
 
+\#include "whitebox_ioctl.h"
+
+void adf4351_ioctl_get(adf4351_t* rf, whitebox_args_t* w) {
+    #for $i in range(5+1)
+    adf4351_load(rf, w->flags.adf4351[$i]);
+    #end for
+}
+
+void adf4351_ioctl_set(adf4351_t* rf, whitebox_args_t* w) {
+    #for $i in range(5+1)
+    w->flags.adf4351[$i] = adf4351_pack(rf, $i);
+    #end for
+}
+
 rf_divider_select_t get_divider_select(int div) {
     if (div == 1) return RF_DIVIDER_SELECT_DIV1;
     if (div == 2) return RF_DIVIDER_SELECT_DIV2;
@@ -46,12 +60,13 @@ double _actual_frequency(double FRAC, double N, double MOD, int DIV, int R, int 
     return rf_out;
 }
 
-double adf4351_tune(adf4351_t* rf, double target_freq) {
-    fprintf(stdout, "Target frequency %f Mhz\n", target_freq / 1e6);
+double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, double target_freq) {
+    fprintf(stdout, "ref=%.2fMHz res=%.2fkHz target=%.2fMHz\n",
+            ref_freq / 1e6,
+            res_freq / 1e3,
+            target_freq / 1e6);
 
     double actual_freq, pfd_freq;
-    double ref_freq = 26e6;
-    double res_freq = 100e3;
     int R=0, BS=0, N=0, FRAC=0, MOD=0;
     int RFdiv = 1;
     reference_divide_by_2_t T = REFERENCE_DIVIDE_BY_2_DISABLED;
@@ -100,10 +115,10 @@ double adf4351_tune(adf4351_t* rf, double target_freq) {
 
     FRAC = (int)(( vco_freq / pfd_freq - N ) * MOD);
 
-    /*if (R % 2 == 0) {
+    if (R % 2 == 0) {
         T = REFERENCE_DIVIDE_BY_2_ENABLED;
         R /= 2;
-    }*/
+    }
 
     _actual_frequency(FRAC, N, MOD, RFdiv, R, T, D);
 
