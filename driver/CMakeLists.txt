@@ -1,5 +1,5 @@
 if(NOT DEFINED INSTALL_ROOT)
-    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.9.0)
+    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
 endif()
 
 if(NOT DEFINED KERNELDIR)
@@ -10,7 +10,7 @@ configure_file(Kbuild Kbuild
     COPYONLY
 )
 
-set(DRIVER_SOURCES fluidsp.h fluidsp_impl.c fluidsp_info.c fluidsp_driver.c radioctl.c)
+set(DRIVER_SOURCES whitebox_driver.c whitebox.h whitebox_ioctl.h pdma.c pdma.h whitebox_ring_buffer.h whitebox_ring_buffer.c whitebox_gpio.h whitebox_gpio.c)
 
 foreach (DRIVER_SOURCE ${DRIVER_SOURCES})
     configure_file(${DRIVER_SOURCE} ${DRIVER_SOURCE}

@@ -1,4 +1,5 @@
-obj-m := fluidsp.o
-fluidsp-y := fluidsp_impl.o fluidsp_info.o fluidsp_driver.o
+obj-m := whitebox.o pdma.o
 
-obj-m := radioctl.o
+whitebox-y := whitebox_driver.o whitebox_gpio.o whitebox_ring_buffer.o
+
+pdma-y: pdma.o
