@@ -19,11 +19,11 @@ add_custom_target(whitebox_doxygen_docs
 find_package(Sphinx REQUIRED)
 
 if(NOT DEFINED SPHINX_THEME)
-    set(SPHINX_THEME default)
+    set(SPHINX_THEME whiteboxtheme)
 endif()
 
 if(NOT DEFINED SPHINX_THEME_DIR)
-    set(SPHINX_THEME_DIR)
+    set(SPHINX_THEME_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 # configured documentation tools and intermediate build results
@@ -46,7 +46,7 @@ configure_file(
 
 add_custom_target(whitebox_html_docs
     ${SPHINX_EXECUTABLE}
-    -q -b html
+    -vvv -q -b html
     -c "${BINARY_BUILD_DIR}"
     -d "${SPHINX_CACHE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -56,9 +56,18 @@ add_custom_target(whitebox_html_docs
 
 add_dependencies(whitebox_html_docs DEPENDS whitebox_doxygen_docs)
 
+add_custom_target(upload_docs
+    s3cmd sync
+    ${CMAKE_CURRENT_BINARY_DIR}/html/
+    s3://radio.testa.co
+    COMMENT "Uploading website to http://radio.testa.co/"
+)
+
+add_dependencies(upload_docs DPENDS whitebox_html_docs)
+
 add_custom_target(whitebox_pdf_docs
     ${SPHINX_EXECUTABLE}
-    -q -b latex
+    -vvv -q -b latex
     -c "${BINARY_BUILD_DIR}"
     -d "${SPHINX_CACHE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -68,5 +77,5 @@ add_custom_target(whitebox_pdf_docs
 
 add_dependencies(whitebox_pdf_docs DEPENDS whitebox_doxygen_docs)
 
-add_custom_target(docs)
+add_custom_target(docs ALL)
 add_dependencies(docs DEPENDS whitebox_pdf_docs whitebox_html_docs)

@@ -1,0 +1,24 @@
+ADF4351 VCO with Integrated PLL
+===============================
+
+The ADF4351 is an IC that provides the local oscillator for the CMX991's RF mixers.
+
+The IC is controlled via a 4-wire SPI-like serial interface.  It has a write only register file which controls features of the IC.
+
+.. c:type:: typedef struct adf4351_t
+    
+    The register file of the ADF4351 IC.
+
+.. c:function:: void adf4351_init(adf4351_t* rf)
+    
+    Initializes the ADF4351 chip, including GPIO pins.
+
+.. c:function:: void adf4351_destroy(adf4351_t* rf)
+
+.. c:function:: void adf4351_copy(adf4351_t* rf)
+
+.. c:function:: void adf4351_print_to_file(adf4351_t* rf, FILE* f)
+
+.. c:function:: float adf4351_tune(adf4351_t* rf, float target_freq)
+
+.. c:function:: float adf4351_actual_frequency(adf4351_t* rf)

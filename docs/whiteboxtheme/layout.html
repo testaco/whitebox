@@ -1,0 +1,164 @@
+{% extends "basic/layout.html" %}
+{%- set render_sidebar = False %}
+
+{%- macro datasheetrelbar(footer) %}
+    <div class="row">
+        <div class="span12">
+        {%- if not footer %}
+        <h2>Testa KD2BMH -- T-WBB -- Whitebox Bravo</h2>
+        {%- endif %}
+        <ul class="breadcrumb">
+        {%- block rootrellink %}
+        <li><a href="{{ pathto(master_doc) }}">{{ shorttitle|e }}</a>{{ reldelim1 }}</li>
+        {%- endblock %}
+        {%- for parent in parents %}
+          <li><a href="{{ parent.link|e }}" {% if loop.last %}{{ accesskey("U") }}{% endif %}>{{ parent.title }}</a>{{ reldelim1 }}</li>
+        {%- endfor %}
+        <li>{{ title }}</li>
+      </ul>
+        </div>
+    </div>
+{%- endmacro %}
+
+{%- macro marketing() %}
+
+
+<header class="jumbotron subhead" id="overview">
+  <div class="container">
+    <div class="row">
+        <div class="span7">
+            <br/>
+            {# <img src="{{ pathto('_static/img/bravotop-mid.jpg', 1) }}" /> #}
+            {# <img src="holder.js/546x410" /> #}
+<iframe width="500" height="315" src="http://www.youtube.com/embed/vmWebMWfJ-I?wmode=transparent" frameborder="0" wmode="Opaque" allowfullscreen></iframe>
+        </div>
+        <div class="span5">
+            <h3>Whitebox Handheld SDR</h3>
+            <br/>
+            <br/>
+            <p style="font-size: 21px;"><strong>Low power</strong>, <strong>embeddable framework</strong>;<br/> inspired by cell phone and SDR architectures</p>
+            <br/>
+            <br/>
+            <p style="font-size: 21px;"><strong>Keep Up To Date</strong> on early access to development kits</p>
+
+<!-- Begin MailChimp Signup Form -->
+<link href="//cdn-images.mailchimp.com/embedcode/slim-081711.css" rel="stylesheet" type="text/css">
+<style type="text/css">
+    #mc_embed_signup{background:#fff; clear:left; font:14px Helvetica,Arial,sans-serif; }
+    /* Add your own MailChimp form style overrides in your site stylesheet or in this style block.
+       We recommend moving this block and the preceding CSS link to the HEAD of your HTML file. */
+</style>
+<div id="mc_embed_signup">
+<form action="http://whitebox.us2.list-manage.com/subscribe/post?u=daf6c8b70db7652c8239134a4&amp;id=108d806e1b" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate>
+    
+    <input type="email" value="" name="EMAIL" class="email" id="mce-EMAIL" placeholder="email address" required>
+    <div class="clear"><input type="submit" value="Subscribe" name="subscribe" id="mc-embedded-subscribe" class="btn btn-large btn-primary"></div>
+</form>
+</div>
+
+<!--End mc_embed_signup-->
+            
+        </div>
+    </div>
+  </div>
+</header>
+
+
+{%- endmacro %}
+
+{%- block doctype -%}
+<!DOCTYPE html>
+{%- endblock %}
+
+{%- block extrahead %}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="_static/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <script src="_static/js/bootstrap.min.js"></script>
+    <script src="_static/js/holder.js"></script>
+    <style>
+        .headerlink { padding-left: 1ex }
+        h1 .headerlink,
+        h2 .headerlink,
+        h3 .headerlink,
+        h4 .headerlink,
+        h5 .headerlink,
+        h6 .headerlink
+            { display: none; }
+        h1:hover .headerlink,
+        h2:hover .headerlink,
+        h3:hover .headerlink,
+        h4:hover .headerlink,
+        h5:hover .headerlink,
+        h6:hover .headerlink
+            { display: inline; }
+    </style>
+{%- endblock %}
+
+{%- block relbar1 %}{% endblock %}
+{%- block relbar2 %}{% endblock %}
+
+{%- block content %}
+    <div class="navbar navbar-inverse navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <div class="nav-collapse collapse">
+            <ul class="nav">
+              <li class="active"><a href="{{ pathto(master_doc) }}"><img src="_static/img/whitebox-logo.jpg" style="height: 25px" /></a></li>
+              <li class="active"><a href="{{ pathto(master_doc) }}">Home</a></li>
+              <li><a href="http://github.com/testaco/whitebox">GitHub</a></li>
+              <li><a href="http://facebook.com/whiteboxradio">Facebook</a></li>
+              <li><a href="http://twitter.com/testa">Twitter</a></li>
+            </ul>
+            <form class="navbar-form pull-right">
+              <input class="span2" type="text" placeholder="search">
+              <button type="submit" class="btn">Search</button>
+            </form>
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div>
+
+    {% if pagename == 'index' %}
+        {{ marketing() }}
+    {% endif %}
+
+    <div class="container">
+
+
+        {{ datasheetrelbar(False) }}
+
+
+  {%- block document %}
+      <div class="row">
+            <div class="span12">
+            {% block body %} {% endblock %}
+            </div>
+      </div>
+  {%- endblock %}
+
+        {{ datasheetrelbar(True) }}
+    </div>
+{%- endblock %}
+
+{%- block footer %}
+    <div class="footer">
+    {%- if show_copyright %}
+      {%- if hasdoc('copyright') %}
+        {% trans path=pathto('copyright'), copyright=copyright|e %}&copy; <a href="{{ path }}">Copyright</a> {{ copyright }}.{% endtrans %}
+      {%- else %}
+        {% trans copyright=copyright|e %}&copy; Copyright {{ copyright }}.{% endtrans %}
+      {%- endif %}
+    {%- endif %}
+    {%- if last_updated %}
+      {% trans last_updated=last_updated|e %}Last updated on {{ last_updated }}.{% endtrans %}
+    {%- endif %}
+    {%- if show_sphinx %}
+      {% trans sphinx_version=sphinx_version|e %}Created using <a href="http://sphinx-doc.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+    {%- endif %}
+    </div>
+{%- endblock %}

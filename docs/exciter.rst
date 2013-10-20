@@ -1,0 +1,2 @@
+.. automodule:: exciter
+    :members: exciter
