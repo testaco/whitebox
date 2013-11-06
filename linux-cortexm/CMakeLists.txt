@@ -1,6 +1,4 @@
-if(NOT DEFINED INSTALL_ROOT)
-    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
-endif()
+set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
 
 if(NOT DEFINED KERNELDIR)
     set(KERNELDIR ${INSTALL_ROOT}/linux)
@@ -26,13 +24,6 @@ configure_file(whitebox.busybox whitebox.busybox
     COPYONLY
 )
 
-#add_custom_target(linux_patch
-#    COMMAND patch -Np1 < ${CMAKE_CURRENT_SOURCE_DIR}/a2fgpio.patch
-#    DEPENDS a2fgpio.patch
-#    WORKING_DIRECTORY ${KERNELDIR}
-#    VERBATIM
-#)
-
 macro(emcraft_build CMD)
     add_custom_target(${CMD}
         COMMAND ${CMAKE_COMMAND} -DPROJECT_NAME=${CMAKE_PROJECT_NAME} -DINSTALL_ROOT=${INSTALL_ROOT} -DCOMMAND=${CMD} -P ${CMAKE_CURRENT_SOURCE_DIR}/linux.cmake
@@ -41,9 +32,21 @@ macro(emcraft_build CMD)
     )
 endmacro(emcraft_build)
 
-emcraft_build(linux)
 emcraft_build(kmenuconfig)
 emcraft_build(bmenuconfig)
 emcraft_build(busybox)
 emcraft_build(kclean)
 emcraft_build(bclean)
+
+add_custom_command(OUTPUT whitebox.uImage
+    COMMAND ${CMAKE_COMMAND} -DPROJECT_NAME=${CMAKE_PROJECT_NAME} -DINSTALL_ROOT=${INSTALL_ROOT} -DCOMMAND=linux -P ${CMAKE_CURRENT_SOURCE_DIR}/linux.cmake
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS whitebox.initramfs.in drivers apps
+    VERBATIM
+)
+
+add_custom_target(linux
+    DEPENDS whitebox.uImage)
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/whitebox.uImage
+    DESTINATION ${TFTP_DIR})

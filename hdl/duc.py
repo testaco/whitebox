@@ -69,17 +69,14 @@ class Signature(object):
         return Signature(name, self.signed, bits=self.bits)
 
     def copy_with_bit_gain(self, name, bit_gain):
-        print 'bitgain', name, bit_gain
         new_bits = self.bits + bit_gain
         return Signature(name, self.signed, bits=new_bits)
 
     def copy_with_gain(self, name, gain):
-        print 'gain', name, gain
         bit_gain = math.ceil(math.log(gain, 2))
         return self.copy_with_bit_gain(name, bit_gain)
 
     def record(self, clearn, clock):
-        print '\n\n****hi'
         @always(clock.posedge)
         def recorder():
             if clearn == clearn.active:
@@ -109,7 +106,7 @@ def truncator(clearn, in_clock, in_sign, out_sign):
 
     assert i_lsb >= 0 and q_lsb >= 0
 
-    print 'truncator from', in_sign.bits, 'to', out_sign.bits, 'and so', i_msb, i_lsb, i_msb - i_lsb
+    #print 'truncator from', in_sign.bits, 'to', out_sign.bits, 'and so', i_msb, i_lsb, i_msb - i_lsb
 
 
     @always_seq(in_clock.posedge, reset=clearn)
@@ -337,7 +334,7 @@ def cic(clearn, clock,
     out_i = out_sign.i
     out_q = out_sign.q
 
-    print 'CIC order=%d delay=%d interp=%d' % (cic_order, cic_delay, interp)
+    #print 'CIC order=%d delay=%d interp=%d' % (cic_order, cic_delay, interp)
 
     combed_gain = lambda i: ((cic_delay * interp) ** (i+1))/interp
     accum_gain = lambda i: combed_gain(cic_order-1)
@@ -354,7 +351,7 @@ def cic(clearn, clock,
 
         o = combed[n]
 
-        print 'comb stage', n, i, '->', o
+        #print 'comb stage', n, i, '->', o
 
         combs.append(comb(clearn, clock, cic_delay, i, o))
 
@@ -363,7 +360,7 @@ def cic(clearn, clock,
         combed[cic_order - 1], interpolated,
         interp)
 
-    print 'interpolator', combed[cic_order - 1], '->', interpolated
+    #print 'interpolator', combed[cic_order - 1], '->', interpolated
 
     accums = []
     for n in range(cic_order):
@@ -374,11 +371,11 @@ def cic(clearn, clock,
 
         o = accumed[n]
 
-        print 'accum stage', n, i, '->', o
+        #print 'accum stage', n, i, '->', o
 
         accums.append(accumulator(clearn, clock, i, o))
 
-    print 'decimated', accumed[cic_order - 1], '->', out_sign
+    #print 'decimated', accumed[cic_order - 1], '->', out_sign
 
     truncator_2 = truncator(clearn, clock,
         accumed[cic_order - 1], out_sign)
@@ -387,7 +384,6 @@ def cic(clearn, clock,
 
     if kwargs.get('sim', None):
         sim = kwargs['sim']
-        print 'gunna call record'
         sim.record(in_sign)
         [sim.record(c) for c in combed]
         sim.record(interpolated)

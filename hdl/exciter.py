@@ -50,6 +50,7 @@ WES_CLEAR_BIT = 0
 WES_TXEN_BIT = 8
 WES_DDSEN_BIT = 9
 WES_FILTEREN_BIT = 10
+WES_LOOPEN_BIT = 11
 WES_AEMPTY_BIT = 16
 WES_AFULL_BIT = 17
 
@@ -57,6 +58,7 @@ WES_CLEAR = intbv(2**WES_CLEAR_BIT)[32:]
 WES_TXEN = intbv(2**WES_TXEN_BIT)[32:]
 WES_DDSEN = intbv(2**WES_DDSEN_BIT)[32:]
 WES_FILTEREN = intbv(2**WES_FILTEREN_BIT)[32:]
+WES_LOOPEN = intbv(2**WES_LOOPEN_BIT)[32:]
 WES_AEMPTY = intbv(2**WES_AEMPTY_BIT)[32:]
 WES_AFULL = intbv(2**WES_AFULL_BIT)[32:]
 
@@ -184,6 +186,7 @@ def exciter(
             ddsen, dds_sample, 0, # dds_sample
             muxed, muxed_i, muxed_q)
 
+    ## DAC Conditioning
     corrected = Signal(bool(0))
     corrected_i = Signal(intbv(0, min=-2**9, max=2**9))
     corrected_q = Signal(intbv(0, min=-2**9, max=2**9))
@@ -208,6 +211,7 @@ def exciter(
         fifo_resetn.next = resetn and clearn
         dmaready.next = not fifo_afull
         txirq.next = fifo_aempty
+        status_led.next = txen
 
         if state == state_t.IDLE:
             if penable and psel:
@@ -224,13 +228,18 @@ def exciter(
                 elif paddr[8:] == WE_STATE_ADDR:
                     if pwrite:
                         if pwdata[WES_CLEAR_BIT]:
+                            # Whats next... I think it's to try it with these
+                            # new lines and see why... how TXEN is set,
+                            # the FIFO is full, and the DMA is stuck!? weird
+                            txen.next = 0
+                            ddsen.next = 0
+                            filteren.next = 0
                             overrun.next = 0
                             clearn.next = 0
                             pready.next = 0
                             state.next = state_t.CLEAR
                         else:
                             txen.next = pwdata[WES_TXEN_BIT]
-                            status_led.next = pwdata[WES_TXEN_BIT]
                             ddsen.next = pwdata[WES_DDSEN_BIT]
                             filteren.next = pwdata[WES_FILTEREN_BIT]
                             pready.next = 0
@@ -437,6 +446,7 @@ if __name__ == '__main__':
     print "#define WES_TXEN\t%#010x" % WES_TXEN
     print "#define WES_DDSEN\t%#010x" % WES_DDSEN
     print "#define WES_FILTEREN\t%#010x" % WES_FILTEREN
+    print "#define WES_LOOPEN\t%#010x" % WES_LOOPEN
     print "#define WES_AEMPTY\t%#010x" % WES_AEMPTY
     print "#define WES_AFULL\t%#010x" % WES_AFULL
 

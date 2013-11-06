@@ -27,12 +27,13 @@ endfunction(find_python_module)
 
 find_python_module(myhdl REQUIRED)
 find_python_module(matplotlib REQUIRED)
+find_python_module(numpy REQUIRED)
 
-add_custom_command(
-    OUTPUT signalgenerator.v
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/signalgenerator.py
-    DEPENDS signalgenerator.py
-) 
+#add_custom_command(
+#    OUTPUT signalgenerator.v
+#    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/signalgenerator.py
+#    DEPENDS signalgenerator.py
+#) 
 
 add_custom_command(
     OUTPUT exciter.v
@@ -40,13 +41,13 @@ add_custom_command(
     DEPENDS exciter.py apb3_utils.py fifo.py duc.py
 ) 
 
-add_custom_target(test_hdl)
-
-add_custom_command(TARGET test_hdl
-    PRE_BUILD
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py
-    COMMENT "Testing exciter"
-)
+#add_custom_target(test_hdl)
+#
+#add_custom_command(TARGET test_hdl
+#    PRE_BUILD
+#    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py
+#    COMMENT "Testing exciter"
+#)
 
 #add_custom_command(TARGET test_hdl
 #    PRE_BUILD
@@ -61,7 +62,31 @@ add_custom_command(TARGET test_hdl
 #) 
 
 add_custom_target(hdl
-    DEPENDS signalgenerator.v exciter.v #receiver.v
+    DEPENDS exciter.v #receiver.v signalgenerator.v
+)
+
+add_test(NAME test_duc_cic_impulse
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicImpulse
+)
+
+add_test(NAME test_duc_cic_sin
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicSin
+)
+
+add_test(NAME test_duc_cic_interpolate_20
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicInterpolate20
+)
+
+add_test(NAME test_exciter_dds
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestDDS
+)
+
+add_test(NAME test_exciter_overrun_underrun
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestOverrunUnderrun
+)
+
+add_test(NAME test_exciter_pipe_samples
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestPipeSamples
 )
 
 add_subdirectory(constraint)

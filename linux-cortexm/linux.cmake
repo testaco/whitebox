@@ -14,6 +14,6 @@ set(ENV{MCU} A2F)
 set(ENV{SAMPLE} ${PROJECT_NAME})
 
 execute_process(
-    COMMAND make -f Emcraft.make ${COMMAND}
+    COMMAND make V=1 -f Emcraft.make ${COMMAND}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

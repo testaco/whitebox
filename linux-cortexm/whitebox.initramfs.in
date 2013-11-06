@@ -4,6 +4,9 @@ dir /root 0700 0 0
 dir /proc 0755 0 0
 dir /sys 0755 0 0
 dir /etc 0755 0 0
+dir /lib 755 0 0
+dir /lib/modules 755 0 0
+dir /lib/modules/2.6.33-arm1 755 0 0
 dir /var 0755 0 0
 dir /var/config 0755 0 0
 dir /var/tmp 0755 0 0
@@ -24,6 +27,7 @@ nod /dev/kmem 0600 0 0 c 1 2
 nod /dev/zero 0600 0 0 c 1 5
 nod /dev/random 0600 0 0 c 1 8
 nod /dev/urandom 0600 0 0 c 1 9
+nod /dev/whitebox 0600 0 0 c 254 0
 
 file /etc/inittab @CMAKE_CURRENT_SOURCE_DIR@/local/etc/inittab 755 0 0
 file /etc/rc @CMAKE_CURRENT_SOURCE_DIR@/local/etc/rc 755 0 0
@@ -34,12 +38,17 @@ file /etc/group @CMAKE_CURRENT_SOURCE_DIR@/local/etc/group 644 0 0
 file /etc/shadow @CMAKE_CURRENT_SOURCE_DIR@/local/etc/shadow 644 0 0
 file /etc/securetty @CMAKE_CURRENT_SOURCE_DIR@/local/etc/securetty 644 0 0
 
+file /lib/modules/2.6.33-arm1/modules.dep @CMAKE_CURRENT_SOURCE_DIR@/local/lib/modules/2.6.33-arm1/modules.dep 644 0 0
+file /lib/modules/2.6.33-arm1/pdma.ko  @CMAKE_BINARY_DIR@/driver/pdma.ko 644 0 0
+file /lib/modules/2.6.33-arm1/whitebox.ko  @CMAKE_BINARY_DIR@/driver/whitebox.ko 644 0 0
+
 file /bin/busybox @INSTALL_ROOT@/A2F/busybox/busybox 755 0 0
 slink /bin/init busybox 777 0 0
 slink /init /bin/init 777 0 0
 slink /bin/insmod busybox 777 0 0
 slink /bin/rmmod busybox 777 0 0
 slink /bin/lsmod busybox 777 0 0
+slink /bin/modprobe busybox 777 0 0
 slink /bin/hostname busybox 777 0 0
 slink /bin/cat busybox 777 0 0
 slink /bin/cp busybox 777 0 0
@@ -77,12 +86,18 @@ slink /bin/traceroute busybox 777 0 0
 slink /bin/wget busybox 777 0 0
 slink /bin/vi busybox 777 0 0
 slink /bin/udhcpc busybox 777 0 0
+slink /bin/nc busybox 777 0 0
 ifarch A2F file /bin/iap_tool @INSTALL_ROOT@/A2F/root/usr/bin/iap_tool 755 0 0
 
 dir /usr 755 0 0
 dir /usr/bin 755 0 0
+dir /usr/sbin 755 0 0
 dir /usr/share 755 0 0
 dir /usr/share/udhcpc 755 0 0
-file /usr/share/udhcpc/default.script @CMAKE_CURRENT_SOURCE_DIR@/local/usr/share/udhcpc/default.script 755 0 0
 
-nod /dev/whitebox 0600 0 0 c 166 0
+file /usr/bin/gnuradio_peripheral @CMAKE_BINARY_DIR@/lib/gnuradio_peripheral 755 0 0
+file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
+file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0
+file /usr/bin/test_driver @CMAKE_BINARY_DIR@/lib/test_driver 755 0 0
+file /usr/bin/test_device @CMAKE_BINARY_DIR@/lib/test_device 755 0 0
+file /usr/share/udhcpc/default.script @CMAKE_CURRENT_SOURCE_DIR@/local/usr/share/udhcpc/default.script 755 0 0

@@ -181,7 +181,7 @@ class DSPSim(object):
 
         
 
-class TestSequenceFunctions(unittest.TestCase):
+#class TestSequenceFunctions(unittest.TestCase):
 #    def test_pass(self):
 #        s = DSPSim(
 #                in_sign=int16,
@@ -236,7 +236,8 @@ class TestSequenceFunctions(unittest.TestCase):
 #        f_out = figure_continuous_complex("interpolator_0_out", 223,
 #                    f_interpolator_0, out_t, out_c)
 
-    def __test_cic_impulse(self):
+class TestCicImpulse(unittest.TestCase):
+    def test_cic_impulse(self):
         cic_order = 3
         cic_delay = 1
         interp = Signal(intbv(4, min=0, max=2**10))
@@ -285,9 +286,11 @@ class TestSequenceFunctions(unittest.TestCase):
         f_out = figure_continuous_complex("out", 212, f_cic_impulse, out_t, out_c*int(interp))
         s.plot_chain("cic_impulse_debug")
 
-        plt.show()
+        #plt.show()
+        plt.savefig("cic_impulse.png")
 
-    def __test_cic_sin(self):
+class TestCicSin(unittest.TestCase):
+    def test_cic_sin(self):
         cic_delay = 1
         cic_order = 3
         interp = Signal(intbv(20, min=0, max=2**10))
@@ -304,7 +307,7 @@ class TestSequenceFunctions(unittest.TestCase):
         )
         def test_cic_sin():
             cic_0 = cic(s.clearn, s.clock, s.input, s.output,
-                    interp, decim,
+                    interp,
                     cic_order=cic_order, cic_delay=cic_delay,
                     sim=s)
             return cic_0
@@ -334,12 +337,15 @@ class TestSequenceFunctions(unittest.TestCase):
         f_out = figure_continuous_complex("out", 212, f_cic_sin, out_t, out_c)
 
         s.plot_chain("")
-        plt.show()
+        #plt.show()
+        plt.savefig("cic_sin.png")
 
-    def test_cic_interpolate_400(self):
+
+class TestCicInterpolate20(unittest.TestCase):
+    def test_cic_interpolate_20(self):
         cic_delay = 1
         cic_order = 3
-        interp = Signal(intbv(400, min=0, max=2**10))
+        interp = Signal(intbv(20, min=0, max=2**10))
         decim = Signal(intbv(1, min=0, max=2**10))
 
         in_sign = Signature("in", True, bits=16)
@@ -351,7 +357,7 @@ class TestSequenceFunctions(unittest.TestCase):
                 in_sign=in_sign,
                 out_sign=out_sign,
         )
-        def test_cic_interpolate_400():
+        def test_cic_interpolate_20():
             truncated = Signature("truncated", True, bits=8)
             truncator_0 = truncator(s.clearn, s.clock, s.input, truncated)
             cic_0 = cic(s.clearn, s.clock, truncated, s.output, #cic_0_out,
@@ -360,29 +366,31 @@ class TestSequenceFunctions(unittest.TestCase):
                     sim=None)
             return cic_0, truncator_0
 
-        numsamples = 256
+        numsamples = 32
         #fname = '/home/testa/whitebox/build/nbfm_voice.samples'
         fname = '/home/testa/whitebox/hdl/sin.samples'
         in_i, in_q = load_quadrature_short_samples(fname, offset=65012, numsamples=numsamples)
         in_t = np.arange(0, in_i.shape[0])
 
         try:
-            out_i, out_q = s.simulate_quadrature(in_i, in_q, test_cic_interpolate_400, interp=interp)
+            out_i, out_q = s.simulate_quadrature(in_i, in_q, test_cic_interpolate_20, interp=interp)
         except:
-            #s.plot_chain("cic_interpolate_400_error")
+            #s.plot_chain("cic_interpolate_20_error")
             #plt.show()
             raise
 
         out_t = np.arange(0, out_i.shape[0])
 
-        f_cic_interpolate_400 = plt.figure("cic_interpolate_400")
-        #plt.title("cic_interpolate_400")
+        f_cic_interpolate_20 = plt.figure("cic_interpolate_20")
+        #plt.title("cic_interpolate_20")
 
-        f_in = figure_discrete_quadrature("in", (2, 1, 1), f_cic_interpolate_400, in_sign, in_t, in_i, in_q)
-        f_out = figure_discrete_quadrature("out", (2, 1, 2), f_cic_interpolate_400, out_sign, out_t, out_i, out_q)
+        f_in = figure_discrete_quadrature("in", (2, 1, 1), f_cic_interpolate_20, in_sign, in_t, in_i, in_q)
+        f_out = figure_discrete_quadrature("out", (2, 1, 2), f_cic_interpolate_20, out_sign, out_t, out_i, out_q)
 
-        s.plot_chain("")
-        plt.show()
+        #s.plot_chain("")
+        #plt.show()
+        plt.savefig("cic_sin.png")
+
 
 if __name__ == '__main__':
     unittest.main()

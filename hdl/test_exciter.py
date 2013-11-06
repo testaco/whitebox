@@ -209,11 +209,7 @@ class ExciterSim(object):
         )
         return fifo_0, exciter_0
 
-class TestSequenceFunctions(unittest.TestCase):
-
-    def setUp(self):
-        pass
-
+class TestDDS(unittest.TestCase):
     def test_dds(self):
         bus = Apb3Bus(duration=APB3_DURATION)
 
@@ -249,6 +245,8 @@ class TestSequenceFunctions(unittest.TestCase):
         s.simulate(stimulus, test_exciter_dds)
 
 
+
+class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):
         INTERP = 200
         FIFO_DEPTH = 4
@@ -308,6 +306,7 @@ class TestSequenceFunctions(unittest.TestCase):
 
         s.simulate(stimulus, test_exciter_overrun_underrun)
 
+class TestPipeSamples(unittest.TestCase):
     def test_pipe_samples(self):
         bus = Apb3Bus(duration=APB3_DURATION)
         BULK_SIZE=8 #

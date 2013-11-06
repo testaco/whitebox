@@ -5,10 +5,15 @@
 
 #include "whitebox.h"
 
+void whitebox_init(whitebox_t* wb) {
+    wb->fd = -EINVAL;
+}
+
 whitebox_t* whitebox_alloc(void) {
     whitebox_t* wb;
     wb = malloc(sizeof(whitebox_t));
-    wb->fd = -EINVAL;
+    whitebox_init(wb);
+    return wb;
 }
 
 void whitebox_free(whitebox_t* wb) {
@@ -18,8 +23,13 @@ void whitebox_free(whitebox_t* wb) {
 int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
     char* filename;
     // Can't call open twice
+
     if (wb->fd >= 0) {
         return -EBUSY;
+    }
+
+    if (rate <= 0) {
+        return -EINVAL;
     }
 
     if (filn) {
@@ -33,15 +43,20 @@ int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
 
     wb->fd = open(filename, flags);
 
+
     if (W_DAC_RATE_HZ % rate != 0) {
         fprintf(stderr, "Error, sample rate is not a multiple of DAC clock rate!");
         exit(1);
     }
 
+
+    wb->rate = rate;
     wb->interp = W_DAC_RATE_HZ / rate;
 
     whitebox_reset(wb);
+
     whitebox_tx_set_interp(wb, wb->interp);
+    whitebox_tx_set_buffer_threshold(wb, rate/10, WE_FIFO_SIZE - rate/10);
 
     free(filename);
 
@@ -59,6 +74,7 @@ int whitebox_close(whitebox_t* wb) {
 
     close(wb->fd);
     wb->fd = -EINVAL;
+    return 0;
 }
 
 void whitebox_print_to_file(whitebox_t* wb, FILE* f) {
@@ -98,14 +114,27 @@ int whitebox_reset(whitebox_t* wb) {
     if (wb->fd < 0) {
         return -EBADF;
     }
-    ioctl(wb->fd, WE_CLEAR);
+    return ioctl(wb->fd, W_RESET);
 }
 
-int whitebox_plls_locked(whitebox_t* wb) {
+unsigned int whitebox_status(whitebox_t* wb) {
+    unsigned int status;
     if (wb->fd < 0) {
         return -EBADF;
     }
-    ioctl(wb->fd, W_LOCKED);
+    ioctl(wb->fd, W_STATUS, &status);
+    return status;
+}
+
+int whitebox_plls_locked(whitebox_t* wb) {
+    return !(whitebox_status(wb) & W_STATUS_LOCK_LOST);
+}
+
+int whitebox_tx_clear(whitebox_t* wb) {
+    if (wb->fd < 0) {
+        return -EBADF;
+    }
+    return ioctl(wb->fd, WE_CLEAR);
 }
 
 int whitebox_tx(whitebox_t* wb, float frequency) {
@@ -117,6 +146,7 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     cmx991_resume(&wb->cmx991);
     if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
         fprintf(stderr, "Error setting the pll\n");
+        return 1;
     }
     cmx991_tx_tune(&wb->cmx991, 198.00e6, IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
         TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P6DB);
@@ -124,6 +154,10 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     ioctl(wb->fd, WC_SET, &w);
 
     vco_frequency = (frequency - 45.00e6) * 2.0;
+    if (vco_frequency <= 35.00e6) {
+        fprintf(stderr, "VCO frequency too low\n");
+        return 2;
+    }
 
     adf4351_init(&wb->adf4351);
     wb->adf4351.charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
@@ -141,6 +175,7 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     wb->adf4351.ld_pin_mode = LD_PIN_MODE_DLD;
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+    return 0;
 }
 
 int whitebox_tx_set_interp(whitebox_t* wb, uint32_t interp) {
@@ -158,6 +193,7 @@ int whitebox_tx_set_buffer_threshold(whitebox_t* wb,
                     (uint32_t)(afval << WET_AFVAL_OFFSET);
     ioctl(wb->fd, WE_SET, &w);
 }
+
 int whitebox_tx_get_buffer_runs(whitebox_t* wb,
             uint16_t* overruns, uint16_t* underruns) {
     whitebox_args_t w;
@@ -165,6 +201,12 @@ int whitebox_tx_get_buffer_runs(whitebox_t* wb,
     *overruns = (uint16_t)((w.flags.exciter.runs & WER_OVERRUNS_MASK)
                     >> WER_OVERRUNS_OFFSET);
     *underruns = (uint16_t)((w.flags.exciter.runs & WER_UNDERRUNS_MASK));
+}
+
+int whitebox_tx_get_ring_buffer_size(whitebox_t* wb) {
+    whitebox_args_t w;
+    ioctl(wb->fd, WE_GET_RB_INFO, &w);
+    return w.rb_info.size;
 }
 
 void whitebox_tx_set_dds_fcw(whitebox_t* wb, uint32_t fcw) {

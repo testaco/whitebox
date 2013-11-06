@@ -82,7 +82,7 @@ bmenuconfig	:
 busybox		: $(SAMPLE).busybox
 	cp -f $(SAMPLE).busybox $(INSTALL_ROOT)/A2F/busybox/.config
 	$(MAKE) -C $(INSTALL_ROOT)/A2F/busybox
-#	cp -f $(INSTALL_ROOT)/A2F/busybox/busybox $@
+	cp -f $(INSTALL_ROOT)/A2F/busybox/busybox $@
 
 %.$(KERNEL_IMAGE) : %.$(KERNEL_CONFIG) %.$(RAMFS_CONFIG) $(CUSTOM_APPS) busybox
 	cp -f $(SAMPLE).$(RAMFS_CONFIG) $(INSTALL_ROOT)/linux/initramfs-list-min

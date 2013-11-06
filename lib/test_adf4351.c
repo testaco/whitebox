@@ -4,8 +4,9 @@
 
 #include "adf4351.h"
 
-void test_adf4351_pack_unpack() {
-    printf("test_adf4351_pack_unpack... ");
+#include "whitebox_test.h"
+
+int test_adf4351_pack_unpack(void *data) {
     adf4351_t adf4351;
     adf4351_load(&adf4351, 0x00180005);
     adf4351_load(&adf4351, 0x00CD01FC);
@@ -22,11 +23,10 @@ void test_adf4351_pack_unpack() {
     assert(0x003C8058 == adf4351_pack(&adf4351, 0));
 
     assert(abs(198e6 - adf4351_actual_frequency(&adf4351)) < 1e3);
-    printf("passed\n");
+    return 0;
 }
 
-void test_adf4351_compute_frequency() {
-    printf("test_adf4351_compute_frequency... ");
+int test_adf4351_compute_frequency(void *data) {
     adf4351_t adf4351;
     adf4351_load(&adf4351, 0x00180005);
     adf4351_load(&adf4351, 0x00CD01FC);
@@ -34,24 +34,23 @@ void test_adf4351_compute_frequency() {
     adf4351_load(&adf4351, 0x00004EC2);
     adf4351_load(&adf4351, 0x00000069);
     adf4351_load(&adf4351, 0x003C8058);
-
     assert(abs(198e6 - adf4351_actual_frequency(&adf4351)) < 1e3);
-    printf("passed\n");
-}
-
-void test_adf4351_tune() {
-    printf("test_adf4351_compute_frequency... ");
-    adf4351_t adf4351;
-    adf4351_tune(&adf4351, 198e6);
-    assert(fabs(198e6 - adf4351_actual_frequency(&adf4351)) < 1e3);
-
-    printf("passed\n");
-}
-
-int main() {
-    test_adf4351_pack_unpack();
-    test_adf4351_compute_frequency();
-    test_adf4351_tune();
-    printf("All tests passed.\n");
     return 0;
+}
+
+int test_adf4351_tune(void *data) {
+    adf4351_t adf4351;
+    adf4351_pll_enable(&adf4351, 26e6, 100e3, 198e6);
+    assert(fabs(198e6 - adf4351_actual_frequency(&adf4351)) < 1e3);
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    whitebox_test_t tests[] = {
+        WHITEBOX_TEST(test_adf4351_pack_unpack),
+        WHITEBOX_TEST(test_adf4351_compute_frequency),
+        WHITEBOX_TEST(test_adf4351_tune),
+        WHITEBOX_TEST(0),
+    };
+    return whitebox_test_main(tests, NULL, argc, argv);
 }

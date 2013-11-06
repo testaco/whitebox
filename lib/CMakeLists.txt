@@ -25,6 +25,7 @@ target_link_libraries(whitebox ${CMAKE_REQUIRED_LIBRARIES})
 set_target_properties(whitebox PROPERTIES SOVERSION ${SOVERSION})
 
 set(WHITEBOX_PUBLIC_HEADERS
+    whitebox_test.h
     whitebox.h
     adf4351.h
     cmx991.h
@@ -32,9 +33,9 @@ set(WHITEBOX_PUBLIC_HEADERS
     gpio.h
 )
 
-install(FILES ${WHITEBOX_PUBLIC_HEADERS}
-	DESTINATION include/whitebox
-)
+#install(FILES ${WHITEBOX_PUBLIC_HEADERS}
+#	DESTINATION include/whitebox
+#)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/driver)
 
@@ -44,31 +45,40 @@ target_link_libraries(test_adf4351 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_cmx991 test_cmx991.c)
 target_link_libraries(test_cmx991 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(test_radio test_radio.c)
-target_link_libraries(test_radio ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_executable(test_driver test_driver.c)
+target_link_libraries(test_driver ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(app app.c)
-target_link_libraries(app ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_executable(test_device test_device.c)
+target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(cw cw.c)
-target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
+#add_executable(cw cw.c)
+#target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
 
-add_executable(samples samples.c)
-target_link_libraries(samples ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+#add_executable(rfcat rfcat.c)
+#target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(rfcat rfcat.c)
-target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_executable(gnuradio_peripheral gnuradio_peripheral.c)
+target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-install(TARGETS
-	whitebox
-    app
-    cw
-    samples
-    rfcat
-    test_adf4351
-    test_cmx991
-    test_radio
-	LIBRARY DESTINATION lib${LIB_SUFFIX}
-	ARCHIVE DESTINATION lib${LIB_SUFFIX}
-	RUNTIME DESTINATION bin
+add_custom_target(apps
+    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral)
+
+add_test(NAME target_netboot
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot
+)
+
+add_test(NAME target_test_cmx991
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_cmx991
+)
+
+add_test(NAME target_test_adf4351
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_adf4351
+)
+
+add_test(NAME target_test_driver
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_driver
+)
+
+add_test(NAME target_test_device
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_device
 )

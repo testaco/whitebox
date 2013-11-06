@@ -1,13 +1,19 @@
 cmake_minimum_required (VERSION 2.8)
 
+project(whitebox)
+
 # Prevent in-source builds
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
+# Build shared libraries by default
+set(BUILD_SHARED_LIBS FALSE)
+
+# Enable testing
+enable_testing()
+
 # Set the toolchain
 set(CMAKE_TOOLCHAIN_FILE cmake/Toolchains/arm_cortex_m3_native.cmake)
-
-project(whitebox)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
@@ -28,8 +34,18 @@ endif()
 
 message(STATUS "whitebox version: ${PROJECT_VERSION}")
 
-# Build shared libraries by default
-set(BUILD_SHARED_LIBS FALSE)
+if(NOT IS_DIRECTORY ${TFTP_DIR})
+    message(WARNING "no tftp destination")
+endif()
+
+if(NOT EXISTS ${TTY})
+    message(WARNING "no tty for the target")
+endif()
+
+if(NOT DEFINED BAUD)
+    set(BAUD "115200")
+endif()
+
 
 add_subdirectory(linux-cortexm)
 
@@ -41,9 +57,15 @@ add_subdirectory(lib)
 
 add_subdirectory(gnuradio)
 
-# MUST be after everything else has been generated
 add_subdirectory(docs)
+
+add_dependencies(docs linux)
+
+add_custom_target(target
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot --reset "run update"
+)
 
 #
 # Cpack configuration to go here...
 #
+
