@@ -117,17 +117,8 @@ int whitebox_reset(whitebox_t* wb) {
     return ioctl(wb->fd, W_RESET);
 }
 
-unsigned int whitebox_status(whitebox_t* wb) {
-    unsigned int status;
-    if (wb->fd < 0) {
-        return -EBADF;
-    }
-    ioctl(wb->fd, W_STATUS, &status);
-    return status;
-}
-
 int whitebox_plls_locked(whitebox_t* wb) {
-    return !(whitebox_status(wb) & W_STATUS_LOCK_LOST);
+    return ioctl(wb->fd, W_LOCKED);
 }
 
 int whitebox_tx_clear(whitebox_t* wb) {
@@ -201,12 +192,6 @@ int whitebox_tx_get_buffer_runs(whitebox_t* wb,
     *overruns = (uint16_t)((w.flags.exciter.runs & WER_OVERRUNS_MASK)
                     >> WER_OVERRUNS_OFFSET);
     *underruns = (uint16_t)((w.flags.exciter.runs & WER_UNDERRUNS_MASK));
-}
-
-int whitebox_tx_get_ring_buffer_size(whitebox_t* wb) {
-    whitebox_args_t w;
-    ioctl(wb->fd, WE_GET_RB_INFO, &w);
-    return w.rb_info.size;
 }
 
 void whitebox_tx_set_dds_fcw(whitebox_t* wb, uint32_t fcw) {

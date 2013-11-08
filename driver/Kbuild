@@ -1,5 +1,5 @@
 obj-m := whitebox.o pdma.o
 
-whitebox-y := whitebox_driver.o whitebox_gpio.o whitebox_ring_buffer.o
+whitebox-y := whitebox_driver.o whitebox_gpio.o whitebox_user_source.o whitebox_rf_sink.o
 
 pdma-y: pdma.o

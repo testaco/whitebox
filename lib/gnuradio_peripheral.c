@@ -119,12 +119,12 @@ int udp_peripheral_open_device(udp_peripheral_t* p) {
         exit(dev_fd);
     }
 
-    p->samples_buffer = mmap(0,
+    /*p->samples_buffer = mmap(0,
             whitebox_tx_get_ring_buffer_size(p->wb),
             PROT_READ | PROT_WRITE,
             MAP_SHARED,
             dev_fd,
-            0);
+            0);*/
 
     if (p->samples_buffer == MAP_FAILED) {
         fprintf(stderr, "value was %d\n", errno);
@@ -178,7 +178,7 @@ int udp_peripheral_open_udp(udp_peripheral_t* p) {
 
 void udp_peripheral_close(udp_peripheral_t* p) {
     close(p->udpfd);
-    munmap(p->samples_buffer, whitebox_tx_get_ring_buffer_size(p->wb));
+    //munmap(p->samples_buffer, whitebox_tx_get_ring_buffer_size(p->wb));
     whitebox_close(p->wb);
 }
 

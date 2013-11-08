@@ -5,11 +5,14 @@
 #include <linux/platform_device.h>
 #include <linux/types.h>
 #include <linux/wait.h>
+#include <linux/cdev.h>
 
 #include "whitebox_ioctl.h"
+#include "whitebox_block.h"
 
 #define WHITEBOX_DRIVER_NAME "whitebox"
 
+#define WHITEBOX_EXCITER_IRQ A2F_FPGA_DEMUX_IRQ_MAP(0)
 #define WHITEBOX_EXCITER_REGS          0x40050400
 #define WHITEBOX_EXCITER_SAMPLE_OFFSET 0x00
 #define WHITEBOX_EXCITER_STATUS_OFFSET 0x04
@@ -43,6 +46,38 @@
 #define WHITEBOX_GPIO_VCO_CE       (FPGA_GPIO_BASE+17)
 #define WHITEBOX_GPIO_VCO_PDB      (FPGA_GPIO_BASE+18)
 #define WHITEBOX_GPIO_VCO_LD       (FPGA_GPIO_BASE+19)
+
+/*
+ * Book-keeping for the device
+ */
+struct whitebox_device {
+    struct semaphore sem;
+    struct cdev cdev;
+    struct device* device;
+    int irq;
+    int irq_disabled;
+    struct whitebox_platform_data_t* platform_data;
+    wait_queue_head_t write_wait_queue;
+    u32 adf4351_regs[WA_REGS_COUNT];
+    atomic_t mapped;
+
+    struct whitebox_user_source user_source;
+    struct whitebox_rf_sink rf_sink;
+};
+
+/*
+ * IO Mapped structure of the exciter
+ */
+struct whitebox_exciter_regs {
+    u32 sample;
+    u32 state;
+    u32 interp;
+    u32 fcw;
+    u32 runs;
+    u32 threshold;
+};
+
+#define WHITEBOX_EXCITER(s) ((volatile struct whitebox_exciter_regs *)(s->rf_sink.regs))
 
 
 /*

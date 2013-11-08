@@ -1,5 +1,4 @@
 #include <asm/uaccess.h>
-#include <linux/cdev.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -16,42 +15,9 @@
 #include "pdma.h"
 #include "whitebox.h"
 #include "whitebox_gpio.h"
-#include "whitebox_ring_buffer.h"
+#include "whitebox_block.h"
 
-#define WHITEBOX_EXCITER_IRQ A2F_FPGA_DEMUX_IRQ_MAP(0)
-
-/*
- * Book-keeping for the device
- */
-struct whitebox_device_t {
-    struct semaphore sem;
-    struct cdev cdev;
-    struct device* device;
-    void* exciter;
-    int irq;
-    int irq_disabled;
-    struct whitebox_ring_buffer tx_rb;
-    struct whitebox_platform_data_t* platform_data;
-    u8 tx_dma_ch;
-    u8 tx_dma_active;
-    wait_queue_head_t write_wait_queue;
-    u32 adf4351_regs[WA_REGS_COUNT];
-} *whitebox_device;
-
-/*
- * IO Mapped structure of the exciter
- */
-struct whitebox_exciter_regs_t {
-    u32 sample;
-    u32 state;
-    u32 interp;
-    u32 fcw;
-    u32 runs;
-    u32 threshold;
-};
-
-#define WHITEBOX_EXCITER(s) ((volatile struct whitebox_exciter_regs_t *)(s->exciter))
-
+static struct whitebox_device *whitebox_device;
 static dev_t whitebox_devno;
 static struct class* whitebox_class;
 
@@ -71,16 +37,15 @@ static int whitebox_debug = 0;
 module_param(whitebox_debug, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(whitebox_debug, "whitebox debugging level, >0 is verbose");
 
-
 /*
  * Number of pages for the ring buffer
  */
-static unsigned whitebox_num_pages = 8;
+static int whitebox_user_source_order = 3;
 
 /*
  * User can change the number of pages for the ring buffer
  */
-//module_param(whitebox_num_pages, unsigned, S_IRUSR | S_IWUSR);
+//module_param(whitebox_num_pages, int, S_IRUSR | S_IWUSR);
 //MODULE_PARAM_DESC(whitebox_num_pages, "number of pages for the ring buffer");
 
 static u8 whitebox_cmx991_regs_write_lut[] = {
@@ -97,96 +62,76 @@ static u8 whitebox_cmx991_regs_read_lut[] = {
 	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
-void d_printk_wb(int level, struct whitebox_device_t* wb) {
+void d_printk_wb(int level, struct whitebox_device* wb) {
     u32 state;
     state = WHITEBOX_EXCITER(wb)->state;
     state = WHITEBOX_EXCITER(wb)->state;
 
-    d_printk(level, "%c%c%c%c readable=%d active=%d\n",
+    d_printk(level, "%c%c%c%c\n",
         state & WES_TXEN ? 'T' : ' ',
         state & WES_DDSEN ? 'D' : ' ',
         state & WES_AFULL ? 'F' : ' ',
-        state & WES_AEMPTY ? 'E' : ' ',
-        wb->tx_rb.readable_pages,
-        wb->tx_rb.dma_active);
+        state & WES_AEMPTY ? 'E' : ' ');
 }
 
 /* Prototpyes */
 long whitebox_ioctl_reset(void);
 
-int tx_start(struct whitebox_device_t* wb) {
-    int count = 0;
-    dma_addr_t mapping;
-    u32 state;
+int tx_start(struct whitebox_device* wb) {
+    struct whitebox_user_source *user_source = &wb->user_source;
+    struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
+    size_t src_count, dest_count;
+    unsigned long src, dest;
+    size_t count;
+    int result;
 
-    state = WHITEBOX_EXCITER(wb)->state;
-    state = WHITEBOX_EXCITER(wb)->state;
-    if (state & WES_AFULL) {
-        if (!(state & WES_TXEN)) {
-            WHITEBOX_EXCITER(wb)->state = state | WES_TXEN;
-            d_printk(1, "afull, txen\n");
-        }
-        return count;
+    if (!spin_trylock(&rf_sink->lock))
+        return -EBUSY;
+
+    src_count = whitebox_user_source_data_available(user_source, &src);
+    dest_count = whitebox_rf_sink_space_available(rf_sink, &dest);
+    count = min(src_count, dest_count);
+    
+    if (count <= 0) {
+        spin_unlock(&rf_sink->lock);
+        return -EBUSY;
     }
 
-    count = whitebox_ring_buffer_read_dma_start(&wb->tx_rb,
-            &mapping);
+    result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
 
-    if (count < 0) {
-        d_printk(0, "Couldn't dma map ring buffer for xfer\n");
-    }
-    else if (count > 0) {
-        d_printk(3, "%d\n", count >> 2);
-
-        d_printk_wb(2, wb);
-        d_printk(1, "starting tx\n");
-
-        pdma_start(wb->tx_dma_ch,
-                mapping,
-                (u32)&WHITEBOX_EXCITER(wb)->sample,
-                count >> 2);
-        if (wb->irq_disabled) {
-            //enable_irq(wb->irq);
-            wb->irq_disabled = 0;
-        }
-    } else {
-        d_printk(1, "nothing to tx\n");
-        if (!wb->irq_disabled) {
-            d_printk(1, "nothing to tx, disabling irq\n");
-            //disable_irq_nosync(wb->irq);
-            d_printk(1, "hey\n");
-            wb->irq_disabled = 1;
-            d_printk(1, "wake_up\n");
-            //wake_up_interruptible(&wb->write_wait_queue);
-        }
+    if (result < 0) {
+        spin_unlock(&rf_sink->lock);
+        d_printk(0, "rf_sink_work error!\n");
+        return result;
     }
 
-    d_printk_wb(4, wb);
-    return count;
+    return result;
 }
 
-void tx_dma_cb(void* data) {
-    struct whitebox_device_t* wb = (struct whitebox_device_t*)data;
-    //u32 state;
+void tx_dma_cb(void *data) {
+    struct whitebox_device *wb = (struct whitebox_device *)data;
+    struct whitebox_user_source *user_source = &wb->user_source;
+    struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
+    size_t count;
     d_printk(1, "tx dma cb\n");
 
-    whitebox_ring_buffer_read_dma_finish(&wb->tx_rb);
+    count = whitebox_rf_sink_work_done(rf_sink);
+    whitebox_user_source_consume(user_source, count);
+    whitebox_rf_sink_produce(rf_sink, count);
+
+    spin_unlock(&rf_sink->lock);
 
     d_printk(1, "wake_up\n");
 
     wake_up_interruptible(&wb->write_wait_queue);
 
     tx_start(wb);
-
-    d_printk_wb(4, wb);
 }
 
 static irqreturn_t tx_irq_cb(int irq, void* ptr) {
-    struct whitebox_device_t* wb = (struct whitebox_device_t*)ptr;
+    struct whitebox_device* wb = (struct whitebox_device*)ptr;
     d_printk(1, "clearing txirq\n");
     WHITEBOX_EXCITER(wb)->state = WES_CLEAR_TXIRQ;
-
-    //d_printk_wb(0, wb);
 
     tx_start(wb);
 
@@ -195,46 +140,39 @@ static irqreturn_t tx_irq_cb(int irq, void* ptr) {
 
 static int whitebox_open(struct inode* inode, struct file* filp) {
     int ret = 0;
+    struct whitebox_user_source *user_source = &whitebox_device->user_source;
+    struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
     d_printk(2, "whitebox open\n");
 
     if (atomic_add_return(1, &use_count) != 1) {
-        d_printk(0, "Device in use\n");
+        d_printk(1, "Device in use\n");
         ret = -EBUSY;
         goto fail_in_use;
     }
 
-    whitebox_ioctl_reset();
-
     if (filp->f_flags & O_WRONLY || filp->f_flags & O_RDWR) {
-        // init dma channel
-        ret = pdma_request(whitebox_device->tx_dma_ch,
-                (pdma_irq_handler_t)tx_dma_cb,
-                whitebox_device,
-                10,
-                PDMA_CONTROL_PER_SEL_FPGA0 |
-                PDMA_CONTROL_HIGH_PRIORITY |
-                PDMA_CONTROL_XFER_SIZE_4B |
-                PDMA_CONTROL_DST_ADDR_INC_0 |
-                PDMA_CONTROL_SRC_ADDR_INC_4 |
-                PDMA_CONTROL_PERIPH |
-                PDMA_CONTROL_DIR_MEM_TO_PERIPH |
-                PDMA_CONTROL_INTEN);
+        ret = whitebox_rf_sink_alloc(rf_sink);
         if (ret < 0) {
             d_printk(0, "DMA Channel request failed\n");
             goto fail_in_use;
         }
 
-        // init ring buffers
-        whitebox_ring_buffer_init(&whitebox_device->tx_rb);
-
-        whitebox_device->tx_dma_active = 0;
+        ret = whitebox_user_source_alloc(user_source);
+        if (ret < 0) {
+            d_printk(0, "Buffer allocation failed\n");
+            goto fail_free_rf_sink;
+        }
 
         // enable dac
-        whitebox_gpio_dac_enable(whitebox_device->platform_data);
+        //whitebox_gpio_dac_enable(whitebox_device->platform_data);
     }
+
+    whitebox_ioctl_reset();
 
     goto done_open;
 
+fail_free_rf_sink:
+    whitebox_rf_sink_free(rf_sink);
 fail_in_use:
     atomic_dec(&use_count);
 done_open:
@@ -242,6 +180,8 @@ done_open:
 }
 
 static int whitebox_release(struct inode* inode, struct file* filp) {
+    struct whitebox_user_source *user_source = &whitebox_device->user_source;
+    struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
     u32 state;
     d_printk(2, "whitebox release\n");
     
@@ -256,22 +196,22 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
             cpu_relax();
         }*/
 
-        whitebox_ioctl_reset();
+        //whitebox_ioctl_reset();
 
         // Disable DAC
-        whitebox_gpio_dac_disable(whitebox_device->platform_data);
+        //whitebox_gpio_dac_disable(whitebox_device->platform_data);
 
-        // release dma channel
-        pdma_release(whitebox_device->tx_dma_ch);
+        whitebox_rf_sink_free(rf_sink);
+        whitebox_user_source_free(user_source);
 
         // Turn off transmission
+        // should be rf_sink->rf_chip->clear_state(WES_TXEN);
         state = WHITEBOX_EXCITER(whitebox_device)->state;
         state = WHITEBOX_EXCITER(whitebox_device)->state;
         WHITEBOX_EXCITER(whitebox_device)->state = state & ~WES_TXEN;
     }
 
     atomic_dec(&use_count);
-
     return 0;
 }
 
@@ -281,25 +221,24 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
 }
 
 static int whitebox_write(struct file* filp, const char __user* buf, size_t count, loff_t* pos) {
+    unsigned long dest;
+    size_t dest_count;
     int ret = 0;
+    struct whitebox_user_source *user_source = &whitebox_device->user_source;
     
     d_printk(2, "whitebox write\n");
 
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
-    
 
-    while (whitebox_ring_buffer_writeable_pages(&whitebox_device->tx_rb) <= 0) {
+    while ((dest_count = whitebox_user_source_space_available(user_source, &dest)) == 0) {
         up(&whitebox_device->sem);
         if (filp->f_flags & O_NONBLOCK)
             return -EAGAIN;
 
-        tx_start(whitebox_device);
-
         if (wait_event_interruptible(whitebox_device->write_wait_queue,
-                whitebox_ring_buffer_writeable_pages(
-                    &whitebox_device->tx_rb) > 0))
+                (dest_count = whitebox_user_source_space_available(user_source, &dest)) > 0))
             return -ERESTARTSYS;
         if (down_interruptible(&whitebox_device->sem)) {
             return -ERESTARTSYS;
@@ -308,19 +247,20 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
     d_printk(1, "hi");
 
-    ret = whitebox_ring_buffer_write_from_user(&whitebox_device->tx_rb,
-            buf, count);
+    ret = whitebox_user_source_work(user_source, (unsigned long)buf, count, dest, dest_count);
 
     if (ret < 0) {
         up(&whitebox_device->sem);
         return -EFAULT;
     }
 
+    whitebox_user_source_produce(user_source, ret);
+
     up(&whitebox_device->sem);
 
     tx_start(whitebox_device);
 
-    return count;
+    return ret;
 }
 
 long whitebox_ioctl_reset(void) {
@@ -496,20 +436,22 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_release_nothing;
     }
 
-    whitebox_device = kzalloc(sizeof(struct whitebox_device_t), GFP_KERNEL);
+    whitebox_device = kzalloc(sizeof(struct whitebox_device), GFP_KERNEL);
 
     sema_init(&whitebox_device->sem, 1);
 
-    whitebox_device->exciter = ioremap(whitebox_exciter_regs->start,
-            resource_size(whitebox_exciter_regs));
-    if (!whitebox_device->exciter) {
-		d_printk(0, "unable to map registers for "
-			"whitebox exciter base=%08x\n", whitebox_exciter_regs->start);
-		ret = -EINVAL;
-		goto fail_ioremap;
-    }
+    init_waitqueue_head(&whitebox_device->write_wait_queue);
 
-    d_printk(2, "Mapped exciter to address %08x\n", whitebox_exciter_regs->start);
+    whitebox_user_source_init(&whitebox_device->user_source,
+            whitebox_user_source_order, &whitebox_device->mapped);
+
+    whitebox_rf_sink_init(&whitebox_device->rf_sink,
+            whitebox_exciter_regs->start, 
+            resource_size(whitebox_exciter_regs),
+            WHITEBOX_PLATFORM_DATA(pdev)->tx_dma_ch,
+            tx_dma_cb,
+            whitebox_device,
+            64);
 
     whitebox_device->irq = irq;
     /*ret = request_irq(irq, tx_irq_cb, 0,
@@ -560,24 +502,14 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_gpio_request;
     }
 
-    ret = whitebox_ring_buffer_alloc(&whitebox_device->tx_rb, whitebox_num_pages);
-    if (ret < 0) {
-        d_printk(0, "Error allocating the transmit ring buffer\n");
-        ret = -ENOMEM;
-        goto fail_alloc_ring_buffers;
-    }
-
-    whitebox_device->tx_dma_ch = WHITEBOX_PLATFORM_DATA(pdev)->tx_dma_ch;
     whitebox_device->platform_data = WHITEBOX_PLATFORM_DATA(pdev);
 
     whitebox_gpio_cmx991_reset(whitebox_device->platform_data);
 
-    init_waitqueue_head(&whitebox_device->write_wait_queue);
+	printk(KERN_INFO "Whitebox: bravo found\n");
 
     goto done;
 
-fail_alloc_ring_buffers:
-    whitebox_gpio_free(pdev);
 fail_gpio_request:
     device_destroy(whitebox_class, whitebox_devno);
 fail_create_device:
@@ -590,8 +522,8 @@ fail_alloc_region:
 fail_create_class:
 /*    free_irq(whitebox_device->irq, whitebox_device);
 fail_irq:*/
-    iounmap(whitebox_device->exciter);
-fail_ioremap:
+//    iounmap(whitebox_device->exciter);
+//fail_ioremap:
     kfree(whitebox_device);
 
 fail_release_nothing:
@@ -601,8 +533,6 @@ done:
 
 static int whitebox_remove(struct platform_device* pdev) {
     d_printk(2, "whitebox remove\n");
-
-    whitebox_ring_buffer_free(&whitebox_device->tx_rb);
 
     whitebox_gpio_free(pdev);
 
@@ -616,7 +546,7 @@ static int whitebox_remove(struct platform_device* pdev) {
 
     //free_irq(whitebox_device->irq, whitebox_device);
 
-    iounmap(whitebox_device->exciter);
+    //iounmap(whitebox_device->exciter);
 
     kfree(whitebox_device);
     return 0;

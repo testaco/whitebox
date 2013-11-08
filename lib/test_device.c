@@ -109,7 +109,8 @@ int test_tx_write(void* data) {
         assert(ret == sizeof(uint32_t) * i);
     }
 
-    assert(whitebox_status(&wb) == W_STATUS_READY);
+    // TODO: check for overrun & underrun, other errors
+
     assert(whitebox_close(&wb) == 0);
 }
 
