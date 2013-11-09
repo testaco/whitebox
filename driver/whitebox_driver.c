@@ -32,22 +32,31 @@ static atomic_t use_count = ATOMIC_INIT(0);
 static int whitebox_debug = 0;
 
 /*
- * User can change verbosity of the driver
+ * User can change verbosity of the driver.
  */
 module_param(whitebox_debug, int, S_IRUSR | S_IWUSR);
-MODULE_PARM_DESC(whitebox_debug, "whitebox debugging level, >0 is verbose");
 
 /*
- * Number of pages for the ring buffer
+ * Order of the user_source circular buffer.
  */
 static int whitebox_user_source_order = 3;
+module_param(whitebox_user_source_order, int, S_IRUSR | S_IWUSR);
 
 /*
- * User can change the number of pages for the ring buffer
+ * Whether or not to use the mock exciter.
  */
-//module_param(whitebox_num_pages, int, S_IRUSR | S_IWUSR);
-//MODULE_PARAM_DESC(whitebox_num_pages, "number of pages for the ring buffer");
+static int whitebox_mock_exciter_en = 0;
+module_param(whitebox_mock_exciter_en, int, S_IRUSR | S_IWUSR);
 
+/*
+ * Order of the mock exciter circular buffer
+ */
+static int whitebox_mock_exciter_order = 3;
+module_param(whitebox_mock_exciter_order, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Register mappings for the CMX991 register file.
+ */
 static u8 whitebox_cmx991_regs_write_lut[] = {
     0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x20, 0x21, 0x22, 0x23
 };
@@ -61,18 +70,6 @@ static u8 whitebox_cmx991_regs_read_lut[] = {
 #define d_printk(level, fmt, args...)				\
 	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
-
-void d_printk_wb(int level, struct whitebox_device* wb) {
-    u32 state;
-    state = WHITEBOX_EXCITER(wb)->state;
-    state = WHITEBOX_EXCITER(wb)->state;
-
-    d_printk(level, "%c%c%c%c\n",
-        state & WES_TXEN ? 'T' : ' ',
-        state & WES_DDSEN ? 'D' : ' ',
-        state & WES_AFULL ? 'F' : ' ',
-        state & WES_AEMPTY ? 'E' : ' ');
-}
 
 /* Prototpyes */
 long whitebox_ioctl_reset(void);
@@ -131,7 +128,6 @@ void tx_dma_cb(void *data) {
 static irqreturn_t tx_irq_cb(int irq, void* ptr) {
     struct whitebox_device* wb = (struct whitebox_device*)ptr;
     d_printk(1, "clearing txirq\n");
-    WHITEBOX_EXCITER(wb)->state = WES_CLEAR_TXIRQ;
 
     tx_start(wb);
 
@@ -142,6 +138,10 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
     int ret = 0;
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
     struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
+    struct whitebox_exciter *exciter = whitebox_mock_exciter_en ?
+            &whitebox_device->mock_exciter.exciter :
+            &whitebox_device->exciter;
+
     d_printk(2, "whitebox open\n");
 
     if (atomic_add_return(1, &use_count) != 1) {
@@ -149,6 +149,16 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
         ret = -EBUSY;
         goto fail_in_use;
     }
+
+    whitebox_user_source_init(&whitebox_device->user_source,
+            whitebox_user_source_order, &whitebox_device->mapped);
+
+    whitebox_rf_sink_init(&whitebox_device->rf_sink,
+            whitebox_device->platform_data->tx_dma_ch,
+            tx_dma_cb,
+            whitebox_device,
+            exciter,
+            64);
 
     if (filp->f_flags & O_WRONLY || filp->f_flags & O_RDWR) {
         ret = whitebox_rf_sink_alloc(rf_sink);
@@ -182,7 +192,6 @@ done_open:
 static int whitebox_release(struct inode* inode, struct file* filp) {
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
     struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
-    u32 state;
     d_printk(2, "whitebox release\n");
     
     if (atomic_read(&use_count) != 1) {
@@ -205,10 +214,7 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
         whitebox_user_source_free(user_source);
 
         // Turn off transmission
-        // should be rf_sink->rf_chip->clear_state(WES_TXEN);
-        state = WHITEBOX_EXCITER(whitebox_device)->state;
-        state = WHITEBOX_EXCITER(whitebox_device)->state;
-        WHITEBOX_EXCITER(whitebox_device)->state = state & ~WES_TXEN;
+        rf_sink->exciter->ops->clear_state(rf_sink->exciter, WES_TXEN);
     }
 
     atomic_dec(&use_count);
@@ -265,11 +271,12 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
 long whitebox_ioctl_reset(void) {
     int i;
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
     whitebox_gpio_cmx991_reset(whitebox_device->platform_data);
     for (i = 0; i < WA_REGS_COUNT; ++i) {
         whitebox_device->adf4351_regs[i] = 0;
     }
-    WHITEBOX_EXCITER(whitebox_device)->state = WES_CLEAR;
+    exciter->ops->set_state(exciter, WES_CLEAR);
     return 0;
 }
 
@@ -287,22 +294,19 @@ long whitebox_ioctl_locked(unsigned long arg) {
 }
 
 long whitebox_ioctl_exciter_clear(void) {
-    WHITEBOX_EXCITER(whitebox_device)->state = WES_CLEAR;
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    exciter->ops->set_state(exciter, WES_CLEAR);
     return 0;
 }
 
 long whitebox_ioctl_exciter_get(unsigned long arg) {
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
     whitebox_args_t w;
-    w.flags.exciter.state = WHITEBOX_EXCITER(whitebox_device)->state;
-    w.flags.exciter.state = WHITEBOX_EXCITER(whitebox_device)->state;
-    w.flags.exciter.interp = WHITEBOX_EXCITER(whitebox_device)->interp;
-    w.flags.exciter.interp = WHITEBOX_EXCITER(whitebox_device)->interp;
-    w.flags.exciter.fcw = WHITEBOX_EXCITER(whitebox_device)->fcw;
-    w.flags.exciter.fcw = WHITEBOX_EXCITER(whitebox_device)->fcw;
-    w.flags.exciter.runs = WHITEBOX_EXCITER(whitebox_device)->runs;
-    w.flags.exciter.runs = WHITEBOX_EXCITER(whitebox_device)->runs;
-    w.flags.exciter.threshold = WHITEBOX_EXCITER(whitebox_device)->threshold;
-    w.flags.exciter.threshold = WHITEBOX_EXCITER(whitebox_device)->threshold;
+    w.flags.exciter.state = exciter->ops->get_state(exciter);
+    w.flags.exciter.interp = exciter->ops->get_interp(exciter);
+    w.flags.exciter.fcw = exciter->ops->get_fcw(exciter);
+    w.flags.exciter.runs = exciter->ops->get_runs(exciter);
+    w.flags.exciter.threshold = exciter->ops->get_threshold(exciter);
     if (copy_to_user((whitebox_args_t*)arg, &w,
             sizeof(whitebox_args_t)))
         return -EACCES;
@@ -310,14 +314,15 @@ long whitebox_ioctl_exciter_get(unsigned long arg) {
 }
 
 long whitebox_ioctl_exciter_set(unsigned long arg) {
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
     whitebox_args_t w;
     if (copy_from_user(&w, (whitebox_args_t*)arg,
             sizeof(whitebox_args_t)))
         return -EACCES;
-    WHITEBOX_EXCITER(whitebox_device)->state = w.flags.exciter.state;
-    WHITEBOX_EXCITER(whitebox_device)->interp = w.flags.exciter.interp;
-    WHITEBOX_EXCITER(whitebox_device)->fcw = w.flags.exciter.fcw;
-    WHITEBOX_EXCITER(whitebox_device)->threshold = w.flags.exciter.threshold;
+    exciter->ops->set_state(exciter, w.flags.exciter.state);
+    exciter->ops->set_interp(exciter, w.flags.exciter.interp);
+    exciter->ops->set_fcw(exciter, w.flags.exciter.fcw);
+    exciter->ops->set_threshold(exciter, w.flags.exciter.threshold);
     return 0;
 }
 
@@ -442,16 +447,17 @@ static int whitebox_probe(struct platform_device* pdev) {
 
     init_waitqueue_head(&whitebox_device->write_wait_queue);
 
-    whitebox_user_source_init(&whitebox_device->user_source,
-            whitebox_user_source_order, &whitebox_device->mapped);
-
-    whitebox_rf_sink_init(&whitebox_device->rf_sink,
+    if ((ret = whitebox_exciter_create(&whitebox_device->exciter,
             whitebox_exciter_regs->start, 
+            resource_size(whitebox_exciter_regs)))) {
+        goto fail_create_exciter;
+    }
+
+    if ((ret = whitebox_mock_exciter_create(&whitebox_device->mock_exciter,
             resource_size(whitebox_exciter_regs),
-            WHITEBOX_PLATFORM_DATA(pdev)->tx_dma_ch,
-            tx_dma_cb,
-            whitebox_device,
-            64);
+            whitebox_mock_exciter_order))) {
+        goto fail_create_mock;
+    }
 
     whitebox_device->irq = irq;
     /*ret = request_irq(irq, tx_irq_cb, 0,
@@ -513,19 +519,17 @@ static int whitebox_probe(struct platform_device* pdev) {
 fail_gpio_request:
     device_destroy(whitebox_class, whitebox_devno);
 fail_create_device:
+    cdev_del(&whitebox_device->cdev);
 fail_create_cdev:
     unregister_chrdev_region(whitebox_devno, 1);
-
 fail_alloc_region:
     class_destroy(whitebox_class);
-
 fail_create_class:
-/*    free_irq(whitebox_device->irq, whitebox_device);
-fail_irq:*/
-//    iounmap(whitebox_device->exciter);
-//fail_ioremap:
+    whitebox_exciter_destroy(&whitebox_device->mock_exciter.exciter);
+fail_create_mock:
+    whitebox_exciter_destroy(&whitebox_device->exciter);
+fail_create_exciter:
     kfree(whitebox_device);
-
 fail_release_nothing:
 done:
     return ret;
@@ -536,17 +540,16 @@ static int whitebox_remove(struct platform_device* pdev) {
 
     whitebox_gpio_free(pdev);
 
-    cdev_del(&whitebox_device->cdev);
-
     device_destroy(whitebox_class, whitebox_devno);
+
+    cdev_del(&whitebox_device->cdev);
 
     unregister_chrdev_region(whitebox_devno, 1);
 
     class_destroy(whitebox_class);
 
-    //free_irq(whitebox_device->irq, whitebox_device);
-
-    //iounmap(whitebox_device->exciter);
+    whitebox_exciter_destroy(&whitebox_device->mock_exciter.exciter);
+    whitebox_exciter_destroy(&whitebox_device->exciter);
 
     kfree(whitebox_device);
     return 0;

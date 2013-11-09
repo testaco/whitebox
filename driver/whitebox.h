@@ -9,6 +9,7 @@
 
 #include "whitebox_ioctl.h"
 #include "whitebox_block.h"
+#include "whitebox_exciter.h"
 
 #define WHITEBOX_DRIVER_NAME "whitebox"
 
@@ -63,22 +64,10 @@ struct whitebox_device {
 
     struct whitebox_user_source user_source;
     struct whitebox_rf_sink rf_sink;
+
+    struct whitebox_exciter exciter;
+    struct whitebox_mock_exciter mock_exciter;
 };
-
-/*
- * IO Mapped structure of the exciter
- */
-struct whitebox_exciter_regs {
-    u32 sample;
-    u32 state;
-    u32 interp;
-    u32 fcw;
-    u32 runs;
-    u32 threshold;
-};
-
-#define WHITEBOX_EXCITER(s) ((volatile struct whitebox_exciter_regs *)(s->rf_sink.regs))
-
 
 /*
  * Platform data includes pin mappings for each GPIO on the Bravo card

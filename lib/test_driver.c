@@ -271,6 +271,12 @@ int test_mmap_write_not_locked(void *data) {
 #endif
 
 int main(int argc, char **argv) {
+    int fd;
+    int result;
+    fd = open("/sys/module/whitebox/parameters/whitebox_mock_exciter_en", O_WRONLY);
+    write(fd, "1");
+    close(fd);
+
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_blocking_open_close),
         WHITEBOX_TEST(test_blocking_open_busy),
@@ -291,5 +297,9 @@ int main(int argc, char **argv) {
 #endif
         WHITEBOX_TEST(0),
     };
-    return whitebox_test_main(tests, NULL, argc, argv);
+    result = whitebox_test_main(tests, NULL, argc, argv);
+    fd = open("/sys/module/whitebox/parameters/whitebox_mock_exciter_en", O_WRONLY);
+    write(fd, "0");
+    close(fd);
+    return result;
 }

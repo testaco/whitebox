@@ -10,7 +10,16 @@ configure_file(Kbuild Kbuild
     COPYONLY
 )
 
-set(DRIVER_SOURCES whitebox_driver.c whitebox.h whitebox_ioctl.h pdma.c pdma.h whitebox_block.h whitebox_rf_sink.c whitebox_user_source.c whitebox_gpio.h whitebox_gpio.c)
+set(DRIVER_SOURCES
+        whitebox_driver.c
+        whitebox.h
+        whitebox_ioctl.h
+        pdma.c pdma.h
+        whitebox_block.h
+        whitebox_rf_sink.c
+        whitebox_user_source.c
+        whitebox_exciter.h whitebox_exciter.c
+        whitebox_gpio.h whitebox_gpio.c)
 
 foreach (DRIVER_SOURCE ${DRIVER_SOURCES})
     configure_file(${DRIVER_SOURCE} ${DRIVER_SOURCE}

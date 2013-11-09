@@ -64,13 +64,7 @@ int whitebox_user_source_work(struct whitebox_user_source *user_source,
         unsigned long dest, size_t dest_count);
 
 
-struct whitebox_rf_sink;
-
-struct whitebox_rf_sink_operations {
-    u32 (*get_state)(struct whitebox_rf_sink *rf_sink);
-    void (*set_state)(struct whitebox_rf_sink *rf_sink, u32 state_mask);
-    void (*clear_state)(struct whitebox_rf_sink *rf_sink, u32 state_mask);
-};
+struct whitebox_exciter;
 
 struct whitebox_rf_sink {
     /* locked at start of dma, must use trylock since its a tasklet */
@@ -91,18 +85,15 @@ struct whitebox_rf_sink {
     size_t quantum;
 
     /* exciter regs */
-    unsigned long regs_start;
-    size_t regs_size;
-    void *regs;
+    //unsigned long regs_start;
+    //size_t regs_size;
 
-    /* Operations to act on regs */
-    struct whitebox_rf_sink_operations *rf_ops;
+    struct whitebox_exciter *exciter;
 };
 
 void whitebox_rf_sink_init(struct whitebox_rf_sink *rf_sink,
-        unsigned long regs_start, size_t regs_size,
         int dma_ch, void (*dma_cb)(void*), void *dma_cb_data,
-        size_t quantum);
+        struct whitebox_exciter *exciter, size_t quantum);
 int whitebox_rf_sink_alloc(struct whitebox_rf_sink *rf_sink);
 void whitebox_rf_sink_free(struct whitebox_rf_sink *rf_sink);
 size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,
