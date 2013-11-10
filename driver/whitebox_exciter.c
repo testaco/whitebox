@@ -1,7 +1,7 @@
 #include <asm/io.h>
 #include <linux/vmalloc.h>
 
-#include "whitebox_exciter.h"
+#include "whitebox.h"
 
 static int whitebox_rf_exciter_debug = 0;
 #define d_printk(level, fmt, args...)				\
@@ -84,6 +84,19 @@ u32 _exciter_get_runs(struct whitebox_exciter *exciter)
     return runs;
 }
 
+long _exciter_space_available(struct whitebox_exciter *exciter,
+        unsigned long *dest)
+{
+    u32 state;
+    state = exciter->ops->get_state(exciter);
+    *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
+    if (!(state & WES_AFULL))
+        return exciter->quantum;
+    if (state & WES_SPACE)
+        return 1;
+    return 0;
+}
+
 struct whitebox_exciter_operations _exciter_ops = {
     .free = _exciter_free,
     .get_state = _exciter_get_state,
@@ -96,6 +109,7 @@ struct whitebox_exciter_operations _exciter_ops = {
     .get_threshold = _exciter_get_threshold,
     .set_threshold = _exciter_set_threshold,
     .get_runs = _exciter_get_runs,
+    .space_available = _exciter_space_available,
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,
@@ -119,11 +133,82 @@ void _mock_exciter_free(struct whitebox_exciter *exciter)
     vfree(exciter->regs);
 }
 
+u32 _mock_exciter_get_state(struct whitebox_exciter *exciter)
+{
+    struct whitebox_mock_exciter *mock_exciter = 
+        container_of(exciter, struct whitebox_mock_exciter, exciter);
+    u32 state;
+    long tail, head, space;
+    long tail2, head2, data;
+
+    d_printk(1, "\n");
+
+    state = WHITEBOX_EXCITER(exciter)->state;
+
+    head = mock_exciter->buf.head;
+    tail = ACCESS_ONCE(mock_exciter->buf.tail);
+    space = CIRC_SPACE(head, tail, mock_exciter->buf_size);
+    if (space)
+        state |= WES_SPACE;
+    if (space < exciter->quantum)
+        state |= WES_AFULL;
+
+    head2 = mock_exciter->buf.head;
+    tail2 = ACCESS_ONCE(mock_exciter->buf.tail);
+    data = CIRC_CNT(head2, tail2, mock_exciter->buf_size);
+    if (data)
+        state |= WES_DATA;
+    if (data < exciter->quantum)
+        state |= WES_AEMPTY;
+
+    return state;
+}
+
+void _mock_exciter_set_state(struct whitebox_exciter *exciter, u32 state_mask)
+{
+    u32 state;
+    d_printk(1, "\n");
+    if (state_mask & WES_CLEAR) {
+        WHITEBOX_EXCITER(exciter)->state = 0;
+        return;
+    }
+    if (state_mask & WES_TXSTOP) {
+        exciter->ops->clear_state(exciter, WES_TXEN);
+        return;
+    }
+    state = WHITEBOX_EXCITER(exciter)->state;
+    WHITEBOX_EXCITER(exciter)->state = state | state_mask;
+}
+
+void _mock_exciter_clear_state(struct whitebox_exciter *exciter, u32 state_mask)
+{
+    u32 state;
+    d_printk(1, "\n");
+    state = WHITEBOX_EXCITER(exciter)->state;
+    WHITEBOX_EXCITER(exciter)->state = state & ~state_mask;
+}
+
+long _mock_exciter_space_available(struct whitebox_exciter *exciter,
+        unsigned long *dest)
+{
+    struct whitebox_mock_exciter *mock_exciter = 
+        container_of(exciter, struct whitebox_mock_exciter, exciter);
+    u32 state = exciter->ops->get_state(exciter);
+    d_printk(1, "\n");
+    *dest = (unsigned long)mock_exciter->buf.buf + mock_exciter->buf.head;
+    if (!(state & WES_AFULL))
+        return exciter->quantum;
+    if (state & WES_SPACE)
+        return 4;
+    return 0;
+}
+
+
 struct whitebox_exciter_operations _mock_exciter_ops = {
     .free = _mock_exciter_free,
-    .get_state = _exciter_get_state,
-    .set_state = _exciter_set_state,
-    .clear_state = _exciter_clear_state,
+    .get_state = _mock_exciter_get_state,
+    .set_state = _mock_exciter_set_state,
+    .clear_state = _mock_exciter_clear_state,
     .get_interp = _exciter_get_interp,
     .set_interp = _exciter_set_interp,
     .get_fcw = _exciter_get_fcw,
@@ -131,6 +216,7 @@ struct whitebox_exciter_operations _mock_exciter_ops = {
     .get_threshold = _exciter_get_threshold,
     .set_threshold = _exciter_set_threshold,
     .get_runs = _exciter_get_runs,
+    .space_available = _mock_exciter_space_available,
 };
 
 int whitebox_mock_exciter_create(struct whitebox_mock_exciter *mock_exciter,

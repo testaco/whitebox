@@ -48,6 +48,12 @@
 #define WHITEBOX_GPIO_VCO_PDB      (FPGA_GPIO_BASE+18)
 #define WHITEBOX_GPIO_VCO_LD       (FPGA_GPIO_BASE+19)
 
+enum whitebox_device_state {
+    WDS_IDLE,
+    WDS_TX,
+    WDS_RX,
+};
+
 /*
  * Book-keeping for the device
  */
@@ -55,6 +61,7 @@ struct whitebox_device {
     struct semaphore sem;
     struct cdev cdev;
     struct device* device;
+    enum whitebox_device_state state;
     int irq;
     int irq_disabled;
     struct whitebox_platform_data_t* platform_data;

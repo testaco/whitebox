@@ -28,13 +28,16 @@ static atomic_t use_count = ATOMIC_INIT(0);
 
 /*
  * Driver verbosity level: 0->silent; >0->verbose
- */
-static int whitebox_debug = 0;
-
-/*
  * User can change verbosity of the driver.
  */
+static int whitebox_debug = 0;
 module_param(whitebox_debug, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Does a mis-locked PLL cause a file error?
+ */
+static int whitebox_check_plls = 1;
+module_param(whitebox_check_plls, int, S_IRUSR | S_IWUSR);
 
 /*
  * Order of the user_source circular buffer.
@@ -53,6 +56,12 @@ module_param(whitebox_mock_exciter_en, int, S_IRUSR | S_IWUSR);
  */
 static int whitebox_mock_exciter_order = 3;
 module_param(whitebox_mock_exciter_order, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Block size of dma xfers to the exciter peripheral.
+ */
+static int whitebox_exciter_quantum = 64;
+module_param(whitebox_exciter_quantum, int, S_IRUSR | S_IWUSR);
 
 /*
  * Register mappings for the CMX991 register file.
@@ -96,6 +105,9 @@ int tx_start(struct whitebox_device* wb) {
 
     result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
 
+    d_printk(2, "src=%08lx src_count=%ld dest=%08lx dest_count=%ld result=%d\n",
+            src, src_count, dest, dest_count, result);
+
     if (result < 0) {
         spin_unlock(&rf_sink->lock);
         d_printk(0, "rf_sink_work error!\n");
@@ -123,6 +135,24 @@ void tx_dma_cb(void *data) {
     wake_up_interruptible(&wb->write_wait_queue);
 
     tx_start(wb);
+}
+
+void tx_stop(struct whitebox_device *wb) {
+    d_printk(2, "\n");
+    wb->rf_sink.exciter->ops->set_state(wb->rf_sink.exciter, WES_TXSTOP);
+}
+
+int tx_error(struct whitebox_device *wb) {
+    int c, locked;
+    d_printk(2, "%d\n", whitebox_check_plls);
+    if (whitebox_check_plls) {
+        c = whitebox_gpio_cmx991_read(wb->platform_data,
+            WHITEBOX_CMX991_LD_REG);
+        locked = whitebox_gpio_adf4351_locked(wb->platform_data)
+                && (c & WHITEBOX_CMX991_LD_MASK);
+        return !locked;
+    }
+    return 0;
 }
 
 static irqreturn_t tx_irq_cb(int irq, void* ptr) {
@@ -157,8 +187,9 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
             whitebox_device->platform_data->tx_dma_ch,
             tx_dma_cb,
             whitebox_device,
-            exciter,
-            64);
+            exciter);
+
+    exciter->quantum = whitebox_exciter_quantum;
 
     if (filp->f_flags & O_WRONLY || filp->f_flags & O_RDWR) {
         ret = whitebox_rf_sink_alloc(rf_sink);
@@ -176,6 +207,8 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
         // enable dac
         //whitebox_gpio_dac_enable(whitebox_device->platform_data);
     }
+
+    whitebox_device->state = WDS_IDLE;
 
     whitebox_ioctl_reset();
 
@@ -198,6 +231,9 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
         d_printk(0, "Device not in use");
         return -ENOENT;
     }
+
+    if (whitebox_device->state == WDS_TX)
+        tx_stop(whitebox_device);
 
     if (filp->f_flags & O_WRONLY || filp->f_flags & O_RDWR) {
         // wait for DMA to finish
@@ -238,6 +274,28 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
         return -ERESTARTSYS;
     }
 
+    if (whitebox_device->state == WDS_RX) {
+        up(&whitebox_device->sem);
+        d_printk(1, "in receive\n");
+        return -EBUSY;
+    }
+
+    if (count == 0) {
+        tx_stop(whitebox_device);
+        up(&whitebox_device->sem);
+        return 0;
+    }
+
+    if ((ret = tx_error(whitebox_device))) {
+        d_printk(1, "tx_error\n");
+        up(&whitebox_device->sem);
+        return ret;
+    }
+
+    if (whitebox_device->state == WDS_IDLE) {
+        whitebox_device->state = WDS_TX;
+    }
+
     while ((dest_count = whitebox_user_source_space_available(user_source, &dest)) == 0) {
         up(&whitebox_device->sem);
         if (filp->f_flags & O_NONBLOCK)
@@ -267,6 +325,22 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     tx_start(whitebox_device);
 
     return ret;
+}
+
+static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync)
+{
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    if (down_interruptible(&whitebox_device->sem)) {
+        return -ERESTARTSYS;
+    }
+    if (whitebox_device->state == WDS_TX) {
+        tx_stop(whitebox_device);
+        while (exciter->ops->get_state(exciter) & WES_TXEN)
+            cpu_relax();
+        whitebox_device->state = WDS_IDLE;
+    }
+    up(&whitebox_device->sem);
+    return 0;
 }
 
 long whitebox_ioctl_reset(void) {
@@ -416,6 +490,7 @@ static struct file_operations whitebox_fops = {
     .release = whitebox_release,
     .read = whitebox_read,
     .write = whitebox_write,
+    .fsync = whitebox_fsync,
     .unlocked_ioctl = whitebox_ioctl,
 };
 

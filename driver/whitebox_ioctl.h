@@ -34,12 +34,14 @@ typedef struct whitebox_args {
 #define WE_FIFO_SIZE    1024
 
 #define WES_CLEAR       0x00000001
-#define WES_CLEAR_TXIRQ 0x00000002
+#define WES_TXSTOP      0x00000002
 #define WES_TXEN        0x00000100
 #define WES_DDSEN       0x00000200
 #define WES_FILTEREN    0x00000400
 #define WES_AEMPTY      0x00010000
 #define WES_AFULL       0x00020000
+#define WES_SPACE       0x00100000
+#define WES_DATA        0x00200000
 
 #define WER_OVERRUNS_MASK    0xffff0000
 #define WER_OVERRUNS_OFFSET  16

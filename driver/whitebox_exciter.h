@@ -18,11 +18,11 @@ struct whitebox_exciter_regs {
 
 #define WHITEBOX_EXCITER(e) ((volatile struct whitebox_exciter_regs *)((e)->regs))
 
-
 struct whitebox_exciter_operations;
 
 struct whitebox_exciter {
     void *regs;
+    size_t quantum;
     struct whitebox_exciter_operations *ops;
 };
 
@@ -49,6 +49,9 @@ struct whitebox_exciter_operations {
     void (*set_threshold)(struct whitebox_exciter *exciter, u32 threshold);
 
     u32 (*get_runs)(struct whitebox_exciter *exciter);
+
+    long (*space_available)(struct whitebox_exciter *exciter,
+            unsigned long *dest);
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,

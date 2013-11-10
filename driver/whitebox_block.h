@@ -82,7 +82,7 @@ struct whitebox_rf_sink {
     /* callback data */
     void *dma_cb_data;
     /* how many samples to send per dma callback */
-    size_t quantum;
+    //size_t quantum;
 
     /* exciter regs */
     //unsigned long regs_start;
@@ -93,7 +93,7 @@ struct whitebox_rf_sink {
 
 void whitebox_rf_sink_init(struct whitebox_rf_sink *rf_sink,
         int dma_ch, void (*dma_cb)(void*), void *dma_cb_data,
-        struct whitebox_exciter *exciter, size_t quantum);
+        struct whitebox_exciter *exciter);
 int whitebox_rf_sink_alloc(struct whitebox_rf_sink *rf_sink);
 void whitebox_rf_sink_free(struct whitebox_rf_sink *rf_sink);
 size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,

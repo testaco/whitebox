@@ -12,14 +12,13 @@ static int whitebox_rf_sink_debug = 0;
 
 void whitebox_rf_sink_init(struct whitebox_rf_sink *rf_sink,
         int dma_ch, void (*dma_cb)(void*), void *dma_cb_data,
-        struct whitebox_exciter *exciter, size_t quantum)
+        struct whitebox_exciter *exciter)
 {
     spin_lock_init(&rf_sink->lock);
     rf_sink->off = 0;
     rf_sink->dma_ch = dma_ch;
     rf_sink->dma_cb = dma_cb;
     rf_sink->dma_cb_data = dma_cb_data;
-    rf_sink->quantum = quantum;
     rf_sink->exciter = exciter;
 }
 
@@ -47,16 +46,7 @@ void whitebox_rf_sink_free(struct whitebox_rf_sink *rf_sink)
 size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,
         unsigned long *dest)
 {
-    u32 state;
-    state = rf_sink->exciter->ops->get_state(rf_sink->exciter);
-    if (state & WES_AFULL) {
-        if (!(state & WES_TXEN)) {
-            rf_sink->exciter->ops->set_state(rf_sink->exciter, WES_TXEN);
-            d_printk(1, "afull, txen\n");
-        }
-        return 0;
-    }
-    return rf_sink->quantum;
+    return rf_sink->exciter->ops->space_available(rf_sink->exciter, dest);
 }
 
 int whitebox_rf_sink_produce(struct whitebox_rf_sink *rf_sink, size_t count)
