@@ -23,6 +23,7 @@ struct whitebox_exciter_operations;
 struct whitebox_exciter {
     void *regs;
     size_t quantum;
+    u32 pdma_config;
     struct whitebox_exciter_operations *ops;
 };
 
@@ -48,7 +49,8 @@ struct whitebox_exciter_operations {
     u32 (*get_threshold)(struct whitebox_exciter *exciter);
     void (*set_threshold)(struct whitebox_exciter *exciter, u32 threshold);
 
-    u32 (*get_runs)(struct whitebox_exciter *exciter);
+    void (*get_runs)(struct whitebox_exciter *exciter,
+            u16 *overruns, u16 *underruns);
 
     long (*space_available)(struct whitebox_exciter *exciter,
             unsigned long *dest);

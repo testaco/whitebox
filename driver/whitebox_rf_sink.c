@@ -28,14 +28,7 @@ int whitebox_rf_sink_alloc(struct whitebox_rf_sink *rf_sink)
             (pdma_irq_handler_t)rf_sink->dma_cb,
             rf_sink->dma_cb_data,
             10,
-            PDMA_CONTROL_PER_SEL_FPGA0 |
-            PDMA_CONTROL_HIGH_PRIORITY |
-            PDMA_CONTROL_XFER_SIZE_4B |
-            PDMA_CONTROL_DST_ADDR_INC_0 |
-            PDMA_CONTROL_SRC_ADDR_INC_4 |
-            PDMA_CONTROL_PERIPH |
-            PDMA_CONTROL_DIR_MEM_TO_PERIPH |
-            PDMA_CONTROL_INTEN);
+            rf_sink->exciter->pdma_config);
 }
 
 void whitebox_rf_sink_free(struct whitebox_rf_sink *rf_sink)

@@ -66,8 +66,10 @@ struct whitebox_device {
     int irq_disabled;
     struct whitebox_platform_data_t* platform_data;
     wait_queue_head_t write_wait_queue;
-    u32 adf4351_regs[WA_REGS_COUNT];
     atomic_t mapped;
+
+    u32 adf4351_regs[WA_REGS_COUNT];
+    u16 cur_overruns, cur_underruns;
 
     struct whitebox_user_source user_source;
     struct whitebox_rf_sink rf_sink;

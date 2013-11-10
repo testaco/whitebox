@@ -40,6 +40,12 @@ static int whitebox_check_plls = 1;
 module_param(whitebox_check_plls, int, S_IRUSR | S_IWUSR);
 
 /*
+ * Does an overrun or underrun cause a file error?
+ */
+static int whitebox_check_runs = 1;
+module_param(whitebox_check_runs, int, S_IRUSR | S_IWUSR);
+
+/*
  * Order of the user_source circular buffer.
  */
 static int whitebox_user_source_order = 3;
@@ -83,7 +89,15 @@ static u8 whitebox_cmx991_regs_read_lut[] = {
 /* Prototpyes */
 long whitebox_ioctl_reset(void);
 
-int tx_start(struct whitebox_device* wb) {
+int tx_start(struct whitebox_device *wb)
+{
+    struct whitebox_exciter *exciter = wb->rf_sink.exciter;
+    exciter->ops->set_state(exciter, WES_CLEAR);
+    exciter->ops->get_runs(exciter, &wb->cur_overruns, &wb->cur_underruns);
+    return 0;
+}
+
+int tx_exec(struct whitebox_device* wb) {
     struct whitebox_user_source *user_source = &wb->user_source;
     struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
     size_t src_count, dest_count;
@@ -105,7 +119,7 @@ int tx_start(struct whitebox_device* wb) {
 
     result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
 
-    d_printk(2, "src=%08lx src_count=%ld dest=%08lx dest_count=%ld result=%d\n",
+    d_printk(2, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu result=%d\n",
             src, src_count, dest, dest_count, result);
 
     if (result < 0) {
@@ -134,7 +148,7 @@ void tx_dma_cb(void *data) {
 
     wake_up_interruptible(&wb->write_wait_queue);
 
-    tx_start(wb);
+    tx_exec(wb);
 }
 
 void tx_stop(struct whitebox_device *wb) {
@@ -143,14 +157,28 @@ void tx_stop(struct whitebox_device *wb) {
 }
 
 int tx_error(struct whitebox_device *wb) {
-    int c, locked;
-    d_printk(2, "%d\n", whitebox_check_plls);
     if (whitebox_check_plls) {
+        int c, locked;
         c = whitebox_gpio_cmx991_read(wb->platform_data,
             WHITEBOX_CMX991_LD_REG);
         locked = whitebox_gpio_adf4351_locked(wb->platform_data)
                 && (c & WHITEBOX_CMX991_LD_MASK);
-        return !locked;
+        if (!locked)
+            return 1;
+    }
+
+    if (whitebox_check_runs) {
+        u16 overruns, underruns;
+        wb->rf_sink.exciter->ops->get_runs(wb->rf_sink.exciter,
+                &overruns, &underruns);
+        if (wb->cur_overruns != overruns) {
+            wb->cur_overruns = overruns;
+            return 2;
+        }
+        if (wb->cur_underruns != underruns) {
+            wb->cur_underruns = underruns;
+            return 3;
+        }
     }
     return 0;
 }
@@ -159,7 +187,7 @@ static irqreturn_t tx_irq_cb(int irq, void* ptr) {
     struct whitebox_device* wb = (struct whitebox_device*)ptr;
     d_printk(1, "clearing txirq\n");
 
-    tx_start(wb);
+    tx_exec(wb);
 
     return IRQ_HANDLED;
 }
@@ -250,7 +278,7 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
         whitebox_user_source_free(user_source);
 
         // Turn off transmission
-        rf_sink->exciter->ops->clear_state(rf_sink->exciter, WES_TXEN);
+        //rf_sink->exciter->ops->clear_state(rf_sink->exciter, WES_TXEN);
     }
 
     atomic_dec(&use_count);
@@ -280,20 +308,21 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
         return -EBUSY;
     }
 
+    if (whitebox_device->state == WDS_IDLE) {
+        whitebox_device->state = WDS_TX;
+        tx_start(whitebox_device);
+    }
+
     if (count == 0) {
         tx_stop(whitebox_device);
         up(&whitebox_device->sem);
         return 0;
     }
 
-    if ((ret = tx_error(whitebox_device))) {
+    if (tx_error(whitebox_device)) {
         d_printk(1, "tx_error\n");
         up(&whitebox_device->sem);
-        return ret;
-    }
-
-    if (whitebox_device->state == WDS_IDLE) {
-        whitebox_device->state = WDS_TX;
+        return -EFAULT;
     }
 
     while ((dest_count = whitebox_user_source_space_available(user_source, &dest)) == 0) {
@@ -322,7 +351,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
     up(&whitebox_device->sem);
 
-    tx_start(whitebox_device);
+    tx_exec(whitebox_device);
 
     return ret;
 }
@@ -334,6 +363,10 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
         return -ERESTARTSYS;
     }
     if (whitebox_device->state == WDS_TX) {
+        if (tx_error(whitebox_device)) {
+            up(&whitebox_device->sem);
+            return -EFAULT;
+        }
         tx_stop(whitebox_device);
         while (exciter->ops->get_state(exciter) & WES_TXEN)
             cpu_relax();
@@ -379,7 +412,7 @@ long whitebox_ioctl_exciter_get(unsigned long arg) {
     w.flags.exciter.state = exciter->ops->get_state(exciter);
     w.flags.exciter.interp = exciter->ops->get_interp(exciter);
     w.flags.exciter.fcw = exciter->ops->get_fcw(exciter);
-    w.flags.exciter.runs = exciter->ops->get_runs(exciter);
+    // TODO w.flags.exciter.runs = exciter->ops->get_runs(exciter);
     w.flags.exciter.threshold = exciter->ops->get_threshold(exciter);
     if (copy_to_user((whitebox_args_t*)arg, &w,
             sizeof(whitebox_args_t)))
@@ -458,6 +491,20 @@ long whitebox_ioctl_adf4351_set(unsigned long arg) {
     return 0;
 }
 
+long whitebox_ioctl_mock_exciter_command(unsigned long arg) {
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+
+    if (w.mock_command == WMC_CAUSE_UNDERRUN) {
+        WHITEBOX_EXCITER(&whitebox_device->mock_exciter.exciter)->runs +=
+                0x00000001;
+    }
+
+    return 0;
+}
+
 static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long arg) {
     switch(cmd) {
         case W_RESET:
@@ -478,6 +525,8 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_adf4351_get(arg);
         case WA_SET:
             return whitebox_ioctl_adf4351_set(arg);
+        case WM_CMD:
+            return whitebox_ioctl_mock_exciter_command(arg);
         default:
             return -EINVAL;
     }

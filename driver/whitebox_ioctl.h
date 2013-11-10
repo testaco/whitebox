@@ -22,6 +22,7 @@ typedef struct whitebox_args {
         uint32_t adf4351[WA_REGS_COUNT];
     } flags;
     uint8_t locked;
+    uint32_t mock_command;
 } whitebox_args_t;
 
 #define W_RESET _IO('w', 1)
@@ -56,3 +57,7 @@ typedef struct whitebox_args {
 
 #define WA_GET _IOR('w', 8, whitebox_args_t*)
 #define WA_SET _IOW('w', 9, whitebox_args_t*)
+
+#define WM_CMD _IOW('w', 10, whitebox_args_t*)
+
+#define WMC_CAUSE_UNDERRUN    (1 << 0)

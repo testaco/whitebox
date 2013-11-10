@@ -1,6 +1,7 @@
 #include <asm/io.h>
 #include <linux/vmalloc.h>
 
+#include "pdma.h"
 #include "whitebox.h"
 
 static int whitebox_rf_exciter_debug = 0;
@@ -76,12 +77,14 @@ void _exciter_set_threshold(struct whitebox_exciter *exciter, u32 threshold)
     WHITEBOX_EXCITER(exciter)->threshold = threshold;
 }
 
-u32 _exciter_get_runs(struct whitebox_exciter *exciter)
+void _exciter_get_runs(struct whitebox_exciter *exciter,
+        u16 *overruns, u16 *underruns)
 {
     u32 runs;
     runs = WHITEBOX_EXCITER(exciter)->runs;
     runs = WHITEBOX_EXCITER(exciter)->runs;
-    return runs;
+    *overruns = (u16)((runs & WER_OVERRUNS_MASK) >> WER_OVERRUNS_OFFSET);
+    *underruns = (u16)(runs & WER_UNDERRUNS_MASK);
 }
 
 long _exciter_space_available(struct whitebox_exciter *exciter,
@@ -122,6 +125,15 @@ int whitebox_exciter_create(struct whitebox_exciter *exciter,
             "whitebox exciter base=%08lx\n", regs_start);
         return -EINVAL;
     }
+    exciter->pdma_config =
+            PDMA_CONTROL_PER_SEL_FPGA0 |
+            //PDMA_CONTROL_HIGH_PRIORITY |
+            PDMA_CONTROL_XFER_SIZE_4B |
+            PDMA_CONTROL_DST_ADDR_INC_0 |
+            PDMA_CONTROL_SRC_ADDR_INC_4 |
+            PDMA_CONTROL_PERIPH |
+            PDMA_CONTROL_DIR_MEM_TO_PERIPH |
+            PDMA_CONTROL_INTEN;
     return 0;
 }
 
@@ -230,6 +242,13 @@ int whitebox_mock_exciter_create(struct whitebox_mock_exciter *mock_exciter,
             "whitebox mock exciter\n");
         return -EINVAL;
     }
+    exciter->pdma_config =
+            //PDMA_CONTROL_HIGH_PRIORITY |
+            PDMA_CONTROL_XFER_SIZE_4B |
+            PDMA_CONTROL_DST_ADDR_INC_4 |
+            PDMA_CONTROL_SRC_ADDR_INC_4 |
+            PDMA_CONTROL_DIR_MEM_TO_PERIPH |
+            PDMA_CONTROL_INTEN;
 
     mock_exciter->order = order;
     mock_exciter->buf_size = PAGE_SIZE << mock_exciter->order;
