@@ -104,4 +104,7 @@ struct whitebox_platform_data_t {
 
 #define WHITEBOX_PLATFORM_DATA(pdev) ((struct whitebox_platform_data_t *)(pdev->dev.platform_data))
 
+extern int whitebox_check_plls;
+extern int whitebox_check_runs;
+
 #endif /* __WHITEBOX_H */

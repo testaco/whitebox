@@ -36,13 +36,13 @@ module_param(whitebox_debug, int, S_IRUSR | S_IWUSR);
 /*
  * Does a mis-locked PLL cause a file error?
  */
-static int whitebox_check_plls = 1;
+int whitebox_check_plls = 1;
 module_param(whitebox_check_plls, int, S_IRUSR | S_IWUSR);
 
 /*
  * Does an overrun or underrun cause a file error?
  */
-static int whitebox_check_runs = 1;
+int whitebox_check_runs = 1;
 module_param(whitebox_check_runs, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -89,108 +89,11 @@ static u8 whitebox_cmx991_regs_read_lut[] = {
 /* Prototpyes */
 long whitebox_ioctl_reset(void);
 
-int tx_start(struct whitebox_device *wb)
-{
-    struct whitebox_exciter *exciter = wb->rf_sink.exciter;
-    exciter->ops->set_state(exciter, WES_CLEAR);
-    exciter->ops->get_runs(exciter, &wb->cur_overruns, &wb->cur_underruns);
-    return 0;
-}
-
-int tx_exec(struct whitebox_device* wb) {
-    struct whitebox_user_source *user_source = &wb->user_source;
-    struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
-    size_t src_count, dest_count;
-    unsigned long src, dest;
-    size_t count;
-    int result;
-
-    if (!spin_trylock(&rf_sink->lock))
-        return -EBUSY;
-
-    src_count = whitebox_user_source_data_available(user_source, &src);
-    dest_count = whitebox_rf_sink_space_available(rf_sink, &dest);
-    count = min(src_count, dest_count);
-    
-    if (count <= 0) {
-        spin_unlock(&rf_sink->lock);
-        return -EBUSY;
-    }
-
-    result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
-
-    d_printk(2, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu result=%d\n",
-            src, src_count, dest, dest_count, result);
-
-    if (result < 0) {
-        spin_unlock(&rf_sink->lock);
-        d_printk(0, "rf_sink_work error!\n");
-        return result;
-    }
-
-    return result;
-}
-
-void tx_dma_cb(void *data) {
-    struct whitebox_device *wb = (struct whitebox_device *)data;
-    struct whitebox_user_source *user_source = &wb->user_source;
-    struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
-    size_t count;
-    d_printk(1, "tx dma cb\n");
-
-    count = whitebox_rf_sink_work_done(rf_sink);
-    whitebox_user_source_consume(user_source, count);
-    whitebox_rf_sink_produce(rf_sink, count);
-
-    spin_unlock(&rf_sink->lock);
-
-    d_printk(1, "wake_up\n");
-
-    wake_up_interruptible(&wb->write_wait_queue);
-
-    tx_exec(wb);
-}
-
-void tx_stop(struct whitebox_device *wb) {
-    d_printk(2, "\n");
-    wb->rf_sink.exciter->ops->set_state(wb->rf_sink.exciter, WES_TXSTOP);
-}
-
-int tx_error(struct whitebox_device *wb) {
-    if (whitebox_check_plls) {
-        int c, locked;
-        c = whitebox_gpio_cmx991_read(wb->platform_data,
-            WHITEBOX_CMX991_LD_REG);
-        locked = whitebox_gpio_adf4351_locked(wb->platform_data)
-                && (c & WHITEBOX_CMX991_LD_MASK);
-        if (!locked)
-            return 1;
-    }
-
-    if (whitebox_check_runs) {
-        u16 overruns, underruns;
-        wb->rf_sink.exciter->ops->get_runs(wb->rf_sink.exciter,
-                &overruns, &underruns);
-        if (wb->cur_overruns != overruns) {
-            wb->cur_overruns = overruns;
-            return 2;
-        }
-        if (wb->cur_underruns != underruns) {
-            wb->cur_underruns = underruns;
-            return 3;
-        }
-    }
-    return 0;
-}
-
-static irqreturn_t tx_irq_cb(int irq, void* ptr) {
-    struct whitebox_device* wb = (struct whitebox_device*)ptr;
-    d_printk(1, "clearing txirq\n");
-
-    tx_exec(wb);
-
-    return IRQ_HANDLED;
-}
+int tx_start(struct whitebox_device *wb);
+int tx_exec(struct whitebox_device* wb);
+void tx_dma_cb(void *data);
+void tx_stop(struct whitebox_device *wb);
+int tx_error(struct whitebox_device *wb);
 
 static int whitebox_open(struct inode* inode, struct file* filp) {
     int ret = 0;
