@@ -2,17 +2,17 @@
 #include "whitebox.h"
 #include "whitebox_gpio.h"
 
-int tx_start(struct whitebox_device *wb)
+int rx_start(struct whitebox_device *wb)
 {
-    struct whitebox_exciter *exciter = wb->rf_sink.exciter;
-    exciter->ops->get_runs(exciter, &wb->cur_overruns, &wb->cur_underruns);
+    struct whitebox_receiver *receiver = wb->rf_source.receiver;
+    receiver->ops->get_runs(receiver, &wb->cur_overruns, &wb->cur_underruns);
     return 0;
 }
 
-int tx_exec(struct whitebox_device* wb)
+int rx_exec(struct whitebox_device* wb)
 {
-    struct whitebox_user_source *user_source = &wb->user_source;
-    struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
+    struct whitebox_rf_source *rf_source = &wb->rf_source;
+    struct whitebox_user_sink *user_sink = &wb->user_sink;
     size_t src_count, dest_count;
     unsigned long src, dest;
     size_t count;
@@ -20,64 +20,66 @@ int tx_exec(struct whitebox_device* wb)
 
     // stats->calls++;
 
-    if (!spin_trylock(&rf_sink->lock))
+    if (!spin_trylock(&rf_source->lock))
         // stats->busy++;
         return -EBUSY;
 
-    src_count = whitebox_user_source_data_available(user_source, &src);
-    dest_count = whitebox_rf_sink_space_available(rf_sink, &dest);
+    src_count = whitebox_rf_source_data_available(rf_source, &src);
+    dest_count = whitebox_user_sink_space_available(user_sink, &dest);
     count = min(src_count, dest_count);
     
     if (count == 0) {
         // stats->blocked++;
-        spin_unlock(&rf_sink->lock);
+        spin_unlock(&rf_source->lock);
         return -EBUSY;
     }
 
-    result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
+    result = whitebox_rf_source_work(rf_source, src, src_count, dest, dest_count);
 
     if (result < 0) {
         // stats->failed_work++;
-        spin_unlock(&rf_sink->lock);
+        spin_unlock(&rf_source->lock);
         return result;
     }
 
     // stats->work++;
 
-    // NOTE: Do not unlock the rf_sink's lock - the dma_cb will do it
+    // NOTE: Do not unlock the rf_source's lock - the dma_cb will do it
 
     return result;
 }
 
-void tx_dma_cb(void *data)
+void rx_dma_cb(void *data)
 {
     struct whitebox_device *wb = (struct whitebox_device *)data;
-    struct whitebox_user_source *user_source = &wb->user_source;
-    struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
+    struct whitebox_rf_source *rf_source = &wb->rf_source;
+    struct whitebox_user_sink *user_sink = &wb->user_sink;
     size_t count;
 
-    count = whitebox_rf_sink_work_done(rf_sink);
-    whitebox_user_source_consume(user_source, count);
-    whitebox_rf_sink_produce(rf_sink, count);
+    // stats->cb_calls++:
 
-    spin_unlock(&rf_sink->lock);
+    count = whitebox_rf_source_work_done(rf_source);
+    whitebox_rf_source_consume(rf_source, count);
+    whitebox_user_sink_produce(user_sink, count);
 
-    wake_up_interruptible(&wb->write_wait_queue);
+    spin_unlock(&rf_source->lock);
 
-    tx_exec(wb);
+    wake_up_interruptible(&wb->read_wait_queue);
+
+    rx_exec(wb);
 }
 
-void tx_stop(struct whitebox_device *wb)
+void rx_stop(struct whitebox_device *wb)
 {
     // wait for DMA to finish
-    /*while (pdma_active(whitebox_device->tx_dma_ch) > 0) {
+    /*while (pdma_active(whitebox_device->rx_dma_ch) > 0) {
         cpu_relax();
     }*/
 
-    wb->rf_sink.exciter->ops->set_state(wb->rf_sink.exciter, WES_TXSTOP);
+    wb->rf_source.receiver->ops->set_state(wb->rf_source.receiver, WRS_RXSTOP);
 }
 
-int tx_error(struct whitebox_device *wb)
+int rx_error(struct whitebox_device *wb)
 {
     if (whitebox_check_plls) {
         int c, locked;
@@ -91,7 +93,7 @@ int tx_error(struct whitebox_device *wb)
 
     if (whitebox_check_runs) {
         u16 overruns, underruns;
-        wb->rf_sink.exciter->ops->get_runs(wb->rf_sink.exciter,
+        wb->rf_source.receiver->ops->get_runs(wb->rf_source.receiver,
                 &overruns, &underruns);
         if (wb->cur_overruns != overruns) {
             wb->cur_overruns = overruns;
@@ -107,7 +109,7 @@ int tx_error(struct whitebox_device *wb)
 
 /*static irqreturn_t tx_irq_cb(int irq, void* ptr) {
     struct whitebox_device* wb = (struct whitebox_device*)ptr;
-    tx_exec(wb);
+    rx_exec(wb);
 
     return IRQ_HANDLED;
 }*/

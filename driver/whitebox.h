@@ -10,6 +10,7 @@
 #include "whitebox_ioctl.h"
 #include "whitebox_block.h"
 #include "whitebox_exciter.h"
+#include "whitebox_receiver.h"
 
 #define WHITEBOX_DRIVER_NAME "whitebox"
 
@@ -20,6 +21,14 @@
 #define WHITEBOX_EXCITER_INTERP_OFFSET 0x08
 #define WHITEBOX_EXCITER_FCW_OFFSET    0x0c
 #define WHITEBOX_EXCITER_REGS_COUNT    0x10
+
+#define WHITEBOX_RECEIVER_IRQ A2F_FPGA_DEMUX_IRQ_MAP(1)
+#define WHITEBOX_RECEIVER_REGS          0x40050480
+#define WHITEBOX_RECEIVER_SAMPLE_OFFSET 0x00
+#define WHITEBOX_RECEIVER_STATUS_OFFSET 0x04
+#define WHITEBOX_RECEIVER_INTERP_OFFSET 0x08
+#define WHITEBOX_RECEIVER_FCW_OFFSET    0x0c
+#define WHITEBOX_RECEIVER_REGS_COUNT    0x10
 
 #define WHITEBOX_CMX991_REGS_READ_BASE  0xe1
 #define WHITEBOX_CMX991_REGS_WRITE_BASE 0x11
@@ -66,16 +75,25 @@ struct whitebox_device {
     int irq_disabled;
     struct whitebox_platform_data_t* platform_data;
     wait_queue_head_t write_wait_queue;
+    wait_queue_head_t read_wait_queue;
     atomic_t mapped;
 
     u32 adf4351_regs[WA_REGS_COUNT];
     u16 cur_overruns, cur_underruns;
 
-    struct whitebox_user_source user_source;
-    struct whitebox_rf_sink rf_sink;
+    struct circ_buf mock_buf;
+    struct whitebox_mock_exciter mock_exciter;
+    struct whitebox_mock_receiver mock_receiver;
 
     struct whitebox_exciter exciter;
-    struct whitebox_mock_exciter mock_exciter;
+    struct whitebox_receiver receiver;
+
+    struct whitebox_user_source user_source;
+    struct whitebox_user_sink user_sink;
+
+    struct whitebox_rf_source rf_source;
+    struct whitebox_rf_sink rf_sink;
+
 };
 
 /*
@@ -100,6 +118,7 @@ struct whitebox_platform_data_t {
     unsigned vco_pdb_pin;
     unsigned vco_ld_pin;
     u8 tx_dma_ch;
+    u8 rx_dma_ch;
 };
 
 #define WHITEBOX_PLATFORM_DATA(pdev) ((struct whitebox_platform_data_t *)(pdev->dev.platform_data))

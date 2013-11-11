@@ -18,6 +18,13 @@ typedef struct whitebox_args {
             uint32_t runs;
             uint32_t threshold;
         } exciter;
+        struct {
+            uint32_t state;
+            uint32_t interp;
+            uint32_t fcw;
+            uint32_t runs;
+            uint32_t threshold;
+        } receiver;
         uint8_t cmx991[WC_REGS_COUNT];
         uint32_t adf4351[WA_REGS_COUNT];
     } flags;
@@ -25,9 +32,11 @@ typedef struct whitebox_args {
     uint32_t mock_command;
 } whitebox_args_t;
 
+/* General */
 #define W_RESET _IO('w', 1)
 #define W_LOCKED _IOR('w', 2, whitebox_args_t*)
 
+/* Exciter */
 #define WE_CLEAR _IO('w', 3)
 #define WE_GET  _IOR('w', 4, whitebox_args_t*)
 #define WE_SET _IOW('w', 5, whitebox_args_t*)
@@ -52,12 +61,41 @@ typedef struct whitebox_args {
 #define WET_AFVAL_OFFSET     16
 #define WET_AEVAL_MASK       0x0000ffff
 
-#define WC_GET _IOR('w', 6, whitebox_args_t*)
-#define WC_SET _IOW('w', 7, whitebox_args_t*)
+/* Receiver */
+#define WR_CLEAR _IO('w', 6)
+#define WR_GET  _IOR('w', 7, whitebox_args_t*)
+#define WR_SET _IOW('w', 8, whitebox_args_t*)
 
-#define WA_GET _IOR('w', 8, whitebox_args_t*)
-#define WA_SET _IOW('w', 9, whitebox_args_t*)
+#define WR_FIFO_SIZE    1024
 
-#define WM_CMD _IOW('w', 10, whitebox_args_t*)
+#define WRS_CLEAR       0x00000001
+#define WRS_RXSTOP      0x00000002
+#define WRS_RXEN        0x00000100
+#define WRS_DDSEN       0x00000200
+#define WRS_FILTEREN    0x00000400
+#define WRS_AEMPTY      0x00010000
+#define WRS_AFULL       0x00020000
+#define WRS_SPACE       0x00100000
+#define WRS_DATA        0x00200000
+
+#define WRR_OVERRUNS_MASK    0xffff0000
+#define WRR_OVERRUNS_OFFSET  16
+#define WRR_UNDERRUNS_MASK   0x0000ffff
+
+#define WRT_AFVAL_MASK       0xffff0000
+#define WRT_AFVAL_OFFSET     16
+#define WRT_AEVAL_MASK       0x0000ffff
+
+/* CMX991 */
+#define WC_GET _IOR('w', 9, whitebox_args_t*)
+#define WC_SET _IOW('w', 10, whitebox_args_t*)
+
+/* ADF4351 */
+#define WA_GET _IOR('w', 11, whitebox_args_t*)
+#define WA_SET _IOW('w', 12, whitebox_args_t*)
+
+/* Mock Commands */
+#define WM_CMD _IOW('w', 13, whitebox_args_t*)
 
 #define WMC_CAUSE_UNDERRUN    (1 << 0)
+#define WMC_CAUSE_OVERRUN    (1 << 1)

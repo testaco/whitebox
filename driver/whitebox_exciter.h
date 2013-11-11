@@ -31,7 +31,7 @@ struct whitebox_mock_exciter {
     struct whitebox_exciter exciter;
     unsigned long buf_size;
     int order;
-    struct circ_buf buf;
+    struct circ_buf *buf;
 };
 
 struct whitebox_exciter_operations {
@@ -54,13 +54,15 @@ struct whitebox_exciter_operations {
 
     long (*space_available)(struct whitebox_exciter *exciter,
             unsigned long *dest);
+    int (*produce)(struct whitebox_exciter *exciter,
+            size_t count);
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,
         unsigned long regs_start, size_t regs_size);
 
 int whitebox_mock_exciter_create(struct whitebox_mock_exciter *exciter,
-        size_t regs_size, int order);
+        size_t regs_size, int order, struct circ_buf *buf);
 
 void whitebox_exciter_destroy(struct whitebox_exciter *exciter);
 

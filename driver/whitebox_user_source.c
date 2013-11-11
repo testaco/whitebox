@@ -50,6 +50,11 @@ size_t whitebox_user_source_space_available(struct whitebox_user_source *user_so
 int whitebox_user_source_produce(struct whitebox_user_source *user_source,
         size_t count)
 {
+    d_printk(1, "values... %08x %08x %08x %08x\n",
+            (u32)*(user_source->buf.buf + user_source->buf.head + 0),
+            (u32)*(user_source->buf.buf + user_source->buf.head + 4),
+            (u32)*(user_source->buf.buf + user_source->buf.head + 8),
+            (u32)*(user_source->buf.buf + user_source->buf.head + 12));
     user_source->buf.head = (user_source->buf.head + count) & (user_source->buf_size - 1);
     user_source->off += count;
     return 0;
@@ -77,6 +82,14 @@ int whitebox_user_source_work(struct whitebox_user_source *user_source,
         unsigned long dest, size_t dest_count)
 {
     size_t count = min(src_count, dest_count);
+    d_printk(1, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu\n",
+            src, src_count, dest, dest_count);
+    /*d_printk(1, "values... %08x %08x %08x %08x\n",
+            (u32)*(src + 0),
+            (u32)*(src + 4),
+            (u32)*(src + 8),
+            (u32)*(src + 12));*/
+
     if (copy_from_user((void*)dest, (void*)src, count) != 0) {
         d_printk(0, "failed to copy data from user\n");
         return -EFAULT;

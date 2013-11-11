@@ -44,8 +44,9 @@ size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,
 
 int whitebox_rf_sink_produce(struct whitebox_rf_sink *rf_sink, size_t count)
 {
+    d_printk(1, "%d\n", count);
     rf_sink->off += count;
-    return 0;
+    return rf_sink->exciter->ops->produce(rf_sink->exciter, count);
 }
 
 int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
@@ -53,6 +54,12 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
         unsigned long dest, size_t dest_count)
 {
     rf_sink->dma_count = min(src_count, dest_count);
+    if (rf_sink->dma_count == 0)
+        return 0;
+
+    d_printk(1, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu\n",
+            src, src_count, dest, dest_count);
+
     rf_sink->dma_mapping = dma_map_single(NULL,
             (void*)src, rf_sink->dma_count, DMA_TO_DEVICE);
     if (dma_mapping_error(NULL, rf_sink->dma_mapping)) {

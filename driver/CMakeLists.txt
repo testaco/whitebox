@@ -16,9 +16,10 @@ set(DRIVER_SOURCES
         whitebox_ioctl.h
         pdma.c pdma.h
         whitebox_block.h
-        whitebox_rf_sink.c
-        whitebox_user_source.c
+        whitebox_rf_sink.c whitebox_rf_source.c
+        whitebox_user_source.c whitebox_user_sink.c
         whitebox_exciter.h whitebox_exciter.c whitebox_tx.c
+        whitebox_receiver.h whitebox_receiver.c whitebox_rx.c
         whitebox_gpio.h whitebox_gpio.c)
 
 foreach (DRIVER_SOURCE ${DRIVER_SOURCES})

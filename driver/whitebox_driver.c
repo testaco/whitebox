@@ -52,22 +52,34 @@ static int whitebox_user_source_order = 3;
 module_param(whitebox_user_source_order, int, S_IRUSR | S_IWUSR);
 
 /*
- * Whether or not to use the mock exciter.
+ * Order of the user_sink circular buffer.
  */
-static int whitebox_mock_exciter_en = 0;
-module_param(whitebox_mock_exciter_en, int, S_IRUSR | S_IWUSR);
+static int whitebox_user_sink_order = 3;
+module_param(whitebox_user_sink_order, int, S_IRUSR | S_IWUSR);
 
 /*
- * Order of the mock exciter circular buffer
+ * Whether or not to use the mock.
  */
-static int whitebox_mock_exciter_order = 3;
-module_param(whitebox_mock_exciter_order, int, S_IRUSR | S_IWUSR);
+static int whitebox_mock_en = 0;
+module_param(whitebox_mock_en, int, S_IRUSR | S_IWUSR);
 
 /*
- * Block size of dma xfers to the exciter peripheral.
+ * Order of the mock circular buffer
  */
-static int whitebox_exciter_quantum = 64;
+static int whitebox_mock_order = 3;
+module_param(whitebox_mock_order, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Block size of dma xfers to the exciter peripheral in bytes.
+ */
+static int whitebox_exciter_quantum = (64 << 2);
 module_param(whitebox_exciter_quantum, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Block size of dma xfers to the receiver peripheral.
+ */
+static int whitebox_receiver_quantum = (64 << 2);
+module_param(whitebox_receiver_quantum, int, S_IRUSR | S_IWUSR);
 
 /*
  * Register mappings for the CMX991 register file.
@@ -95,13 +107,24 @@ void tx_dma_cb(void *data);
 void tx_stop(struct whitebox_device *wb);
 int tx_error(struct whitebox_device *wb);
 
+int rx_start(struct whitebox_device *wb);
+int rx_exec(struct whitebox_device* wb);
+void rx_dma_cb(void *data);
+void rx_stop(struct whitebox_device *wb);
+int rx_error(struct whitebox_device *wb);
+
 static int whitebox_open(struct inode* inode, struct file* filp) {
     int ret = 0;
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
     struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
-    struct whitebox_exciter *exciter = whitebox_mock_exciter_en ?
+    struct whitebox_exciter *exciter = whitebox_mock_en ?
             &whitebox_device->mock_exciter.exciter :
             &whitebox_device->exciter;
+    struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
+    struct whitebox_rf_source *rf_source = &whitebox_device->rf_source;
+    struct whitebox_receiver *receiver = whitebox_mock_en ?
+            &whitebox_device->mock_receiver.receiver :
+            &whitebox_device->receiver;
 
     d_printk(2, "whitebox open\n");
 
@@ -122,22 +145,43 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
 
     exciter->quantum = whitebox_exciter_quantum;
 
-    if (filp->f_flags & O_WRONLY || filp->f_flags & O_RDWR) {
-        ret = whitebox_rf_sink_alloc(rf_sink);
-        if (ret < 0) {
-            d_printk(0, "DMA Channel request failed\n");
-            goto fail_in_use;
-        }
-
-        ret = whitebox_user_source_alloc(user_source);
-        if (ret < 0) {
-            d_printk(0, "Buffer allocation failed\n");
-            goto fail_free_rf_sink;
-        }
-
-        // enable dac
-        //whitebox_gpio_dac_enable(whitebox_device->platform_data);
+    ret = whitebox_rf_sink_alloc(rf_sink);
+    if (ret < 0) {
+        d_printk(0, "DMA Channel request failed\n");
+        goto fail_in_use;
     }
+
+    ret = whitebox_user_source_alloc(user_source);
+    if (ret < 0) {
+        d_printk(0, "Buffer allocation failed\n");
+        goto fail_free_rf_sink;
+    }
+
+    whitebox_user_sink_init(&whitebox_device->user_sink,
+            whitebox_user_sink_order, &whitebox_device->mapped);
+
+    whitebox_rf_source_init(&whitebox_device->rf_source,
+            whitebox_device->platform_data->rx_dma_ch,
+            rx_dma_cb,
+            whitebox_device,
+            receiver);
+
+    receiver->quantum = whitebox_receiver_quantum;
+
+    ret = whitebox_rf_source_alloc(rf_source);
+    if (ret < 0) {
+        d_printk(0, "DMA Channel request failed\n");
+        goto fail_free_tx;
+    }
+
+    ret = whitebox_user_sink_alloc(user_sink);
+    if (ret < 0) {
+        d_printk(0, "Buffer allocation failed\n");
+        goto fail_free_rf_source;
+    }
+
+    // enable dac
+    //whitebox_gpio_dac_enable(whitebox_device->platform_data);
 
     whitebox_device->state = WDS_IDLE;
 
@@ -145,6 +189,10 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
 
     goto done_open;
 
+fail_free_rf_source:
+    whitebox_rf_source_free(rf_source);
+fail_free_tx:
+    whitebox_user_source_free(user_source);
 fail_free_rf_sink:
     whitebox_rf_sink_free(rf_sink);
 fail_in_use:
@@ -156,6 +204,8 @@ done_open:
 static int whitebox_release(struct inode* inode, struct file* filp) {
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
     struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
+    struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
+    struct whitebox_rf_source *rf_source = &whitebox_device->rf_source;
     d_printk(2, "whitebox release\n");
     
     if (atomic_read(&use_count) != 1) {
@@ -166,31 +216,80 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
     if (whitebox_device->state == WDS_TX)
         tx_stop(whitebox_device);
 
-    if (filp->f_flags & O_WRONLY || filp->f_flags & O_RDWR) {
-        // wait for DMA to finish
-        /*while (pdma_active(whitebox_device->tx_dma_ch) > 0) {
-            cpu_relax();
-        }*/
+    // Disable DAC
+    //whitebox_gpio_dac_disable(whitebox_device->platform_data);
 
-        //whitebox_ioctl_reset();
-
-        // Disable DAC
-        //whitebox_gpio_dac_disable(whitebox_device->platform_data);
-
-        whitebox_rf_sink_free(rf_sink);
-        whitebox_user_source_free(user_source);
-
-        // Turn off transmission
-        //rf_sink->exciter->ops->clear_state(rf_sink->exciter, WES_TXEN);
-    }
+    whitebox_rf_sink_free(rf_sink);
+    whitebox_user_source_free(user_source);
+    whitebox_rf_source_free(rf_source);
+    whitebox_user_sink_free(user_sink);
 
     atomic_dec(&use_count);
     return 0;
 }
 
 static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff_t* pos) {
-    d_printk(2, "whitebox read\n");
-    return 0;
+    unsigned long src;
+    size_t src_count;
+    int ret = 0;
+    struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
+    
+    d_printk(1, "whitebox read\n");
+
+    if (down_interruptible(&whitebox_device->sem)) {
+        return -ERESTARTSYS;
+    }
+
+    if (whitebox_device->state == WDS_TX) {
+        up(&whitebox_device->sem);
+        d_printk(1, "in transmit\n");
+        return -EBUSY;
+    }
+
+    if (whitebox_device->state == WDS_IDLE) {
+        whitebox_device->state = WDS_RX;
+        rx_start(whitebox_device);
+    }
+
+    if (count == 0) {
+        rx_stop(whitebox_device);
+        up(&whitebox_device->sem);
+        return 0;
+    }
+
+    if (rx_error(whitebox_device)) {
+        d_printk(1, "rx_error\n");
+        up(&whitebox_device->sem);
+        return -EFAULT;
+    }
+
+    rx_exec(whitebox_device);
+
+    while ((src_count = whitebox_user_sink_data_available(user_sink, &src)) == 0) {
+        up(&whitebox_device->sem);
+        if (filp->f_flags & O_NONBLOCK)
+            return -EAGAIN;
+
+        if (wait_event_interruptible(whitebox_device->read_wait_queue,
+                (src_count = whitebox_user_sink_data_available(user_sink, &src)) > 0))
+            return -ERESTARTSYS;
+        if (down_interruptible(&whitebox_device->sem)) {
+            return -ERESTARTSYS;
+        }
+    }
+
+    ret = whitebox_user_sink_work(user_sink, src, src_count, (unsigned long)buf, count);
+
+    if (ret < 0) {
+        up(&whitebox_device->sem);
+        return -EFAULT;
+    }
+
+    whitebox_user_sink_consume(user_sink, ret);
+
+    up(&whitebox_device->sem);
+
+    return ret;
 }
 
 static int whitebox_write(struct file* filp, const char __user* buf, size_t count, loff_t* pos) {
@@ -222,8 +321,8 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
         return 0;
     }
 
-    if (tx_error(whitebox_device)) {
-        d_printk(1, "tx_error\n");
+    if ((ret = tx_error(whitebox_device))) {
+        d_printk(1, "tx_error=%d\n", ret);
         up(&whitebox_device->sem);
         return -EFAULT;
     }
@@ -262,9 +361,11 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
+    d_printk(1, "state=%d\n", whitebox_device->state);
     if (whitebox_device->state == WDS_TX) {
         if (tx_error(whitebox_device)) {
             up(&whitebox_device->sem);
@@ -275,6 +376,16 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             cpu_relax();
         whitebox_device->state = WDS_IDLE;
     }
+    if (whitebox_device->state == WDS_RX) {
+        if (rx_error(whitebox_device)) {
+            up(&whitebox_device->sem);
+            return -EFAULT;
+        }
+        rx_stop(whitebox_device);
+        while (receiver->ops->get_state(receiver) & WRS_RXEN)
+            cpu_relax();
+        whitebox_device->state = WDS_IDLE;
+    }
     up(&whitebox_device->sem);
     return 0;
 }
@@ -282,11 +393,13 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
 long whitebox_ioctl_reset(void) {
     int i;
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
     whitebox_gpio_cmx991_reset(whitebox_device->platform_data);
     for (i = 0; i < WA_REGS_COUNT; ++i) {
         whitebox_device->adf4351_regs[i] = 0;
     }
     exciter->ops->set_state(exciter, WES_CLEAR);
+    receiver->ops->set_state(receiver, WRS_CLEAR);
     return 0;
 }
 
@@ -333,6 +446,39 @@ long whitebox_ioctl_exciter_set(unsigned long arg) {
     exciter->ops->set_interp(exciter, w.flags.exciter.interp);
     exciter->ops->set_fcw(exciter, w.flags.exciter.fcw);
     exciter->ops->set_threshold(exciter, w.flags.exciter.threshold);
+    return 0;
+}
+
+long whitebox_ioctl_receiver_clear(void) {
+    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    receiver->ops->set_state(receiver, WRS_CLEAR);
+    return 0;
+}
+
+long whitebox_ioctl_receiver_get(unsigned long arg) {
+    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    whitebox_args_t w;
+    w.flags.receiver.state = receiver->ops->get_state(receiver);
+    w.flags.receiver.interp = receiver->ops->get_interp(receiver);
+    w.flags.receiver.fcw = receiver->ops->get_fcw(receiver);
+    // TODO w.flags.receiver.runs = receiver->ops->get_runs(receiver);
+    w.flags.receiver.threshold = receiver->ops->get_threshold(receiver);
+    if (copy_to_user((whitebox_args_t*)arg, &w,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    return 0;
+}
+
+long whitebox_ioctl_receiver_set(unsigned long arg) {
+    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    receiver->ops->set_state(receiver, w.flags.receiver.state);
+    receiver->ops->set_interp(receiver, w.flags.receiver.interp);
+    receiver->ops->set_fcw(receiver, w.flags.receiver.fcw);
+    receiver->ops->set_threshold(receiver, w.flags.receiver.threshold);
     return 0;
 }
 
@@ -394,7 +540,7 @@ long whitebox_ioctl_adf4351_set(unsigned long arg) {
     return 0;
 }
 
-long whitebox_ioctl_mock_exciter_command(unsigned long arg) {
+long whitebox_ioctl_mock_command(unsigned long arg) {
     whitebox_args_t w;
     if (copy_from_user(&w, (whitebox_args_t*)arg,
             sizeof(whitebox_args_t)))
@@ -403,6 +549,10 @@ long whitebox_ioctl_mock_exciter_command(unsigned long arg) {
     if (w.mock_command == WMC_CAUSE_UNDERRUN) {
         WHITEBOX_EXCITER(&whitebox_device->mock_exciter.exciter)->runs +=
                 0x00000001;
+    }
+    if (w.mock_command == WMC_CAUSE_OVERRUN) {
+        WHITEBOX_RECEIVER(&whitebox_device->mock_receiver.receiver)->runs +=
+                0x00010000;
     }
 
     return 0;
@@ -420,6 +570,12 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_exciter_get(arg);
         case WE_SET:
             return whitebox_ioctl_exciter_set(arg);
+        case WR_CLEAR:
+            return whitebox_ioctl_receiver_clear();
+        case WR_GET:
+            return whitebox_ioctl_receiver_get(arg);
+        case WR_SET:
+            return whitebox_ioctl_receiver_set(arg);
         case WC_GET:
             return whitebox_ioctl_cmx991_get(arg);
         case WC_SET:
@@ -429,7 +585,7 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         case WA_SET:
             return whitebox_ioctl_adf4351_set(arg);
         case WM_CMD:
-            return whitebox_ioctl_mock_exciter_command(arg);
+            return whitebox_ioctl_mock_command(arg);
         default:
             return -EINVAL;
     }
@@ -448,6 +604,7 @@ static struct file_operations whitebox_fops = {
 
 static int whitebox_probe(struct platform_device* pdev) {
     struct resource* whitebox_exciter_regs;
+    struct resource* whitebox_receiver_regs;
     int irq;
     struct device* dev;
     int ret = 0;
@@ -457,6 +614,13 @@ static int whitebox_probe(struct platform_device* pdev) {
     whitebox_exciter_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     if (!whitebox_exciter_regs) {
         d_printk(0, "no register base for Whitebox exciter\n");
+        ret = -ENXIO;
+        goto fail_release_nothing;
+    }
+
+    whitebox_receiver_regs = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+    if (!whitebox_receiver_regs) {
+        d_printk(0, "no register base for Whitebox receiver\n");
         ret = -ENXIO;
         goto fail_release_nothing;
     }
@@ -473,6 +637,15 @@ static int whitebox_probe(struct platform_device* pdev) {
     sema_init(&whitebox_device->sem, 1);
 
     init_waitqueue_head(&whitebox_device->write_wait_queue);
+    init_waitqueue_head(&whitebox_device->read_wait_queue);
+
+    whitebox_device->mock_buf.buf = (char*)
+            __get_free_pages(GFP_KERNEL | __GFP_DMA | __GFP_COMP |
+            __GFP_NOWARN, whitebox_mock_order);
+    if (!whitebox_device->mock_buf.buf) {
+        d_printk(0, "failed to create mock buffer\n");
+        goto fail_create_mock_buf;
+    }
 
     if ((ret = whitebox_exciter_create(&whitebox_device->exciter,
             whitebox_exciter_regs->start, 
@@ -482,8 +655,22 @@ static int whitebox_probe(struct platform_device* pdev) {
 
     if ((ret = whitebox_mock_exciter_create(&whitebox_device->mock_exciter,
             resource_size(whitebox_exciter_regs),
-            whitebox_mock_exciter_order))) {
-        goto fail_create_mock;
+            whitebox_mock_order,
+            &whitebox_device->mock_buf))) {
+        goto fail_create_mock_exciter;
+    }
+
+    if ((ret = whitebox_receiver_create(&whitebox_device->receiver,
+            whitebox_receiver_regs->start, 
+            resource_size(whitebox_receiver_regs)))) {
+        goto fail_create_receiver;
+    }
+
+    if ((ret = whitebox_mock_receiver_create(&whitebox_device->mock_receiver,
+            resource_size(whitebox_receiver_regs),
+            whitebox_mock_order,
+            &whitebox_device->mock_buf))) {
+        goto fail_create_mock_receiver;
     }
 
     whitebox_device->irq = irq;
@@ -552,10 +739,17 @@ fail_create_cdev:
 fail_alloc_region:
     class_destroy(whitebox_class);
 fail_create_class:
+    whitebox_receiver_destroy(&whitebox_device->mock_receiver.receiver);
+fail_create_mock_receiver:
+    whitebox_receiver_destroy(&whitebox_device->receiver);
+fail_create_receiver:
     whitebox_exciter_destroy(&whitebox_device->mock_exciter.exciter);
-fail_create_mock:
+fail_create_mock_exciter:
     whitebox_exciter_destroy(&whitebox_device->exciter);
 fail_create_exciter:
+    free_pages((unsigned long)whitebox_device->mock_buf.buf,
+            whitebox_mock_order);
+fail_create_mock_buf:
     kfree(whitebox_device);
 fail_release_nothing:
 done:
@@ -575,6 +769,8 @@ static int whitebox_remove(struct platform_device* pdev) {
 
     class_destroy(whitebox_class);
 
+    whitebox_receiver_destroy(&whitebox_device->mock_receiver.receiver);
+    whitebox_receiver_destroy(&whitebox_device->receiver);
     whitebox_exciter_destroy(&whitebox_device->mock_exciter.exciter);
     whitebox_exciter_destroy(&whitebox_device->exciter);
 
@@ -615,6 +811,10 @@ static struct resource whitebox_platform_device_resources[] = {
         .end = WHITEBOX_EXCITER_REGS + WHITEBOX_EXCITER_REGS_COUNT,
         .flags = IORESOURCE_MEM,
     }, {
+        .start = WHITEBOX_RECEIVER_REGS,
+        .end = WHITEBOX_RECEIVER_REGS + WHITEBOX_RECEIVER_REGS_COUNT,
+        .flags = IORESOURCE_MEM,
+    }, {
         .start = WHITEBOX_EXCITER_IRQ,
         .flags = IORESOURCE_IRQ,
     },
@@ -643,6 +843,7 @@ static struct whitebox_platform_data_t whitebox_platform_data = {
     .vco_pdb_pin        = 50,
     .vco_ld_pin         = 51,
     .tx_dma_ch          = 0,
+    .rx_dma_ch          = 1,
 };
 
 static int __init whitebox_init_module(void) {

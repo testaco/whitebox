@@ -185,13 +185,16 @@ int test_blocking_write_underrun(void *data) {
 int test_blocking_xfer(void *data) {
     int fd;
     int ret;
-    uint32_t buf[] = { 0x00, 0x01, 0x02, 0x03 };
+    uint32_t buf[4];
     uint32_t buf2[4];
     int i;
     whitebox_args_t w;
     assert(whitebox_parameter_set("check_plls", 0) == 0);
-    fd = open(WHITEBOX_DEV, O_WRONLY);
+    fd = open(WHITEBOX_DEV, O_RDWR);
     assert(fd > 0);
+
+    for (i = 0; i < 4; ++i)
+        buf[i] = rand();
 
     ret = write(fd, buf, sizeof(uint32_t) * 4);
     assert(ret == sizeof(uint32_t) * 4);
@@ -201,7 +204,41 @@ int test_blocking_xfer(void *data) {
     assert(ret == sizeof(uint32_t) * 4);
     assert(fsync(fd) == 0);
 
-    assert(memcmp(buf, buf2, sizeof(uint32_t) * 4));
+    assert(memcmp(buf, buf2, sizeof(uint32_t) * 4) == 0);
+
+    close(fd);
+    assert(whitebox_parameter_set("check_plls", 1) == 0);
+    return 0;
+}
+
+int test_blocking_xfer2(void *data) {
+    int fd;
+    int ret;
+    uint32_t buf_in1[4], buf_in2[4];
+    uint32_t buf_out[8];
+    int i;
+    whitebox_args_t w;
+    assert(whitebox_parameter_set("check_plls", 0) == 0);
+    fd = open(WHITEBOX_DEV, O_RDWR);
+    assert(fd > 0);
+
+    for (i = 0; i < 4; ++i) {
+        buf_in1[i] = rand();
+        buf_in2[i] = rand();
+    }
+
+    ret = write(fd, buf_in1, sizeof(uint32_t) * 4);
+    assert(ret == sizeof(uint32_t) * 4);
+    ret = write(fd, buf_in2, sizeof(uint32_t) * 4);
+    assert(ret == sizeof(uint32_t) * 4);
+    assert(fsync(fd) == 0);
+
+    ret = read(fd, buf_out, sizeof(uint32_t) * 8);
+    assert(ret == sizeof(uint32_t) * 8);
+    assert(fsync(fd) == 0);
+
+    assert(memcmp(buf_in1, buf_out, sizeof(uint32_t) * 4) == 0);
+    assert(memcmp(buf_in2, buf_out + 4, sizeof(uint32_t) * 4) == 0);
 
     close(fd);
     assert(whitebox_parameter_set("check_plls", 1) == 0);
@@ -319,7 +356,7 @@ int test_mmap_write_not_locked(void *data) {
 int main(int argc, char **argv) {
     int result;
 
-    whitebox_parameter_set("mock_exciter_en", 1);
+    whitebox_parameter_set("mock_en", 1);
 
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_blocking_open_close),
@@ -333,6 +370,7 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
         WHITEBOX_TEST(test_blocking_xfer),
+        WHITEBOX_TEST(test_blocking_xfer2),
 #if 0
         WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_mmap_success),
@@ -343,6 +381,6 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(0),
     };
     result = whitebox_test_main(tests, NULL, argc, argv);
-    whitebox_parameter_set("mock_exciter_en", 0);
+    whitebox_parameter_set("mock_en", 0);
     return result;
 }
