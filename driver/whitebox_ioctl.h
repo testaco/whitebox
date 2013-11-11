@@ -34,7 +34,7 @@ typedef struct whitebox_args {
 
 /* General */
 #define W_RESET _IO('w', 1)
-#define W_LOCKED _IOR('w', 2, whitebox_args_t*)
+#define W_LOCKED _IO('w', 2)
 
 /* Exciter */
 #define WE_CLEAR _IO('w', 3)

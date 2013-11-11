@@ -8,6 +8,7 @@ int test_open_close(void* data) {
     assert(whitebox_reset(&wb) == 0);
     assert(!whitebox_plls_locked(&wb));
     assert(whitebox_close(&wb) == 0);
+    return 0;
 }
 
 int test_tx_clear(void* data) {
@@ -81,30 +82,10 @@ int test_tx_write(void* data) {
     int i = 200, j;
     int ret;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 50e3) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
     for (j = 0; j < 10; ++j) {
-        ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
-        assert(ret == sizeof(uint32_t) * i);
-
-        ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
-        assert(ret == sizeof(uint32_t) * i);
-
-        ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
-        assert(ret == sizeof(uint32_t) * i);
-
-        ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
-        assert(ret == sizeof(uint32_t) * i);
-
-        ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
-        assert(ret == sizeof(uint32_t) * i);
-
-        ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
-        assert(ret == sizeof(uint32_t) * i);
-
         ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
         assert(ret == sizeof(uint32_t) * i);
     }

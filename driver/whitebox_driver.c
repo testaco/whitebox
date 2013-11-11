@@ -403,17 +403,14 @@ long whitebox_ioctl_reset(void) {
     return 0;
 }
 
-long whitebox_ioctl_locked(unsigned long arg) {
-    whitebox_args_t w;
+long whitebox_ioctl_locked(void) {
     u8 c;
+    u8 locked;
     c = whitebox_gpio_cmx991_read(whitebox_device->platform_data,
         WHITEBOX_CMX991_LD_REG);
-    w.locked = whitebox_gpio_adf4351_locked(whitebox_device->platform_data)
+    locked = whitebox_gpio_adf4351_locked(whitebox_device->platform_data)
             && (c & WHITEBOX_CMX991_LD_MASK);
-    if (copy_to_user((whitebox_args_t*)arg, &w,
-            sizeof(whitebox_args_t)))
-        return -EACCES;
-    return 0;
+    return locked;
 }
 
 long whitebox_ioctl_exciter_clear(void) {
@@ -534,7 +531,6 @@ long whitebox_ioctl_adf4351_set(unsigned long arg) {
         whitebox_device->adf4351_regs[i] = w.flags.adf4351[i];
         whitebox_gpio_adf4351_write(whitebox_device->platform_data, 
                 w.flags.adf4351[i]);
-        d_printk(0, "\n[adf4351] %d %x\n", i, w.flags.adf4351[i]);
     }
 
     return 0;
@@ -563,7 +559,7 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
         case W_RESET:
             return whitebox_ioctl_reset();
         case W_LOCKED:
-            return whitebox_ioctl_locked(arg);
+            return whitebox_ioctl_locked();
         case WE_CLEAR:
             return whitebox_ioctl_exciter_clear();
         case WE_GET:

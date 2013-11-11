@@ -62,8 +62,7 @@ int test_ioctl_not_locked(void *data) {
     whitebox_args_t w;
     fd = open(WHITEBOX_DEV, O_WRONLY);
     assert(fd > 0);
-    ioctl(fd, W_LOCKED, &w);
-    assert(!w.locked);
+    assert(!ioctl(fd, W_LOCKED));
     close(fd);
     return 0;
 }
