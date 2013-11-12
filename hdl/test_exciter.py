@@ -15,8 +15,8 @@ from fifo import fifo
 from exciter import exciter, \
     WE_SAMPLE_ADDR, WE_STATE_ADDR, WE_INTERP_ADDR, WE_FCW_ADDR, \
     WE_RUNS_ADDR, WE_THRESHOLD_ADDR, WE_CORRECTION_ADDR, \
-    WES_CLEAR, WES_TXEN, WES_DDSEN, WES_FILTEREN, \
-    WES_AEMPTY, WES_AFULL
+    WES_CLEAR, WES_TXSTOP, WES_TXEN, WES_DDSEN, WES_FILTEREN, \
+    WES_AEMPTY, WES_AFULL, WES_DATA, WES_SPACE
 
 FCW=int(200e6)
 
@@ -269,6 +269,11 @@ class TestOverrunUnderrun(unittest.TestCase):
             # Send a clear
             yield bus.transmit(WE_STATE_ADDR, WES_CLEAR)
 
+            # Check the fifo flags
+            yield bus.receive(WE_STATE_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_DATA)
+
             yield bus.transmit(WE_THRESHOLD_ADDR,
                 concat(intbv(1)[16:], intbv(3)[16:]))
             yield bus.receive(WE_THRESHOLD_ADDR)
@@ -286,6 +291,11 @@ class TestOverrunUnderrun(unittest.TestCase):
                 N.next = N + 1
                 yield bus.receive(WE_RUNS_ADDR)
 
+            # Check that we're full
+            yield bus.receive(WE_STATE_ADDR)
+            assert not (bus.rdata & WES_SPACE)
+            assert bus.rdata & WES_DATA
+
             ## Now start transmitting
             yield bus.transmit(WE_STATE_ADDR, WES_TXEN)
             yield bus.receive(WE_STATE_ADDR)
@@ -300,16 +310,86 @@ class TestOverrunUnderrun(unittest.TestCase):
             ## Make sure we're both over and underrun
             assert bus.rdata & 0xffff0000 and bus.rdata & 0x0000ffff
 
+            # Check the fifo flags
             yield bus.receive(WE_STATE_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_DATA)
 
             raise StopSimulation
 
         s.simulate(stimulus, test_exciter_overrun_underrun)
 
+class TestHalt(unittest.TestCase):
+    def test_halt(self):
+        INTERP = 200
+        FIFO_DEPTH = 4
+        BULK_SIZE = 2
+        bus = Apb3Bus(duration=APB3_DURATION)
+
+        s = ExciterSim(bus)
+
+        fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
+        exciter_args = { 'interp': INTERP }
+
+        def test_exciter_halt():
+            return s.cosim_dut("cosim_exciter_halt",
+                    fifo_args, exciter_args)
+
+        @instance
+        def stimulus():
+            N = Signal(intbv(0)[32:])
+
+            yield bus.reset()
+            # Send a clear
+            yield bus.transmit(WE_STATE_ADDR, WES_CLEAR)
+
+            # Check the fifo flags
+            yield bus.receive(WE_STATE_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_DATA)
+
+            yield bus.transmit(WE_INTERP_ADDR, INTERP)
+            yield bus.receive(WE_INTERP_ADDR)
+            assert bus.rdata == INTERP
+
+            ## Insert some samples
+            for i in range(BULK_SIZE):
+                x = intbv(int(sin(1000 * (2 * pi) * N / 50000) * 2**15), min=-2**15, max=2**15)[16:]
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(x, x))
+                N.next = N + 1
+
+            ## Now start transmitting
+            yield bus.transmit(WE_STATE_ADDR, WES_TXEN)
+            yield bus.receive(WE_STATE_ADDR)
+            assert bus.rdata & WES_TXEN
+
+            ## Insert some more samples
+            for i in range(BULK_SIZE):
+                x = intbv(int(sin(1000 * (2 * pi) * N / 50000) * 2**15), min=-2**15, max=2**15)[16:]
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(x, x))
+                N.next = N + 1
+
+            ## Stop the transmission
+            yield bus.transmit(WE_STATE_ADDR, WES_TXSTOP)
+
+            ## Wait for TXEN to go low
+            yield bus.receive(WE_STATE_ADDR)
+            while bus.rdata & WES_TXEN:
+                yield bus.delay(2)
+                yield bus.receive(WE_STATE_ADDR)
+
+            ## Make sure there were no overruns or underruns
+            yield bus.receive(WE_RUNS_ADDR)
+            assert bus.rdata == 0
+
+            raise StopSimulation
+
+        s.simulate(stimulus, test_exciter_halt)
+
 class TestPipeSamples(unittest.TestCase):
     def test_pipe_samples(self):
         bus = Apb3Bus(duration=APB3_DURATION)
-        BULK_SIZE=8 #
+        BULK_SIZE=1 #
         FIFO_DEPTH=BULK_SIZE*4
         AFVAL = BULK_SIZE*3 #
         AEVAL = BULK_SIZE*2 #
@@ -406,14 +486,14 @@ class TestPipeSamples(unittest.TestCase):
                     #while not txirq:
                     #    yield bus.delay(10*1024)
 
-            while s.dac_en:
-                yield bus.delay(10)
-
             # And turn off the transmitter
+            yield bus.transmit(WE_STATE_ADDR, WES_TXSTOP)
             yield bus.receive(WE_STATE_ADDR)
-            yield bus.transmit(WE_STATE_ADDR, bus.rdata & ~WES_TXEN)
-            yield bus.receive(WE_STATE_ADDR)
-            assert bus.rdata & WES_TXEN == 0
+            while bus.rdata & WES_TXEN:
+                yield bus.receive(WE_STATE_ADDR)
+
+            yield bus.delay(40)
+            assert not s.dac_en
 
             raise StopSimulation
 

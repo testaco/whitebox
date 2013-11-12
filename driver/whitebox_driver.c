@@ -372,8 +372,13 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             return -EFAULT;
         }
         tx_stop(whitebox_device);
-        while (exciter->ops->get_state(exciter) & WES_TXEN)
+        while (exciter->ops->get_state(exciter) & WES_TXEN) {
+            if (tx_error(whitebox_device)) {
+                up(&whitebox_device->sem);
+                return -EFAULT;
+            }
             cpu_relax();
+        }
         whitebox_device->state = WDS_IDLE;
     }
     if (whitebox_device->state == WDS_RX) {
@@ -382,8 +387,13 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             return -EFAULT;
         }
         rx_stop(whitebox_device);
-        while (receiver->ops->get_state(receiver) & WRS_RXEN)
+        while (receiver->ops->get_state(receiver) & WRS_RXEN) {
+            if (rx_error(whitebox_device)) {
+                up(&whitebox_device->sem);
+                return -EFAULT;
+            }
             cpu_relax();
+        }
         whitebox_device->state = WDS_IDLE;
     }
     up(&whitebox_device->sem);

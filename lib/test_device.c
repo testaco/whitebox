@@ -81,8 +81,9 @@ int test_tx_write(void* data) {
     uint32_t buf[1023];
     int i = 200, j;
     int ret;
+    int fd;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6)) > 0);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
     for (j = 0; j < 10; ++j) {
@@ -90,7 +91,7 @@ int test_tx_write(void* data) {
         assert(ret == sizeof(uint32_t) * i);
     }
 
-    // TODO: check for overrun & underrun, other errors
+    assert(fsync(fd) == 0);
 
     assert(whitebox_close(&wb) == 0);
 }

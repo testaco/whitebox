@@ -31,9 +31,10 @@ class Signature(object):
         else:
             raise AttributeError, "Must give bits or min & max"
 
-        self.valid = Signal(bool(0))
-        self.i = Signal(intbv(0, min=self.min, max=self.max))
-        self.q = Signal(intbv(0, min=self.min, max=self.max))
+        self.valid = kwargs.get('valid', Signal(bool(0)))
+        self.last = kwargs.get('last', Signal(bool(0)))
+        self.i = kwargs.get('i', Signal(intbv(0, min=self.min, max=self.max)))
+        self.q = kwargs.get('q', Signal(intbv(0, min=self.min, max=self.max)))
 
     def __repr__(self):
         return '<Signature name=%s bits=%d min=%d max=%d>' % (self.name,
@@ -95,6 +96,8 @@ def truncator(clearn, in_clock, in_sign, out_sign):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -116,8 +119,10 @@ def truncator(clearn, in_clock, in_sign, out_sign):
             # TODO: this adds DC bias
             out_i.next = in_i[i_msb:i_lsb].signed()
             out_q.next = in_q[q_msb:q_lsb].signed()
+            out_last.next = in_last
         else:
             out_valid.next = False
+            out_last.next = False 
             out_i.next = 0
             out_q.next = 0
 
@@ -128,6 +133,8 @@ def upsampler(clearn, clock, in_sign, out_sign, interp):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -139,6 +146,7 @@ def upsampler(clearn, clock, in_sign, out_sign, interp):
             out_q.next = in_q
             out_valid.next = True
             cnt.next = interp - 1
+            out_last.next = in_last
         elif cnt > 0:
             out_valid.next = True
             cnt.next = cnt - 1
@@ -146,6 +154,7 @@ def upsampler(clearn, clock, in_sign, out_sign, interp):
             out_i.next = 0
             out_q.next = 0
             out_valid.next = False
+            out_last.next = False
 
     return upsample
         
@@ -154,6 +163,8 @@ def interpolator(clearn, clock, in_sign, out_sign, interp):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -164,6 +175,7 @@ def interpolator(clearn, clock, in_sign, out_sign, interp):
             out_i.next = in_i #in_i[16:6].signed()
             out_q.next = in_q #in_q[16:6].signed()
             out_valid.next = True
+            out_last.next = in_last
             cnt.next = interp - 1
         elif cnt > 0:
             # Turn off these two lines for the old version of the interpolator
@@ -175,6 +187,7 @@ def interpolator(clearn, clock, in_sign, out_sign, interp):
             out_i.next = 0
             out_q.next = 0
             out_valid.next = False
+            out_last.next = False
 
     return interpolate
 
@@ -183,6 +196,8 @@ def decimator(clearn, clock, in_sign, out_sign, decim):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -197,15 +212,18 @@ def decimator(clearn, clock, in_sign, out_sign, decim):
                 out_i.next = in_i #in_i[16:6].signed()
                 out_q.next = in_q #in_q[16:6].signed()
                 out_valid.next = True
+                out_last.next = in_last
             else:
                 out_i.next = 0
                 out_q.next = 0
                 out_valid.next = False
+                out_last.next = False
 
         else:
             out_i.next = 0
             out_q.next = 0
             out_valid.next = False
+            out_last.next = False
 
     return decimate
 
@@ -213,6 +231,8 @@ def pass_through(clearn, clock, in_sign, out_sign):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -221,10 +241,12 @@ def pass_through(clearn, clock, in_sign, out_sign):
     def p():
         if in_valid:
             out_valid.next = True
+            out_last.next = in_last
             out_i.next = in_i
             out_q.next = in_q
         else:
             out_valid.next = False
+            out_last.next = False
             out_i.next = 0
             out_q.next = 0
 
@@ -271,6 +293,8 @@ def comb(clearn, clock, delay, in_sign, out_sign):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -285,10 +309,12 @@ def comb(clearn, clock, delay, in_sign, out_sign):
     def comber():
         if in_valid:
             out_valid.next = True
+            out_last.next = in_last
             out_i.next = in_i - delayed_i
             out_q.next = in_q - delayed_q
         else:
             out_valid.next = False
+            out_last.next = False
             out_i.next = 0
             out_q.next = 0
 
@@ -298,6 +324,8 @@ def accumulator(clearn, clock, in_sign, out_sign):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -305,10 +333,12 @@ def accumulator(clearn, clock, in_sign, out_sign):
     def accumulate():
         if in_valid:
             out_valid.next = True
+            out_last.next = in_last
             out_i.next = out_i + in_i
             out_q.next = out_q + in_q
         else:
             out_valid.next = False
+            out_last.next = False
             out_i.next = 0
             out_q.next = 0
 
@@ -330,6 +360,8 @@ def cic(clearn, clock,
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
@@ -394,18 +426,35 @@ def cic(clearn, clock,
 
 def iqmux(clearn, clock,
         channel,
-        in0_valid, in0_i, in0_q,
-        in1_valid, in1_i, in1_q,
-        out_valid, out_i, out_q):
+        in0_sign,
+        in1_sign,
+        out_sign):
+
+    in0_valid = in0_sign.valid
+    in0_i = in0_sign.i
+    in0_q = in0_sign.q
+    in0_last = in0_sign.last
+
+    in1_valid = in1_sign.valid
+    in1_i = in1_sign.i
+    in1_q = in1_sign.q
+    in1_last = in1_sign.last
+
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+    out_last = out_sign.last
 
     @always_seq(clock.posedge, reset=clearn)
     def mux():
         if channel == 0:
             out_valid.next = in0_valid
+            out_last.next = in0_last
             out_i.next = in0_i
             out_q.next = in0_q
         else:
             out_valid.next = in1_valid
+            out_last.next = in1_last
             out_i.next = in1_i
             out_q.next = in1_q
 
@@ -413,47 +462,77 @@ def iqmux(clearn, clock,
 
 def offset_corrector(clearn, clock,
         correct_i, correct_q,
-        in_valid, in_i, in_q,
-        out_valid, out_i, out_q):
+        in_sign,
+        out_sign):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
+
+    out_valid = out_sign.valid
+    out_last = out_sign.last
+    out_i = out_sign.i
+    out_q = out_sign.q
 
     @always_seq(clock.posedge, reset=clearn)
     def offset_correct():
         if in_valid:
             out_valid.next = in_valid
+            out_last.next = in_last
             out_i.next = in_i + correct_i  # TODO: saturate!
             out_q.next = in_q + correct_q
         else:
             out_valid.next = False
+            out_last.next = False
             out_i.next = 0
             out_q.next = 0
 
     return offset_correct
 
 def binary_offseter(clearn, clock,
-        in_valid, in_i, in_q,
-        out_valid, out_i, out_q):
+                    in_sign,
+                    out_sign):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
+
+    out_valid = out_sign.valid
+    out_last = out_sign.last
+    out_i = out_sign.i
+    out_q = out_sign.q
 
     @always_seq(clock.posedge, reset=clearn)
     def binary_offset():
         if in_valid:
             out_valid.next = True
+            out_last.next = in_last
             out_i.next = intbv(concat(not in_i[len(in_i) - 1], in_i[len(in_i) - 1:]), min=0, max=2**len(in_i))
             out_q.next = intbv(concat(not in_q[len(in_q) - 1], in_q[len(in_q) - 1:]), min=0, max=2**len(in_q))
         else:
             out_valid.next = False
+            out_last.next = False
             out_i.next = 0
             out_q.next = 0
 
     return binary_offset
 
 def interleaver(clearn, clock, clock2x,
-        in_valid, in_i, in_q,
-        out_valid, out_data):
+        in_sign,
+        out_valid, out_data, out_last):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
 
     phase = Signal(bool(0))
     i = Signal(intbv(0, min=0, max=2**10))
     q = Signal(intbv(0, min=0, max=2**10))
     valid = Signal(bool(0))
+    last = Signal(bool(0))
 
     @always_seq(clock.posedge, reset=clearn)
     def innie():
@@ -461,21 +540,25 @@ def interleaver(clearn, clock, clock2x,
             i.next = in_i
             q.next = in_q
             valid.next = True
+            last.next = in_last
         elif not phase:
             valid.next = False
         else:
             i.next = 0
             q.next = 0
             valid.next = False
+            last.next = False
 
     @always_seq(clock2x.posedge, reset=clearn)
     def outie():
         if valid:
             phase.next = not phase
             out_valid.next = True
+            out_last.next = last
             out_data.next = i if phase else q
         else:
             out_valid.next = False
+            out_last.next = False
             out_data.next = 0
 
     return innie, outie

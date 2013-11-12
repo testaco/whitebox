@@ -41,20 +41,6 @@ add_custom_command(
     DEPENDS exciter.py apb3_utils.py fifo.py duc.py
 ) 
 
-#add_custom_target(test_hdl)
-#
-#add_custom_command(TARGET test_hdl
-#    PRE_BUILD
-#    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py
-#    COMMENT "Testing exciter"
-#)
-
-#add_custom_command(TARGET test_hdl
-#    PRE_BUILD
-#    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py
-#    COMMENT "Testing duc"
-#)
-
 #add_custom_command(
 #    OUTPUT receiver.v
 #    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/receiver.py
@@ -83,6 +69,10 @@ add_test(NAME test_exciter_dds
 
 add_test(NAME test_exciter_overrun_underrun
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestOverrunUnderrun
+)
+
+add_test(NAME test_exciter_halt
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestHalt
 )
 
 add_test(NAME test_exciter_pipe_samples
