@@ -17,8 +17,9 @@ wire dac_en;
 wire status_led;
 wire dmaready;
 wire txirq;
+wire clear_enable;
 
-wire fifo_resetn;
+wire clearn;
 wire fifo_re;
 reg fifo_rclk;
 reg [31:0] fifo_rdata;
@@ -43,12 +44,20 @@ initial begin
     $to_myhdl(pready, prdata,
             dac_data, dac_en,
             status_led,
-            dmaready, txirq,
-            fifo_resetn, fifo_re, fifo_we, fifo_wdata, fifo_afval, fifo_aeval);
+            dmaready, txirq, clear_enable,
+            clearn, fifo_re, fifo_we, fifo_wdata, fifo_afval, fifo_aeval);
 end
+
+exciter_reset er (
+    .resetn(resetn),
+    .dac_clock(dac_clock),
+    .clear_enable(clear_enable),
+    .clearn(clearn)
+);
 
 exciter e (
     .resetn(resetn),
+    .clearn(clearn),
     .dac2x_clock(dac2x_clock),
     .pclk(pclk),
     .paddr(paddr),
@@ -77,7 +86,7 @@ exciter e (
     .fifo_aempty(fifo_aempty),
     .fifo_afval(fifo_afval),
     .fifo_aeval(fifo_aeval),
-    .fifo_resetn(fifo_resetn)
+    .clear_enable(clear_enable)
 );
 
 endmodule

@@ -34,6 +34,7 @@ class ExciterSim(object):
         self.status_led = Signal(bool(0))
         self.dmaready = Signal(bool(1))
         self.txirq = Signal(bool(0))
+        self.clear_enable = Signal(bool(0))
 
     def simulate(self, stimulus, exciter, **kwargs):
         @always(delay(DAC2X_DURATION // 2))
@@ -48,79 +49,6 @@ class ExciterSim(object):
         s = Simulation(dac_clock, dac2x_clock, stimulus, traced)
         s.run()
      
-    def dut(self, fifo_args, exciter_args):
-        fifo_depth = fifo_args['depth']
-        fifo_re = Signal(bool(False))
-        fifo_rclk = self.dac_clock
-        fifo_rdata = Signal(intbv(0)[32:])
-        fifo_rdata.driven = 'wire'
-        fifo_we = Signal(bool(False))
-        fifo_wclk = self.bus.pclk
-        fifo_wdata = Signal(intbv(0)[32:])
-        fifo_full = Signal(bool(False))
-        fifo_full.driven = 'wire'
-        fifo_afull = Signal(bool(False))
-        fifo_afull.driven = 'wire'
-        fifo_empty = Signal(bool(False))
-        fifo_empty.driven = 'wire'
-        fifo_aempty = Signal(bool(False))
-        fifo_aempty.driven = 'wire'
-        fifo_afval = Signal(intbv(fifo_depth)[12:])
-        fifo_aeval = Signal(intbv(0)[12:])
-        fifo_resetn = Signal(bool(1))
-
-        fifo_signals = (
-            fifo_resetn,
-            fifo_re,
-            fifo_rclk,
-            fifo_rdata,
-            fifo_we,
-            fifo_wclk,
-            fifo_wdata,
-            fifo_full,
-            fifo_afull,
-            fifo_empty,
-            fifo_aempty,
-            fifo_afval,
-            fifo_aeval)
-        fifo_0 = fifo(*fifo_signals, **fifo_args)
-
-        exciter_signals = (
-                    self.bus.presetn,
-                    self.dac2x_clock,
-                    self.bus.pclk,
-                    self.bus.paddr,
-                    self.bus.psel,
-                    self.bus.penable,
-                    self.bus.pwrite,
-                    self.bus.pwdata,
-                    self.bus.pready,
-                    self.bus.prdata,
-                    self.bus.pslverr,
-                    self.dac_clock,
-                    self.dac_data,
-                    self.dac_en,
-                    self.status_led,
-                    self.dmaready,
-                    self.txirq,
-                    fifo_resetn,
-                    fifo_re,
-                    fifo_rclk,
-                    fifo_rdata,
-                    fifo_we,
-                    fifo_wclk,
-                    fifo_wdata,
-                    fifo_full,
-                    fifo_afull,
-                    fifo_empty,
-                    fifo_aempty,
-                    fifo_afval,
-                    fifo_aeval)
-
-        exciter_0 = exciter(*exciter_signals, **exciter_args)
-
-        return fifo_0, exciter_0
-
     def cosim_dut(self, cosim_name, fifo_args, exciter_args):
         bus_pclk = self.bus.pclk
         bus_paddr = self.bus.paddr
@@ -136,24 +64,19 @@ class ExciterSim(object):
         fifo_re = Signal(bool(False))
         fifo_rclk = self.dac_clock
         fifo_rdata = Signal(intbv(0)[32:])
-        #fifo_rdata.driven = 'wire'
         fifo_we = Signal(bool(False))
         fifo_wclk = self.bus.pclk
         fifo_wdata = Signal(intbv(0)[32:])
         fifo_full = Signal(bool(False))
-        #fifo_full.driven = 'wire'
         fifo_afull = Signal(bool(False))
-        #fifo_afull.driven = 'wire'
         fifo_empty = Signal(bool(False))
-        #fifo_empty.driven = 'wire'
         fifo_aempty = Signal(bool(False))
-        #fifo_aempty.driven = 'wire'
         fifo_afval = Signal(intbv(fifo_depth)[12:])
         fifo_aeval = Signal(intbv(0)[12:])
-        fifo_resetn = Signal(bool(1))
+        clearn = Signal(bool(1))
 
         fifo_signals = (
-            fifo_resetn,
+            clearn,
             fifo_re,
             fifo_rclk,
             fifo_rdata,
@@ -172,11 +95,12 @@ class ExciterSim(object):
         config_file.write('+define+COSIM_NAME="%s"' % (cosim_name,))
         config_file.close()
 
-        cmd = 'iverilog -o %s.v -c %s exciter.v /home/testa/whitebox/hdl/cosim_exciter.v' % (cosim_name, config_file.name)
+        cmd = 'iverilog -o %s.v -c %s exciter.v exciter_reset.v /home/testa/whitebox/hdl/cosim_exciter.v' % (cosim_name, config_file.name)
         os.system(cmd)
 
         exciter_0 = Cosimulation('vvp -m ./myhdl.vpi %s.v' % (cosim_name, ),
                     resetn=self.bus.presetn,
+                    clearn=clearn,
                     dac2x_clock=self.dac2x_clock,
                     pclk=self.bus.pclk,
                     paddr=self.bus.paddr,
@@ -193,7 +117,7 @@ class ExciterSim(object):
                     status_led=self.status_led,
                     dmaready=self.dmaready,
                     txirq=self.txirq,
-                    fifo_resetn=fifo_resetn,
+                    clear_enable=self.clear_enable,
                     fifo_re=fifo_re,
                     fifo_rclk=fifo_rclk,
                     fifo_rdata=fifo_rdata,

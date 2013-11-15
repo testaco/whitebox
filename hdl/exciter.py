@@ -67,33 +67,42 @@ WES_AFULL = intbv(2**WES_AFULL_BIT)[32:]
 WES_SPACE = intbv(2**WES_SPACE_BIT)[32:]
 WES_DATA = intbv(2**WES_DATA_BIT)[32:]
 
-def duc_reset(resetn,
-        dac_clock,
-        clear_in,
-        clearn):
+def exciter_reset(resetn,
+                  dac_clock,
+                  clear_enable,
+                  clearn):
 
-    state_t = enum('RUN', 'CLEAR', 'CLEARING')
-    state = Signal(state_t.IDLE)
+    state_t = enum('CLEAR', 'CLEARING', 'RUN')
+    state = Signal(state_t.CLEAR)
 
-    clear_count = Signal(intbv(0)[4:])
+    sync_clear_en = Signal(bool(0))
+    clear_en = Signal(bool(0))
+    clear_count = Signal(intbv(0)[10:])
 
-    @always_seq(dac_clock, reset=resetn)
-    def reset():
-        if state == state_t.RUN:
-            clearn.next = 1
-            if clear_in:
-                state.next = state_t.CLEAR
+    @always_seq(dac_clock.posedge, reset=resetn)
+    def controller():
+        sync_clear_en.next = clear_enable
+        clear_en.next = sync_clear_en
         if state == state_t.CLEAR:
             clearn.next = 0
-            clear_count = 16
+            clear_count.next = 16
             state.next = state_t.CLEARING
         elif state == state_t.CLEARING:
-            clearn.next = clearn - 1
-            if clearn == 0:
+            clear_count.next = clear_count - 1
+            if clear_count == 0:
                 state.next = state_t.RUN
+            else:
+                state.next = state_t.CLEARING
+        if state == state_t.RUN:
+            clearn.next = 1
+            if clear_en:
+                state.next = state_t.CLEAR
+    
+    return controller
 
 def exciter(
         resetn,
+        clearn,
         dac2x_clock,
         pclk,
         paddr,
@@ -110,7 +119,7 @@ def exciter(
         status_led,
         dmaready,
         txirq,
-        fifo_resetn,
+        clear_enable,
         fifo_re,
         fifo_rclk,
         fifo_rdata,
@@ -126,7 +135,8 @@ def exciter(
         **kwargs):
     """The exciter.
 
-    :param resetn: Reset
+    :param resetn: Reset the whole radio front end.
+    :param clearn: Clear the DSP Chain
     :param dac_clock: Clock running at DAC rate
     :param dac2x_clock: Clock running at double DAC rate
     :param pclk: The system bus clock
@@ -144,11 +154,11 @@ def exciter(
     :param status_led: Output pin for exciter status
     :param dmaready: Ready signal to DMA controller
     :param txirq: Almost empty interrupt to CPU
+    :param clear_enable: To reset controller, set this high for reset
     """
     dspsim = kwargs.get('dspsim', None)
     interp_default = kwargs.get('interp', 1)
 
-    clearn = ResetSignal(1, 0, async=False)
 
     correct_i = Signal(intbv(0, min=-2**9, max=2**9))
     correct_q = Signal(intbv(0, min=-2**9, max=2**9))
@@ -222,10 +232,12 @@ def exciter(
 
     @always_seq(pclk.posedge, reset=resetn)
     def state_machine():
-        fifo_resetn.next = resetn and clearn
         dmaready.next = not afull
         txirq.next = aempty
         status_led.next = txen
+
+        if not clearn:
+            clear_enable.next = False
 
         if txlast:
             txen.next = 0
@@ -250,7 +262,7 @@ def exciter(
                             ddsen.next = 0
                             filteren.next = 0
                             overrun.next = 0
-                            clearn.next = 0
+                            clear_enable.next = 1
                             pready.next = 0
                             clear_counter.next = 3
                             state.next = state_t.CLEAR
@@ -348,7 +360,6 @@ def exciter(
         elif state == state_t.DONE:
             fifo_we.next = 0
             pready.next = 1
-            clearn.next = 1
             state.next = state_t.IDLE
 
     return synchronizer, state_machine, duc
@@ -363,6 +374,7 @@ if __name__ == '__main__':
     interp = 20
     duc_enable = True
 
+    clearn = ResetSignal(1, 0, async=False)
     dac2x_clock = Signal(bool(0))
     dac_clock = Signal(bool(0))
     dac_data = Signal(intbv(0)[10:])
@@ -370,6 +382,7 @@ if __name__ == '__main__':
     status_led = Signal(bool(0))
     dmaready = Signal(bool(1))
     txirq = Signal(bool(0))
+    clear_enable = Signal(bool(0))
 
     bus_presetn = bus.presetn
     bus_pclk = bus.pclk
@@ -394,10 +407,9 @@ if __name__ == '__main__':
     fifo_aempty = Signal(bool(False))
     fifo_afval = Signal(intbv(fifo_depth)[12:])
     fifo_aeval = Signal(intbv(0)[12:])
-    fifo_resetn = Signal(bool(1))
 
     fifo_args = (
-        fifo_resetn,
+        clearn,
         fifo_re,
         fifo_rclk,
         fifo_rdata,
@@ -415,6 +427,7 @@ if __name__ == '__main__':
         depth=fifo_depth)
     
     signals = (bus_presetn,
+                clearn,
                 dac2x_clock,
                 bus_pclk,
                 bus_paddr,
@@ -431,7 +444,7 @@ if __name__ == '__main__':
                 status_led,
                 dmaready,
                 txirq,
-                fifo_resetn,
+                clear_enable,
                 fifo_re,
                 fifo_rclk,
                 fifo_rdata,
@@ -448,6 +461,9 @@ if __name__ == '__main__':
     toVerilog(exciter, *signals,
             interp=interp,
             duc_enable=duc_enable)
+
+    toVerilog(exciter_reset, bus_presetn,
+            dac_clock, clear_enable, clearn)
 
     print "#define WES_CLEAR\t%#010x" % WES_CLEAR
     print "#define WES_TXSTOP\t%#010x" % WES_TXSTOP
