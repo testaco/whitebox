@@ -41,11 +41,23 @@ def dds(resetn,
                 for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
 
     phase_accumulator = Signal(modbv(0)[pa_bitwidth:])
+
+    fcw_bitwidth = len(frequency_control_word)
+    fcw = Signal(intbv(0, min=0, max=2**fcw_bitwidth))
+    fcw_tmp = Signal(intbv(0, min=0, max=2**fcw_bitwidth))
+    
+    e = Signal(bool(0))
+    e_tmp = Signal(bool(0))
     
     @always_seq(clock.posedge, reset=resetn)
     def synthesizer():
-        if enable:
-            phase_accumulator.next = phase_accumulator + frequency_control_word
+        fcw_tmp.next = frequency_control_word
+        fcw.next = fcw_tmp
+        e_tmp.next = enable
+        e.next = e_tmp
+
+        if e:
+            phase_accumulator.next = phase_accumulator + fcw
             output.next = samples[phase_accumulator[
                 pa_bitwidth:pa_bitwidth-lut_bitwidth+1]]
 

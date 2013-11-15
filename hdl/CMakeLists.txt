@@ -38,7 +38,7 @@ find_python_module(numpy REQUIRED)
 add_custom_command(
     OUTPUT exciter.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/exciter.py
-    DEPENDS exciter.py apb3_utils.py fifo.py duc.py
+    DEPENDS exciter.py apb3_utils.py fifo.py duc.py dds.py
 ) 
 
 #add_custom_command(
@@ -50,6 +50,11 @@ add_custom_command(
 add_custom_target(hdl
     DEPENDS exciter.v #receiver.v signalgenerator.v
 )
+
+add_test(NAME test_apb3_simple_slave
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/apb3_utils.py
+)
+    
 
 add_test(NAME test_duc_cic_impulse
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicImpulse

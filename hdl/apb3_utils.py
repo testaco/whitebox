@@ -5,7 +5,11 @@ APB3 Bus Functional Model
 
 This is the APB3 bus functional model.
 """
-from myhdl import ResetSignal, Signal, enum, intbv, always, delay
+from myhdl import \
+        Signal, ResetSignal, intbv, modbv, enum, concat, \
+        instance, always, always_comb, always_seq, \
+        delay, now, Simulation, StopSimulation, traceSignals, \
+        Cosimulation
 
 apb3_bus_states = enum('IDLE', 'SETUP', 'ACCESS')
 
@@ -149,6 +153,46 @@ class Apb3Bus(object):
             self.pclk.next = False
             yield delay(duration // 2)
 
+def apb3_simple_slave(bus, status_led):
+    bus_presetn = bus.presetn
+    bus_pclk = bus.pclk
+    bus_paddr = bus.paddr
+    bus_psel = bus.psel
+    bus_penable = bus.penable
+    bus_pwrite = bus.pwrite
+    bus_pwdata = bus.pwdata
+    bus_pready = bus.pready
+    bus_prdata = bus.prdata
+    bus_pslverr = bus.pslverr
+
+    state_t = enum('IDLE', 'DONE',)
+    state = Signal(state_t.IDLE)
+
+    counter = Signal(intbv(0)[len(bus_prdata):])
+
+    @always_seq(bus_pclk.posedge, reset=bus_presetn)
+    def state_machine():
+        status_led.next = counter[0]
+        if state == state_t.IDLE:
+            if bus_penable and bus_psel:
+                if bus_paddr[8:] == 0x40:
+                    bus_pready.next = False
+                    if bus_pwrite:
+                        counter.next = bus_pwdata
+                        state.next = state_t.DONE
+                    else:
+                        bus_prdata.next = counter
+                        counter.next = counter + 1
+                        state.next = state_t.DONE
+                else:
+                    state.next = state_t.DONE
+            else:
+                state.next = state_t.IDLE
+        elif state == state_t.DONE:
+            bus_pready.next = True
+            state.next = state_t.IDLE
+
+    return state_machine
 
 import unittest
 
@@ -169,16 +213,28 @@ class TestApb3BusFunctionalModel(unittest.TestCase):
             bus_pready = bus.pready
             bus_prdata = bus.prdata
             bus_pslverr = bus.pslverr
+
+            status_led = Signal(bool(False))
+
+            slave = apb3_simple_slave(bus, status_led)
             
             @myhdl.instance
             def __sim():
                 yield bus.reset() 
-                yield bus.transmit(0x4000, 0x0110)
-                yield bus.receive(0x4000)
-            return __sim
+                assert not status_led
+                yield bus.transmit(0x40, 0x0001)
+                assert status_led
+                yield bus.receive(0x40)
+                assert bus.rdata == 0x0001
+                assert not status_led
+                yield bus.receive(0x40)
+                assert bus.rdata == 0x0002
+                assert status_led
+                raise StopSimulation
+            return __sim, slave
 
         s = myhdl.Simulation(myhdl.traceSignals(_sim))
-        s.run(10000)
+        s.run()
 
 if __name__ == '__main__':
     unittest.main()

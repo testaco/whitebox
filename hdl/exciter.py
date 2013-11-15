@@ -27,16 +27,15 @@ from myhdl import \
         instance, always, always_comb, always_seq, \
         toVerilog
 
-from dds import dds as DDS
-from duc import *
+from duc import duc as DUC
+from duc import duc_fake
+from duc import Signature
 
 class OverrunError(Exception):
     pass
 
 class UnderrunError(Exception):
     pass
-
-DDS_NUM_SAMPLES=512
 
 WE_SAMPLE_ADDR     = 0x00
 WE_STATE_ADDR      = 0x04
@@ -67,6 +66,31 @@ WES_AEMPTY = intbv(2**WES_AEMPTY_BIT)[32:]
 WES_AFULL = intbv(2**WES_AFULL_BIT)[32:]
 WES_SPACE = intbv(2**WES_SPACE_BIT)[32:]
 WES_DATA = intbv(2**WES_DATA_BIT)[32:]
+
+def duc_reset(resetn,
+        dac_clock,
+        clear_in,
+        clearn):
+
+    state_t = enum('RUN', 'CLEAR', 'CLEARING')
+    state = Signal(state_t.IDLE)
+
+    clear_count = Signal(intbv(0)[4:])
+
+    @always_seq(dac_clock, reset=resetn)
+    def reset():
+        if state == state_t.RUN:
+            clearn.next = 1
+            if clear_in:
+                state.next = state_t.CLEAR
+        if state == state_t.CLEAR:
+            clearn.next = 0
+            clear_count = 16
+            state.next = state_t.CLEARING
+        elif state == state_t.CLEARING:
+            clearn.next = clearn - 1
+            if clearn == 0:
+                state.next = state_t.RUN
 
 def exciter(
         resetn,
@@ -132,7 +156,6 @@ def exciter(
     ######### RESAMPLER ###########
     interp = Signal(intbv(interp_default)[32:])
     print 'interp=', interp
-    interp_counter = Signal(intbv(0)[32:])
 
     filteren = Signal(bool(0))
 
@@ -142,78 +165,66 @@ def exciter(
 
     ########## DDS ################
     ddsen = Signal(bool(False))
-    dds_sample = Signal(intbv(0, min=-2**9, max=2**9))
     fcw = Signal(intbv(1)[32:])
-    dds_args = resetn, dac_clock, ddsen, dds_sample, fcw
-    dds = DDS(*dds_args, num_samples=DDS_NUM_SAMPLES)
 
     ############ TX EN ###########
     txen = Signal(bool(0))
     txstop = Signal(bool(0))
+
+    sync_txlast = Signal(bool(0))
     txlast = Signal(bool(0))
 
     ########### DSP - FIFO STATUS #######
+    duc_underrun = Signal(modbv(0, min=0, max=2**16))
+    sync_underrun = Signal(modbv(0, min=0, max=2**16))
     underrun = Signal(modbv(0, min=0, max=2**16))
     overrun = Signal(modbv(0, min=0, max=2**16))
 
-    # DUC DSP Chain
     sample = Signature("sample", True, bits=16)
     sample_valid = sample.valid
     sample_last = sample.last
     sample_i = sample.i
     sample_q = sample.q
 
-    truncated_0 = Signature("truncated0", True, bits=8)
-    truncator_0 = truncator(clearn, dac_clock, sample, truncated_0)
+    dac_last = Signal(bool(0))
+    duc_args = (clearn, dac_clock, dac2x_clock,
+            fifo_empty, fifo_re, fifo_rdata,
+            txen, txstop, ddsen, filteren, interp, fcw, correct_i, correct_q,
+            duc_underrun, sample,
+            dac_en, dac_data, dac_last,)
 
-    truncated_1 = Signature("truncated1", True, bits=10)
-    truncator_1 = truncator(clearn, dac_clock, sample, truncated_1)
+    duc_kwargs = dict(dspsim=dspsim, interp=interp_default)
+    if kwargs.get("duc_enable", True):
+        duc = DUC(*duc_args, **duc_kwargs)
+    else:
+        duc = duc_fake(*duc_args, **duc_kwargs)
 
-    upsampled = Signature("upsampled", True, bits=10)
-    upsampler_0 = upsampler(clearn, dac_clock, truncated_1, upsampled, interp)
-
-    filtered = Signature("filtered", True, bits=10)
-    cic_0 = cic(clearn, dac_clock, truncated_0, filtered,
-            interp,
-            cic_order=3, cic_delay=1,
-            sim=dspsim)
-
-    processed = Signature("processed", True, bits=10)
-    processed_mux = iqmux(clearn, dac_clock,
-            filteren,
-            upsampled, filtered, processed)
-
-    muxed = Signal(bool(0))
-    muxed_i = Signal(intbv(0, min=-2**9, max=2**9))
-    muxed_q = Signal(intbv(0, min=-2**9, max=2**9))
-    muxed = Signature("muxed", True, bits=10)
-    dds_out = Signature("dds_out", True, bits=10,
-            valid=ddsen, i=dds_sample)
-    dds_mux = iqmux(clearn, dac_clock,
-            ddsen,
-            processed,
-            dds_out,
-            muxed)
-
-    ## DAC Conditioning
-    corrected = Signature("corrected", True, bits=10)
-    corrector = offset_corrector(clearn, dac_clock,
-            correct_i, correct_q,
-            muxed, corrected)
+    ## Copies of FIFO flags
+    afull = Signal(bool(0))
+    aempty = Signal(bool(1))
+    sync_afull = Signal(bool(0))
+    sync_aempty = Signal(bool(1))
     
-    offset = Signature("offset", True, bits=10)
-    offseter = binary_offseter(clearn, dac_clock,
-            corrected, offset)
+    ##
+    sync_prdata = Signal(intbv(0)[32:])
+    clear_counter = Signal(intbv(0)[5:])
 
-    interleaver_0 = interleaver(clearn, dac_clock, dac2x_clock,
-            offset, 
-            dac_en, dac_data, txlast)
+    @always_seq(pclk.posedge, reset=resetn)
+    def synchronizer():
+        sync_txlast.next = dac_last
+        txlast.next = sync_txlast
+        sync_underrun.next = duc_underrun
+        underrun.next = sync_underrun
+        sync_afull.next = fifo_afull
+        afull.next = sync_afull
+        sync_aempty.next = fifo_aempty
+        aempty.next = sync_aempty
 
     @always_seq(pclk.posedge, reset=resetn)
     def state_machine():
         fifo_resetn.next = resetn and clearn
-        dmaready.next = not fifo_afull
-        txirq.next = fifo_aempty
+        dmaready.next = not afull
+        txirq.next = aempty
         status_led.next = txen
 
         if txlast:
@@ -241,9 +252,12 @@ def exciter(
                             overrun.next = 0
                             clearn.next = 0
                             pready.next = 0
+                            clear_counter.next = 3
                             state.next = state_t.CLEAR
                         elif pwdata[WES_TXSTOP_BIT]:
                             txstop.next = 1
+                            pready.next = 0
+                            state.next = state_t.DONE
                         else:
                             txen.next = pwdata[WES_TXEN_BIT]
                             ddsen.next = pwdata[WES_DDSEN_BIT]
@@ -252,13 +266,13 @@ def exciter(
                             state.next = state_t.DONE
 
                     else:
-                        prdata.next = concat(
+                        sync_prdata.next = concat(
                             # BYTE 3 - RESERVED
                             intbv(0)[8:],
                             # BYTE 2 NIBBLE 2 - FIFO DATA/SPACE
                             intbv(0)[2:], not fifo_empty, not fifo_full,
                             # BYTE 2 NIBBLE 1 - FIFO AFULL/AEMPTY
-                            intbv(0)[2:], fifo_afull, fifo_aempty,
+                            intbv(0)[2:], afull, aempty,
                             # BYTE 1 - DSP CHAIN
                             intbv(0)[5:], filteren, ddsen, txen,
                             # BYTE 0 - RESERVED
@@ -272,7 +286,7 @@ def exciter(
                         pready.next = 0
                         state.next = state_t.DONE
                     else:
-                        prdata.next = interp
+                        sync_prdata.next = interp
                         pready.next = 0
                         state.next = state_t.READ_FLAG
 
@@ -282,7 +296,7 @@ def exciter(
                         pready.next = 0
                         state.next = state_t.DONE
                     else:
-                        prdata.next = fcw
+                        sync_prdata.next = fcw
                         pready.next = 0
                         state.next = state_t.READ_FLAG
 
@@ -290,7 +304,8 @@ def exciter(
                     if pwrite:
                         state.next = state_t.DONE
                     else:
-                        prdata.next = concat(overrun, underrun)
+                        sync_prdata.next = concat(overrun, underrun)
+                        pready.next = 0
                         state.next = state_t.READ_FLAG
 
                 elif paddr[8:] == WE_THRESHOLD_ADDR:
@@ -299,7 +314,7 @@ def exciter(
                         fifo_aeval.next = pwdata[12:]
                         state.next = state_t.DONE
                     else:
-                        prdata.next = concat(intbv(0)[4:], fifo_afval,
+                        sync_prdata.next = concat(intbv(0)[4:], fifo_afval,
                                 intbv(0)[4:], fifo_aeval)
                         pready.next = 0
                         state.next = state_t.READ_FLAG
@@ -310,7 +325,7 @@ def exciter(
                         correct_i.next = pwdata[10:].signed()
                         state.next = state_t.DONE
                     else:
-                        prdata.next = concat(intbv(0)[6:], correct_q[10:],
+                        sync_prdata.next = concat(intbv(0)[6:], correct_q[10:],
                                 intbv(0)[6:], correct_i[10:])
                         pready.next = 0
                         state.next = state_t.READ_FLAG
@@ -321,10 +336,14 @@ def exciter(
             state.next = state_t.DONE
 
         elif state == state_t.READ_FLAG:
+            prdata.next = sync_prdata
             state.next = state_t.DONE
 
         elif state == state_t.CLEAR:
-            state.next = state_t.DONE
+            if clear_counter == 0:
+                state.next = state_t.DONE
+            else:
+                clear_counter.next = clear_counter - 1
 
         elif state == state_t.DONE:
             fifo_we.next = 0
@@ -332,30 +351,7 @@ def exciter(
             clearn.next = 1
             state.next = state_t.IDLE
 
-    @always_seq(dac_clock.posedge, reset=clearn)
-    def consumer():
-        if txen:
-            if interp_counter == 0:
-                interp_counter.next = interp - 1
-                fifo_re.next = True
-            else:
-                interp_counter.next = interp_counter - 1
-
-            if fifo_re:
-                # Watch for underrun
-                if fifo_empty and not txstop:
-                    underrun.next = underrun + 1
-                sample_i.next = fifo_rdata[16:].signed()
-                sample_q.next = fifo_rdata[32:16].signed()
-                sample_valid.next = True
-                sample_last.next = txstop if fifo_empty else False
-                fifo_re.next = False
-            else:
-                sample_valid.next = False
-    
-    return state_machine, consumer, dds, \
-        truncator_0, truncator_1, cic_0, upsampler_0, processed_mux, \
-        dds_mux, corrector, offseter, interleaver_0
+    return synchronizer, state_machine, duc
 
 
 if __name__ == '__main__':
@@ -365,6 +361,7 @@ if __name__ == '__main__':
     fifo_depth = 1024
     fifo_width = 32
     interp = 20
+    duc_enable = True
 
     dac2x_clock = Signal(bool(0))
     dac_clock = Signal(bool(0))
@@ -448,7 +445,9 @@ if __name__ == '__main__':
                 fifo_afval,
                 fifo_aeval)
 
-    toVerilog(exciter, *signals, interp=interp)
+    toVerilog(exciter, *signals,
+            interp=interp,
+            duc_enable=duc_enable)
 
     print "#define WES_CLEAR\t%#010x" % WES_CLEAR
     print "#define WES_TXSTOP\t%#010x" % WES_TXSTOP
