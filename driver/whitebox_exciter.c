@@ -16,34 +16,22 @@ void _exciter_free(struct whitebox_exciter *exciter)
 
 u32 _exciter_get_state(struct whitebox_exciter *exciter)
 {
-    u32 state;
-    state = WHITEBOX_EXCITER(exciter)->state;
-    state = WHITEBOX_EXCITER(exciter)->state;
-    return state;
+    return WHITEBOX_EXCITER(exciter)->state;
 }
 
 void _exciter_set_state(struct whitebox_exciter *exciter, u32 state_mask)
 {
-    u32 state;
-    state = WHITEBOX_EXCITER(exciter)->state;
-    state = WHITEBOX_EXCITER(exciter)->state;
-    WHITEBOX_EXCITER(exciter)->state = state | state_mask;
+    WHITEBOX_EXCITER(exciter)->state |= state_mask;
 }
 
 void _exciter_clear_state(struct whitebox_exciter *exciter, u32 state_mask)
 {
-    u32 state;
-    state = WHITEBOX_EXCITER(exciter)->state;
-    state = WHITEBOX_EXCITER(exciter)->state;
-    WHITEBOX_EXCITER(exciter)->state = state & ~state_mask;
+    WHITEBOX_EXCITER(exciter)->state &= ~state_mask;
 }
 
 u32 _exciter_get_interp(struct whitebox_exciter *exciter)
 {
-    u32 interp;
-    interp = WHITEBOX_EXCITER(exciter)->interp;
-    interp = WHITEBOX_EXCITER(exciter)->interp;
-    return interp;
+    return WHITEBOX_EXCITER(exciter)->interp;
 }
 
 void _exciter_set_interp(struct whitebox_exciter *exciter, u32 interp)
@@ -53,10 +41,7 @@ void _exciter_set_interp(struct whitebox_exciter *exciter, u32 interp)
 
 u32 _exciter_get_fcw(struct whitebox_exciter *exciter)
 {
-    u32 fcw;
-    fcw = WHITEBOX_EXCITER(exciter)->fcw;
-    fcw = WHITEBOX_EXCITER(exciter)->fcw;
-    return fcw;
+    return WHITEBOX_EXCITER(exciter)->fcw;
 }
 
 void _exciter_set_fcw(struct whitebox_exciter *exciter, u32 fcw)
@@ -66,10 +51,7 @@ void _exciter_set_fcw(struct whitebox_exciter *exciter, u32 fcw)
 
 u32 _exciter_get_threshold(struct whitebox_exciter *exciter)
 {
-    u32 threshold;
-    threshold = WHITEBOX_EXCITER(exciter)->threshold;
-    threshold = WHITEBOX_EXCITER(exciter)->threshold;
-    return threshold;
+    return WHITEBOX_EXCITER(exciter)->threshold;
 }
 
 void _exciter_set_threshold(struct whitebox_exciter *exciter, u32 threshold)
@@ -81,7 +63,6 @@ void _exciter_get_runs(struct whitebox_exciter *exciter,
         u16 *overruns, u16 *underruns)
 {
     u32 runs;
-    runs = WHITEBOX_EXCITER(exciter)->runs;
     runs = WHITEBOX_EXCITER(exciter)->runs;
     *overruns = (u16)((runs & WER_OVERRUNS_MASK) >> WER_OVERRUNS_OFFSET);
     *underruns = (u16)(runs & WER_UNDERRUNS_MASK);

@@ -32,10 +32,15 @@ def dds(resetn,
     :param output: The output digital control word.
     :param frequency_control_word: The fcw.
     """
+    output_valid = output.valid
+    output_last = output.last
+    output_i = output.i
+    output_q = output.q
+
     pa_bitwidth = kwargs.get('phase_accumulator_bitwidth', 40)
     lut_bitwidth = kwargs.get('lut_bitwidth', 10)
     num_samples = kwargs.get('num_samples', 1024)
-    sample_resolution = len(output)
+    sample_resolution = len(output_i)
     half = pow(2, sample_resolution - 1)
     samples = tuple([int(ceil(cos(i)*(half-1))) \
                 for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
@@ -48,7 +53,7 @@ def dds(resetn,
     
     e = Signal(bool(0))
     e_tmp = Signal(bool(0))
-    
+
     @always_seq(clock.posedge, reset=resetn)
     def synthesizer():
         fcw_tmp.next = frequency_control_word
@@ -58,8 +63,16 @@ def dds(resetn,
 
         if e:
             phase_accumulator.next = phase_accumulator + fcw
-            output.next = samples[phase_accumulator[
+            output_i.next = samples[phase_accumulator[
                 pa_bitwidth:pa_bitwidth-lut_bitwidth+1]]
+            output_q.next = 0
+            output_valid.next = 1
+            output_last.next = 0
+        else:
+            output_i.next = 0
+            output_q.next = 0
+            output_valid.next = 0
+            output_last.next = 0
 
     return synthesizer
 

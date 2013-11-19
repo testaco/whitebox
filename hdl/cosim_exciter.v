@@ -38,10 +38,10 @@ initial begin
     $dumpvars;
     $from_myhdl(resetn,
             dac2x_clock, dac_clock,
-            pclk, paddr, psel, penable, pwrite, pwdata, pslverr,
+            pclk, paddr, psel, penable, pwrite, pwdata,
             fifo_rclk, fifo_rdata, fifo_wclk,
             fifo_full, fifo_afull, fifo_empty, fifo_aempty);
-    $to_myhdl(pready, prdata,
+    $to_myhdl(pready, prdata, pslverr,
             dac_data, dac_en,
             status_led,
             dmaready, txirq, clear_enable,
@@ -67,7 +67,7 @@ exciter e (
     .pwdata(pwdata),
     .pready(pready),
     .prdata(prdata),
-    .pslverr(pslverr),
+    //.pslverr(pslverr),
     .dac_clock(dac_clock),
     .dac_data(dac_data),
     .dac_en(dac_en),

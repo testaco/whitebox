@@ -12,7 +12,8 @@ from myhdl import \
 
 from apb3_utils import Apb3Bus
 from fifo import fifo
-from exciter import exciter, \
+from exciter import exciter
+from rfe import \
     WE_SAMPLE_ADDR, WE_STATE_ADDR, WE_INTERP_ADDR, WE_FCW_ADDR, \
     WE_RUNS_ADDR, WE_THRESHOLD_ADDR, WE_CORRECTION_ADDR, \
     WES_CLEAR, WES_TXSTOP, WES_TXEN, WES_DDSEN, WES_FILTEREN, \
@@ -133,6 +134,31 @@ class ExciterSim(object):
         )
         return fifo_0, exciter_0
 
+class TestApb3Transaction(unittest.TestCase):
+    def test_apb3_transaction(self):
+        bus = Apb3Bus(duration=APB3_DURATION)
+
+        s = ExciterSim(bus)
+
+        fifo_args = {'width': 32, 'depth': 1024}
+        exciter_args = {'interp': 200,}
+        def test_exciter_apb3_transaction():
+            return s.cosim_dut("cosim_exciter_apb3_transaction",
+                    fifo_args, exciter_args)
+
+        @instance
+        def stimulus():
+            yield bus.reset()
+            yield bus.transmit(WE_INTERP_ADDR, 20)
+            yield bus.transmit(WE_FCW_ADDR, 100)
+            yield bus.receive(WE_INTERP_ADDR)
+            assert bus.rdata == 20
+            yield bus.receive(WE_FCW_ADDR)
+            assert bus.rdata == 100
+            raise StopSimulation
+
+        s.simulate(stimulus, test_exciter_apb3_transaction)
+
 class TestDDS(unittest.TestCase):
     def test_dds(self):
         bus = Apb3Bus(duration=APB3_DURATION)
@@ -167,8 +193,6 @@ class TestDDS(unittest.TestCase):
             raise StopSimulation
 
         s.simulate(stimulus, test_exciter_dds)
-
-
 
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):

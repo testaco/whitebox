@@ -76,6 +76,24 @@ int test_tx_902_pll(void* data) {
     assert(whitebox_close(&wb) == 0);
 }
 
+int test_ioctl_exciter(void *data) {
+    int fd;
+    whitebox_t wb;
+    whitebox_args_t w;
+    whitebox_init(&wb);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 1e6)) > 0);
+    assert(fd > 0);
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    w.flags.exciter.interp = 100;
+    w.flags.exciter.fcw = 32;
+    assert(ioctl(fd, WE_SET, &w) == 0);
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(w.flags.exciter.interp == 100);
+    assert(w.flags.exciter.fcw == 32);
+    assert(whitebox_close(&wb) == 0);
+    return 0;
+}
+
 int test_tx_write(void* data) {
     whitebox_t wb;
     uint32_t buf[1023];
@@ -83,7 +101,7 @@ int test_tx_write(void* data) {
     int ret;
     int fd;
     whitebox_init(&wb);
-    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6)) > 0);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 1e6)) > 0);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
     for (j = 0; j < 10; ++j) {
@@ -106,6 +124,7 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_tx_420_pll),
         WHITEBOX_TEST(test_tx_902_pll),
         WHITEBOX_TEST(test_tx_write),
+        WHITEBOX_TEST(test_ioctl_exciter),
         WHITEBOX_TEST(0),
     };
     return whitebox_test_main(tests, NULL, argc, argv);

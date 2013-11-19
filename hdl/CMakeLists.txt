@@ -38,7 +38,7 @@ find_python_module(numpy REQUIRED)
 add_custom_command(
     OUTPUT exciter.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/exciter.py
-    DEPENDS exciter.py apb3_utils.py fifo.py duc.py dds.py
+    DEPENDS exciter.py apb3_utils.py fifo.py duc.py dds.py rfe.py
 ) 
 
 #add_custom_command(
@@ -67,6 +67,11 @@ add_test(NAME test_duc_cic_sin
 add_test(NAME test_duc_cic_interpolate_20
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicInterpolate20
 )
+
+add_test(NAME test_exciter_apb3_transaction
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestApb3Transaction
+)
+    
 
 add_test(NAME test_exciter_dds
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestDDS

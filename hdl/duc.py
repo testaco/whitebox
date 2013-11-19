@@ -567,7 +567,7 @@ def interleaver(clearn, clock, clock2x,
 
     return innie, outie
 
-def duc_fake(system_clearn, dac_clock, dac2x_clock,
+def duc_fake(clearn, dac_clock, dac2x_clock,
         fifo_empty, fifo_re, fifo_rdata,
         system_txen, system_txstop,
         system_ddsen, system_filteren,
@@ -581,16 +581,20 @@ def duc_fake(system_clearn, dac_clock, dac2x_clock,
     sample_i = sample.i
     sample_q = sample.q
 
-    @always_seq(dac_clock.posedge, reset=system_clearn)
+    @always_seq(dac_clock.posedge, reset=clearn)
     def pass_through():
+        underrun.next = 0
+        fifo_re.next = 0
+
+    @always_seq(dac2x_clock.posedge, reset=clearn)
+    def pass_through2():
         dac_en.next = 0
         dac_data.next = 0
         dac_last.next = 0
-        underrun.next = 0
 
-    return pass_through
+    return pass_through, pass_through2
 
-def duc(system_clearn, dac_clock, dac2x_clock,
+def duc(clearn, dac_clock, dac2x_clock,
         fifo_empty, fifo_re, fifo_rdata,
         system_txen, system_txstop,
         system_ddsen, system_filteren,
@@ -602,8 +606,8 @@ def duc(system_clearn, dac_clock, dac2x_clock,
     dspsim = kwargs.get('dspsim', None)
     interp_default = kwargs.get('interp', 1)
 
-    sync_clearn = ResetSignal(1, 0, async=False)
-    clearn = ResetSignal(1, 0, async=False)
+    chain = []
+
     sync_txen = Signal(bool(0))
     txen = Signal(bool(0))
     sync_txstop = Signal(bool(0))
@@ -620,66 +624,80 @@ def duc(system_clearn, dac_clock, dac2x_clock,
     correct_i = Signal(intbv(0)[len(system_correct_i):])
     sync_correct_q = Signal(intbv(0)[len(system_correct_q):])
     correct_q = Signal(intbv(0)[len(system_correct_q):])
+    re = Signal(bool(0))
 
     sample_valid = sample.valid
     sample_last = sample.last
     sample_i = sample.i
     sample_q = sample.q
 
-    truncated_0 = Signature("truncated0", True, bits=8)
-    truncator_0 = truncator(clearn, dac_clock, sample, truncated_0)
+    #truncated_0 = Signature("truncated0", True, bits=8)
+    #truncator_0 = truncator(clearn, dac_clock, sample, truncated_0)
 
     truncated_1 = Signature("truncated1", True, bits=10)
     truncator_1 = truncator(clearn, dac_clock, sample, truncated_1)
+    chain.append(truncator_1)
 
     upsampled = Signature("upsampled", True, bits=10)
     upsampler_0 = upsampler(clearn, dac_clock, truncated_1, upsampled, interp)
+    chain.append(upsampler_0)
 
-    filtered = Signature("filtered", True, bits=10)
-    cic_0 = cic(clearn, dac_clock, truncated_0, filtered,
-            interp,
-            cic_order=3, cic_delay=1,
-            sim=dspsim)
+    if kwargs.get('cic_enable', True):
+        filtered = Signature("filtered", True, bits=10)
+        cic_0 = cic(clearn, dac_clock, truncated_0, filtered,
+                interp,
+                cic_order=3, cic_delay=1,
+                sim=dspsim)
+        chain.append(cic_0)
 
-    processed = Signature("processed", True, bits=10)
-    processed_mux = iqmux(clearn, dac_clock,
-            filteren,
-            upsampled, filtered, processed)
+        processed = Signature("processed", True, bits=10)
+        processed_mux = iqmux(clearn, dac_clock,
+                filteren,
+                upsampled, filtered, processed)
+        chain.append(processed_mux)
+    else:
+        processed = upsampled
 
-    dds_sample = Signal(intbv(0, min=-2**9, max=2**9))
-    dds_args = clearn, dac_clock, ddsen, dds_sample, fcw
-    dds = DDS(*dds_args, num_samples=DDS_NUM_SAMPLES)
+    if kwargs.get('dds_enable', True):
+        dds_out = Signature("dds_out", True, bits=10)
+        dds_args = clearn, dac_clock, ddsen, dds_out, fcw
+        dds = DDS(*dds_args, num_samples=DDS_NUM_SAMPLES)
+        chain.append(dds)
 
-    muxed = Signal(bool(0))
-    muxed_i = Signal(intbv(0, min=-2**9, max=2**9))
-    muxed_q = Signal(intbv(0, min=-2**9, max=2**9))
-    muxed = Signature("muxed", True, bits=10)
-    dds_out = Signature("dds_out", True, bits=10,
-            valid=ddsen, i=dds_sample)
-    dds_mux = iqmux(clearn, dac_clock,
-            ddsen,
-            processed,
-            dds_out,
-            muxed)
+        rf_out = Signal(bool(0))
+        rf_out_i = Signal(intbv(0, min=-2**9, max=2**9))
+        rf_out_q = Signal(intbv(0, min=-2**9, max=2**9))
+        rf_out = Signature("rf_out", True, bits=10)
+        dds_mux = iqmux(clearn, dac_clock,
+                ddsen,
+                processed,
+                dds_out,
+                rf_out)
+        chain.append(dds_mux)
+    else:
+        rf_out = processed
 
-    ## DAC Conditioning
-    corrected = Signature("corrected", True, bits=10)
-    corrector = offset_corrector(clearn, dac_clock,
-            correct_i, correct_q,
-            muxed, corrected)
-    
-    offset = Signature("offset", True, bits=10)
-    offseter = binary_offseter(clearn, dac_clock,
-            corrected, offset)
+    if kwargs.get('conditioning_enable', True):
+        corrected = Signature("corrected", True, bits=10)
+        corrector = offset_corrector(clearn, dac_clock,
+                correct_i, correct_q,
+                rf_out, corrected)
+        chain.append(corrector)
+        
+        offset = Signature("offset", True, bits=10)
+        offseter = binary_offseter(clearn, dac_clock,
+                corrected, offset)
+        chain.append(offseter)
+    else:
+        offset = rf_out
 
     interleaver_0 = interleaver(clearn, dac_clock, dac2x_clock,
             offset, 
             dac_en, dac_data, dac_last)
+    chain.append(interleaver_0)
 
     @always_seq(dac_clock.posedge, reset=clearn)
     def synchronizer():
-        sync_clearn.next = system_clearn
-        clearn.next = sync_clearn
         sync_txen.next = system_txen
         txen.next = sync_txen
         sync_txstop.next = system_txstop
@@ -705,10 +723,11 @@ def duc(system_clearn, dac_clock, dac2x_clock,
             if interp_counter == 0:
                 interp_counter.next = interp - 1
                 fifo_re.next = True
+                re.next = True
             else:
                 interp_counter.next = interp_counter - 1
 
-            if fifo_re:
+            if re:
                 # Watch for underrun
                 if fifo_empty and not txstop:
                     underrun.next = underrun + 1
@@ -717,9 +736,10 @@ def duc(system_clearn, dac_clock, dac2x_clock,
                 sample_valid.next = True
                 sample_last.next = txstop if fifo_empty else False
                 fifo_re.next = False
+                re.next = False
             else:
                 sample_valid.next = False
     
-    return synchronizer, consumer, \
-            truncator_0, truncator_1, cic_0, upsampler_0, processed_mux, \
-            dds, dds_mux, corrector, offseter, interleaver_0
+    return synchronizer, consumer, chain
+            #truncator_1, cic_0, upsampler_0, processed_mux, \
+            #dds, dds_mux, corrector, offseter, interleaver_0
