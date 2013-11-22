@@ -12,7 +12,7 @@ from myhdl import \
 
 from apb3_utils import Apb3Bus
 from fifo import fifo
-from exciter import exciter
+from whitebox import whitebox
 from rfe import \
     WE_SAMPLE_ADDR, WE_STATE_ADDR, WE_INTERP_ADDR, WE_FCW_ADDR, \
     WE_RUNS_ADDR, WE_THRESHOLD_ADDR, WE_CORRECTION_ADDR, \
@@ -25,19 +25,22 @@ APB3_DURATION = int(1e9 / 20e6)
 DAC_DURATION = int(1e9 / 10e6)
 DAC2X_DURATION = int(1e9 / 20e6)
 
-class ExciterSim(object):
+class WhiteboxSim(object):
     def __init__(self, bus):
         self.bus = bus
+        self.clear_enable = Signal(bool(0))
         self.dac2x_clock = Signal(bool(0))
         self.dac_clock = Signal(bool(0))
         self.dac_data = Signal(intbv(0)[10:])
         self.dac_en = Signal(bool(0))
-        self.status_led = Signal(bool(0))
-        self.dmaready = Signal(bool(1))
-        self.txirq = Signal(bool(0))
-        self.clear_enable = Signal(bool(0))
+        self.adc_idata = Signal(intbv(0, min=-2**9, max=2**9))
+        self.adc_qdata = Signal(intbv(0, min=-2**9, max=2**9))
+        self.tx_status_led = Signal(bool(0))
+        self.tx_dmaready = Signal(bool(1))
+        self.rx_status_led = Signal(bool(0))
+        self.rx_dmaready = Signal(bool(1))
 
-    def simulate(self, stimulus, exciter, **kwargs):
+    def simulate(self, stimulus, whitebox, **kwargs):
         @always(delay(DAC2X_DURATION // 2))
         def dac2x_clock():
             self.dac2x_clock.next = not self.dac2x_clock
@@ -46,11 +49,11 @@ class ExciterSim(object):
         def dac_clock():
             self.dac_clock.next = not self.dac_clock
 
-        traced = traceSignals(exciter)
+        traced = traceSignals(whitebox)
         s = Simulation(dac_clock, dac2x_clock, stimulus, traced)
         s.run()
      
-    def cosim_dut(self, cosim_name, fifo_args, exciter_args):
+    def cosim_dut(self, cosim_name, fifo_args, whitebox_args):
         bus_pclk = self.bus.pclk
         bus_paddr = self.bus.paddr
         bus_psel = self.bus.psel
@@ -61,48 +64,77 @@ class ExciterSim(object):
         bus_pready = self.bus.pready
         bus_prdata = self.bus.prdata
 
-        fifo_depth = fifo_args['depth']
-        fifo_re = Signal(bool(False))
-        fifo_rclk = self.dac_clock
-        fifo_rdata = Signal(intbv(0)[32:])
-        fifo_we = Signal(bool(False))
-        fifo_wclk = self.bus.pclk
-        fifo_wdata = Signal(intbv(0)[32:])
-        fifo_full = Signal(bool(False))
-        fifo_afull = Signal(bool(False))
-        fifo_empty = Signal(bool(False))
-        fifo_aempty = Signal(bool(False))
-        fifo_afval = Signal(intbv(fifo_depth)[12:])
-        fifo_aeval = Signal(intbv(0)[12:])
         clearn = Signal(bool(1))
 
-        fifo_signals = (
+        fifo_depth = fifo_args['depth']
+
+        tx_fifo_re = Signal(bool(False))
+        tx_fifo_rclk = self.dac_clock
+        tx_fifo_rdata = Signal(intbv(0)[32:])
+        tx_fifo_we = Signal(bool(False))
+        tx_fifo_wclk = self.bus.pclk
+        tx_fifo_wdata = Signal(intbv(0)[32:])
+        tx_fifo_full = Signal(bool(False))
+        tx_fifo_afull = Signal(bool(False))
+        tx_fifo_empty = Signal(bool(False))
+        tx_fifo_aempty = Signal(bool(False))
+        tx_fifo_afval = Signal(intbv(fifo_depth)[12:])
+        tx_fifo_aeval = Signal(intbv(0)[12:])
+        tx_fifo_signals = (
             clearn,
-            fifo_re,
-            fifo_rclk,
-            fifo_rdata,
-            fifo_we,
-            fifo_wclk,
-            fifo_wdata,
-            fifo_full,
-            fifo_afull,
-            fifo_empty,
-            fifo_aempty,
-            fifo_afval,
-            fifo_aeval)
-        fifo_0 = fifo(*fifo_signals, **fifo_args)
+            tx_fifo_re,
+            tx_fifo_rclk,
+            tx_fifo_rdata,
+            tx_fifo_we,
+            tx_fifo_wclk,
+            tx_fifo_wdata,
+            tx_fifo_full,
+            tx_fifo_afull,
+            tx_fifo_empty,
+            tx_fifo_aempty,
+            tx_fifo_afval,
+            tx_fifo_aeval)
+        tx_fifo = fifo(*tx_fifo_signals, **fifo_args)
+
+        rx_fifo_depth = fifo_args['depth']
+        rx_fifo_re = Signal(bool(False))
+        rx_fifo_rclk = self.dac_clock
+        rx_fifo_rdata = Signal(intbv(0)[32:])
+        rx_fifo_we = Signal(bool(False))
+        rx_fifo_wclk = self.bus.pclk
+        rx_fifo_wdata = Signal(intbv(0)[32:])
+        rx_fifo_full = Signal(bool(False))
+        rx_fifo_afull = Signal(bool(False))
+        rx_fifo_empty = Signal(bool(False))
+        rx_fifo_aempty = Signal(bool(False))
+        rx_fifo_afval = Signal(intbv(fifo_depth)[12:])
+        rx_fifo_aeval = Signal(intbv(0)[12:])
+        rx_fifo_signals = (
+            clearn,
+            rx_fifo_re,
+            rx_fifo_rclk,
+            rx_fifo_rdata,
+            rx_fifo_we,
+            rx_fifo_wclk,
+            rx_fifo_wdata,
+            rx_fifo_full,
+            rx_fifo_afull,
+            rx_fifo_empty,
+            rx_fifo_aempty,
+            rx_fifo_afval,
+            rx_fifo_aeval)
+        rx_fifo = fifo(*rx_fifo_signals, **fifo_args)
 
         config_file = tempfile.NamedTemporaryFile(delete=False)
         config_file.write('+define+COSIM_NAME="%s"' % (cosim_name,))
         config_file.close()
 
-        cmd = 'iverilog -o %s.v -c %s exciter.v exciter_reset.v /home/testa/whitebox/hdl/cosim_exciter.v' % (cosim_name, config_file.name)
+        cmd = 'iverilog -o %s.v -c %s whitebox.v whitebox_reset.v /home/testa/whitebox/hdl/cosim_whitebox.v' % (cosim_name, config_file.name)
         os.system(cmd)
 
-        exciter_0 = Cosimulation('vvp -m ./myhdl.vpi %s.v' % (cosim_name, ),
+        whitebox_test = Cosimulation(
+                    'vvp -m ./myhdl.vpi %s.v' % (cosim_name, ),
                     resetn=self.bus.presetn,
-                    clearn=clearn,
-                    dac2x_clock=self.dac2x_clock,
                     pclk=self.bus.pclk,
                     paddr=self.bus.paddr,
                     psel=self.bus.psel,
@@ -111,40 +143,57 @@ class ExciterSim(object):
                     pwdata=self.bus.pwdata,
                     pready=self.bus.pready,
                     prdata=self.bus.prdata,
-                    pslverr=self.bus.pslverr,
-                    dac_clock=self.dac_clock,
-                    dac_data=self.dac_data,
-                    dac_en=self.dac_en,
-                    status_led=self.status_led,
-                    dmaready=self.dmaready,
-                    txirq=self.txirq,
+                    #pslverr=self.bus.pslverr,
+                    clearn=clearn,
                     clear_enable=self.clear_enable,
-                    fifo_re=fifo_re,
-                    fifo_rclk=fifo_rclk,
-                    fifo_rdata=fifo_rdata,
-                    fifo_we=fifo_we,
-                    fifo_wclk=fifo_wclk,
-                    fifo_wdata=fifo_wdata,
-                    fifo_full=fifo_full,
-                    fifo_afull=fifo_afull,
-                    fifo_empty=fifo_empty,
-                    fifo_aempty=fifo_aempty,
-                    fifo_afval=fifo_afval,
-                    fifo_aeval=fifo_aeval
+                    dac_clock=self.dac_clock,
+                    dac2x_clock=self.dac2x_clock,
+                    dac_en=self.dac_en,
+                    dac_data=self.dac_data,
+                    adc_idata=self.adc_idata,
+                    adc_qdata=self.adc_qdata,
+                    tx_status_led=self.tx_status_led,
+                    tx_dmaready=self.tx_dmaready,
+                    rx_status_led=self.rx_status_led,
+                    rx_dmaready=self.rx_dmaready,
+                    tx_fifo_re=tx_fifo_re,
+                    tx_fifo_rclk=tx_fifo_rclk,
+                    tx_fifo_rdata=tx_fifo_rdata,
+                    tx_fifo_we=tx_fifo_we,
+                    tx_fifo_wclk=tx_fifo_wclk,
+                    tx_fifo_wdata=tx_fifo_wdata,
+                    tx_fifo_full=tx_fifo_full,
+                    tx_fifo_afull=tx_fifo_afull,
+                    tx_fifo_empty=tx_fifo_empty,
+                    tx_fifo_aempty=tx_fifo_aempty,
+                    tx_fifo_afval=tx_fifo_afval,
+                    tx_fifo_aeval=tx_fifo_aeval,
+                    rx_fifo_re=rx_fifo_re,
+                    rx_fifo_rclk=rx_fifo_rclk,
+                    rx_fifo_rdata=rx_fifo_rdata,
+                    rx_fifo_we=rx_fifo_we,
+                    rx_fifo_wclk=rx_fifo_wclk,
+                    rx_fifo_wdata=rx_fifo_wdata,
+                    rx_fifo_full=rx_fifo_full,
+                    rx_fifo_afull=rx_fifo_afull,
+                    rx_fifo_empty=rx_fifo_empty,
+                    rx_fifo_aempty=rx_fifo_aempty,
+                    rx_fifo_afval=rx_fifo_afval,
+                    rx_fifo_aeval=rx_fifo_aeval,
         )
-        return fifo_0, exciter_0
+        return tx_fifo, rx_fifo, whitebox_test
 
 class TestApb3Transaction(unittest.TestCase):
     def test_apb3_transaction(self):
         bus = Apb3Bus(duration=APB3_DURATION)
 
-        s = ExciterSim(bus)
+        s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': 1024}
-        exciter_args = {'interp': 200,}
-        def test_exciter_apb3_transaction():
-            return s.cosim_dut("cosim_exciter_apb3_transaction",
-                    fifo_args, exciter_args)
+        whitebox_args = {'interp': 200,}
+        def test_whitebox_apb3_transaction():
+            return s.cosim_dut("cosim_whitebox_apb3_transaction",
+                    fifo_args, whitebox_args)
 
         @instance
         def stimulus():
@@ -157,19 +206,19 @@ class TestApb3Transaction(unittest.TestCase):
             assert bus.rdata == 100
             raise StopSimulation
 
-        s.simulate(stimulus, test_exciter_apb3_transaction)
+        s.simulate(stimulus, test_whitebox_apb3_transaction)
 
 class TestDDS(unittest.TestCase):
     def test_dds(self):
         bus = Apb3Bus(duration=APB3_DURATION)
 
-        s = ExciterSim(bus)
+        s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': 1024}
-        exciter_args = {'interp': 200,}
+        whitebox_args = {'interp': 200,}
 
-        def test_exciter_dds():
-            return s.cosim_dut("cosim_exciter_dds", fifo_args, exciter_args)
+        def test_whitebox_dds():
+            return s.cosim_dut("cosim_whitebox_dds", fifo_args, whitebox_args)
 
         @instance
         def stimulus():
@@ -192,7 +241,7 @@ class TestDDS(unittest.TestCase):
 
             raise StopSimulation
 
-        s.simulate(stimulus, test_exciter_dds)
+        s.simulate(stimulus, test_whitebox_dds)
 
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):
@@ -200,14 +249,14 @@ class TestOverrunUnderrun(unittest.TestCase):
         FIFO_DEPTH = 4
         bus = Apb3Bus(duration=APB3_DURATION)
 
-        s = ExciterSim(bus)
+        s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
-        exciter_args = { 'interp': INTERP }
+        whitebox_args = { 'interp': INTERP }
 
-        def test_exciter_overrun_underrun():
-            return s.cosim_dut("cosim_exciter_overrun_underrun",
-                    fifo_args, exciter_args)
+        def test_whitebox_overrun_underrun():
+            return s.cosim_dut("cosim_whitebox_overrun_underrun",
+                    fifo_args, whitebox_args)
 
         @instance
         def stimulus():
@@ -233,7 +282,7 @@ class TestOverrunUnderrun(unittest.TestCase):
 
             ## Insert samples until overrun
             yield bus.receive(WE_RUNS_ADDR)
-            while not (bus.rdata & 0xffff0000):
+            while not (bus.rdata & 0x000000ff):
                 x = intbv(int(sin(1000 * (2 * pi) * N / 50000) * 2**15), min=-2**15, max=2**15)[16:]
                 yield bus.transmit(WE_SAMPLE_ADDR, concat(x, x))
                 N.next = N + 1
@@ -251,12 +300,12 @@ class TestOverrunUnderrun(unittest.TestCase):
 
             ## Wait until underrun
             yield bus.receive(WE_RUNS_ADDR)
-            while not (bus.rdata & 0x0000ffff):
+            while not (bus.rdata & 0x0000ff00):
                 yield bus.delay(1000)
                 yield bus.receive(WE_RUNS_ADDR)
 
             ## Make sure we're both over and underrun
-            assert bus.rdata & 0xffff0000 and bus.rdata & 0x0000ffff
+            assert bus.rdata & 0x0000ff00 and bus.rdata & 0x000000ff
 
             # Check the fifo flags
             yield bus.receive(WE_STATE_ADDR)
@@ -265,7 +314,7 @@ class TestOverrunUnderrun(unittest.TestCase):
 
             raise StopSimulation
 
-        s.simulate(stimulus, test_exciter_overrun_underrun)
+        s.simulate(stimulus, test_whitebox_overrun_underrun)
 
 class TestHalt(unittest.TestCase):
     def test_halt(self):
@@ -274,14 +323,14 @@ class TestHalt(unittest.TestCase):
         BULK_SIZE = 2
         bus = Apb3Bus(duration=APB3_DURATION)
 
-        s = ExciterSim(bus)
+        s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
-        exciter_args = { 'interp': INTERP }
+        whitebox_args = { 'interp': INTERP }
 
-        def test_exciter_halt():
-            return s.cosim_dut("cosim_exciter_halt",
-                    fifo_args, exciter_args)
+        def test_whitebox_halt():
+            return s.cosim_dut("cosim_whitebox_halt",
+                    fifo_args, whitebox_args)
 
         @instance
         def stimulus():
@@ -332,7 +381,7 @@ class TestHalt(unittest.TestCase):
 
             raise StopSimulation
 
-        s.simulate(stimulus, test_exciter_halt)
+        s.simulate(stimulus, test_whitebox_halt)
 
 class TestPipeSamples(unittest.TestCase):
     def test_pipe_samples(self):
@@ -346,14 +395,14 @@ class TestPipeSamples(unittest.TestCase):
         CORRECT_I = intbv(0, min=-2**9, max=2**9)
         CORRECT_Q = intbv(0, min=-2**9, max=2**9)
 
-        s = ExciterSim(bus)
+        s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
-        exciter_args = { 'fifo_depth': FIFO_DEPTH, 'interp': INTERP }
+        whitebox_args = { 'fifo_depth': FIFO_DEPTH, 'interp': INTERP }
 
-        def test_exciter_pipe_samples():
-            return s.cosim_dut("cosim_exciter_pipe_samples",
-                    fifo_args, exciter_args)
+        def test_whitebox_pipe_samples():
+            return s.cosim_dut("cosim_whitebox_pipe_samples",
+                    fifo_args, whitebox_args)
 
         @instance
         def stimulus():
@@ -445,7 +494,7 @@ class TestPipeSamples(unittest.TestCase):
 
             raise StopSimulation
 
-        s.simulate(stimulus, test_exciter_pipe_samples)
+        s.simulate(stimulus, test_whitebox_pipe_samples)
 
 if __name__ == '__main__':
     unittest.main()

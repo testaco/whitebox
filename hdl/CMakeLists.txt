@@ -29,26 +29,14 @@ find_python_module(myhdl REQUIRED)
 find_python_module(matplotlib REQUIRED)
 find_python_module(numpy REQUIRED)
 
-#add_custom_command(
-#    OUTPUT signalgenerator.v
-#    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/signalgenerator.py
-#    DEPENDS signalgenerator.py
-#) 
-
 add_custom_command(
-    OUTPUT exciter.v
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/exciter.py
-    DEPENDS exciter.py apb3_utils.py fifo.py duc.py dds.py rfe.py
+    OUTPUT whitebox.v
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/whitebox.py
+    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py dds.py rfe.py
 ) 
 
-#add_custom_command(
-#    OUTPUT receiver.v
-#    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/receiver.py
-#    DEPENDS receiver.py apb3_utils.py fifo.py dds.py
-#) 
-
 add_custom_target(hdl
-    DEPENDS exciter.v #receiver.v signalgenerator.v
+    DEPENDS whitebox.v
 )
 
 add_test(NAME test_apb3_simple_slave
@@ -68,25 +56,25 @@ add_test(NAME test_duc_cic_interpolate_20
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicInterpolate20
 )
 
-add_test(NAME test_exciter_apb3_transaction
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestApb3Transaction
+add_test(NAME test_whitebox_apb3_transaction
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestApb3Transaction
 )
     
 
-add_test(NAME test_exciter_dds
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestDDS
+add_test(NAME test_whitebox_dds
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestDDS
 )
 
-add_test(NAME test_exciter_overrun_underrun
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestOverrunUnderrun
+add_test(NAME test_whitebox_overrun_underrun
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestOverrunUnderrun
 )
 
-add_test(NAME test_exciter_halt
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestHalt
+add_test(NAME test_whitebox_halt
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestHalt
 )
 
-add_test(NAME test_exciter_pipe_samples
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_exciter.py TestPipeSamples
+add_test(NAME test_whitebox_pipe_samples
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestPipeSamples
 )
 
 add_subdirectory(constraint)
