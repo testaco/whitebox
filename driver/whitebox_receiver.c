@@ -185,7 +185,7 @@ void _mock_receiver_set_state(struct whitebox_receiver *receiver, u32 state_mask
     struct whitebox_mock_receiver *mock_receiver = 
         container_of(receiver, struct whitebox_mock_receiver, receiver);
     u32 state;
-    if (state_mask & WRS_CLEAR) {
+    if (state_mask & WS_CLEAR) {
         WHITEBOX_RECEIVER(receiver)->state = 0;
         mock_receiver->buf->head = 0;
         mock_receiver->buf->tail = 0;

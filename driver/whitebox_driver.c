@@ -408,8 +408,8 @@ long whitebox_ioctl_reset(void) {
     for (i = 0; i < WA_REGS_COUNT; ++i) {
         whitebox_device->adf4351_regs[i] = 0;
     }
-    exciter->ops->set_state(exciter, WES_CLEAR);
-    receiver->ops->set_state(receiver, WRS_CLEAR);
+    exciter->ops->set_state(exciter, WS_CLEAR);
+    receiver->ops->set_state(receiver, WS_CLEAR);
     return 0;
 }
 
@@ -425,7 +425,7 @@ long whitebox_ioctl_locked(void) {
 
 long whitebox_ioctl_exciter_clear(void) {
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
-    exciter->ops->set_state(exciter, WES_CLEAR);
+    exciter->ops->set_state(exciter, WS_CLEAR);
     return 0;
 }
 
@@ -458,7 +458,7 @@ long whitebox_ioctl_exciter_set(unsigned long arg) {
 
 long whitebox_ioctl_receiver_clear(void) {
     struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
-    receiver->ops->set_state(receiver, WRS_CLEAR);
+    receiver->ops->set_state(receiver, WS_CLEAR);
     return 0;
 }
 

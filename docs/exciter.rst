@@ -1,2 +1,2 @@
-.. automodule:: exciter
-    :members: exciter
+.. automodule:: whitebox
+    :members: whitebox

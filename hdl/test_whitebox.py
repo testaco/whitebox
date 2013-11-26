@@ -13,11 +13,13 @@ from myhdl import \
 from apb3_utils import Apb3Bus
 from fifo import fifo
 from whitebox import whitebox
-from rfe import \
-    WE_SAMPLE_ADDR, WE_STATE_ADDR, WE_INTERP_ADDR, WE_FCW_ADDR, \
-    WE_RUNS_ADDR, WE_THRESHOLD_ADDR, WE_CORRECTION_ADDR, \
-    WES_CLEAR, WES_TXSTOP, WES_TXEN, WES_DDSEN, WES_FILTEREN, \
-    WES_AEMPTY, WES_AFULL, WES_DATA, WES_SPACE
+from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
+
+for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
+    globals()[name] = intbv(1 << bit)[32:]
+
+for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
+    globals()[name] = addr
 
 FCW=int(200e6)
 
@@ -183,6 +185,12 @@ class WhiteboxSim(object):
         )
         return tx_fifo, rx_fifo, whitebox_test
 
+def whitebox_clear(bus):
+    yield bus.transmit(WE_STATUS_ADDR, WS_CLEAR)
+    yield bus.receive(WE_STATUS_ADDR)
+    while bus.rdata & WS_CLEAR:
+        yield bus.receive(WE_STATUS_ADDR)
+
 class TestApb3Transaction(unittest.TestCase):
     def test_apb3_transaction(self):
         bus = Apb3Bus(duration=APB3_DURATION)
@@ -225,16 +233,17 @@ class TestDDS(unittest.TestCase):
             N = Signal(intbv(0)[32:])
 
             yield bus.reset()
+
             # Send a clear
-            yield bus.transmit(WE_STATE_ADDR, WES_CLEAR)
+            yield whitebox_clear(bus)
 
             yield bus.transmit(WE_FCW_ADDR, FCW)
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == FCW
 
             ## Now start dds
-            yield bus.transmit(WE_STATE_ADDR, WES_DDSEN)
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.transmit(WE_STATUS_ADDR, WES_DDSEN)
+            yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_DDSEN
 
             yield bus.delay(10000)
@@ -264,10 +273,10 @@ class TestOverrunUnderrun(unittest.TestCase):
 
             yield bus.reset()
             # Send a clear
-            yield bus.transmit(WE_STATE_ADDR, WES_CLEAR)
+            yield whitebox_clear(bus)
 
             # Check the fifo flags
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_SPACE
             assert not (bus.rdata & WES_DATA)
 
@@ -282,33 +291,33 @@ class TestOverrunUnderrun(unittest.TestCase):
 
             ## Insert samples until overrun
             yield bus.receive(WE_RUNS_ADDR)
-            while not (bus.rdata & 0x000000ff):
+            while not (bus.rdata & 0x0000ffff):
                 x = intbv(int(sin(1000 * (2 * pi) * N / 50000) * 2**15), min=-2**15, max=2**15)[16:]
                 yield bus.transmit(WE_SAMPLE_ADDR, concat(x, x))
                 N.next = N + 1
                 yield bus.receive(WE_RUNS_ADDR)
 
             # Check that we're full
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.receive(WE_STATUS_ADDR)
             assert not (bus.rdata & WES_SPACE)
             assert bus.rdata & WES_DATA
 
             ## Now start transmitting
-            yield bus.transmit(WE_STATE_ADDR, WES_TXEN)
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXEN)
+            yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_TXEN
 
             ## Wait until underrun
             yield bus.receive(WE_RUNS_ADDR)
-            while not (bus.rdata & 0x0000ff00):
+            while not (bus.rdata & 0xffff0000):
                 yield bus.delay(1000)
                 yield bus.receive(WE_RUNS_ADDR)
 
             ## Make sure we're both over and underrun
-            assert bus.rdata & 0x0000ff00 and bus.rdata & 0x000000ff
+            assert bus.rdata & 0xffff0000 and bus.rdata & 0x0000ffff
 
             # Check the fifo flags
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_SPACE
             assert not (bus.rdata & WES_DATA)
 
@@ -338,10 +347,10 @@ class TestHalt(unittest.TestCase):
 
             yield bus.reset()
             # Send a clear
-            yield bus.transmit(WE_STATE_ADDR, WES_CLEAR)
+            yield whitebox_clear(bus)
 
             # Check the fifo flags
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_SPACE
             assert not (bus.rdata & WES_DATA)
 
@@ -356,8 +365,8 @@ class TestHalt(unittest.TestCase):
                 N.next = N + 1
 
             ## Now start transmitting
-            yield bus.transmit(WE_STATE_ADDR, WES_TXEN)
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXEN)
+            yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_TXEN
 
             ## Insert some more samples
@@ -367,13 +376,13 @@ class TestHalt(unittest.TestCase):
                 N.next = N + 1
 
             ## Stop the transmission
-            yield bus.transmit(WE_STATE_ADDR, WES_TXSTOP)
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
 
             ## Wait for TXEN to go low
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.receive(WE_STATUS_ADDR)
             while bus.rdata & WES_TXEN:
                 yield bus.delay(2)
-                yield bus.receive(WE_STATE_ADDR)
+                yield bus.receive(WE_STATUS_ADDR)
 
             ## Make sure there were no overruns or underruns
             yield bus.receive(WE_RUNS_ADDR)
@@ -408,7 +417,6 @@ class TestPipeSamples(unittest.TestCase):
         def stimulus():
             N = Signal(intbv(0)[32:])
 
-            yield bus.reset()
             # Load the samples file
             f = open('/home/testa/whitebox/hdl/sin.samples', 'r')
             struct_fmt = 'I'
@@ -422,7 +430,7 @@ class TestPipeSamples(unittest.TestCase):
 
             # Send a clear
             yield bus.reset()
-            yield bus.transmit(WE_STATE_ADDR, WES_CLEAR)
+            yield whitebox_clear(bus)
 
             yield bus.transmit(WE_INTERP_ADDR, INTERP)
             yield bus.receive(WE_INTERP_ADDR)
@@ -446,13 +454,13 @@ class TestPipeSamples(unittest.TestCase):
             while N < SAMPLES_TO_SIMULATE:
                 ######### TXIRQ_HANDLER ############
                 ## Acknowldege pending interrupt
-                #yield bus.transmit(WE_STATE_ADDR, WES_CLEAR_TXIRQ)
+                #yield bus.transmit(WE_STATUS_ADDR, WS_CLEAR_TXIRQ)
 
                 ######## TXSTART HELPER ###########
                 # If almost full, start the transmit
-                yield bus.receive(WE_STATE_ADDR)
+                yield bus.receive(WE_STATUS_ADDR)
                 if bus.rdata & WES_AFULL:
-                    yield bus.transmit(WE_STATE_ADDR, WES_TXEN | WES_FILTEREN)
+                    yield bus.transmit(WE_STATUS_ADDR, WES_TXEN | WES_FILTEREN)
 
                 # Otherwise, insert BULK_SIZE samples
                 else:
@@ -476,7 +484,7 @@ class TestPipeSamples(unittest.TestCase):
                 # Do other processing...
 
                 ## Wait for TXIRQ to assert
-                yield bus.receive(WE_STATE_ADDR)
+                yield bus.receive(WE_STATUS_ADDR)
                 if bus.rdata & WES_TXEN:
                     pass
                     # TODO!!
@@ -484,10 +492,10 @@ class TestPipeSamples(unittest.TestCase):
                     #    yield bus.delay(10*1024)
 
             # And turn off the transmitter
-            yield bus.transmit(WE_STATE_ADDR, WES_TXSTOP)
-            yield bus.receive(WE_STATE_ADDR)
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
+            yield bus.receive(WE_STATUS_ADDR)
             while bus.rdata & WES_TXEN:
-                yield bus.receive(WE_STATE_ADDR)
+                yield bus.receive(WE_STATUS_ADDR)
 
             yield bus.delay(40)
             assert not s.dac_en

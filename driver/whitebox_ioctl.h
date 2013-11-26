@@ -32,6 +32,39 @@ typedef struct whitebox_args {
     uint32_t mock_command;
 } whitebox_args_t;
 
+/* Register File */
+#define WE_SAMPLE_ADDR          0x0
+#define WE_STATUS_ADDR          0x4
+#define WE_INTERP_ADDR          0x8
+#define WE_FCW_ADDR             0xc
+#define WE_RUNS_ADDR            0x10
+#define WE_THRESHOLD_ADDR       0x14
+#define WE_CORRECTION_ADDR      0x18
+#define WR_SAMPLE_ADDR          0x80
+#define WR_STATUS_ADDR          0x84
+#define WR_DECIM_ADDR           0x88
+#define WR_RUNS_ADDR            0x90
+#define WR_THRESHOLD_ADDR       0x94
+#define WR_CORRECTION_ADDR      0x98
+
+/* Status Flags */
+#define WS_CLEAR                (1 << 0)
+#define WES_TXSTOP              (1 << 1)
+#define WRS_RXSTOP              (1 << 2)
+#define WES_TXEN                (1 << 8)
+#define WES_FILTEREN            (1 << 9)
+#define WES_DDSEN               (1 << 10)
+#define WES_AEMPTY              (1 << 12)
+#define WES_AFULL               (1 << 13)
+#define WES_SPACE               (1 << 14)
+#define WES_DATA                (1 << 15)
+#define WRS_RXEN                (1 << 16)
+#define WRS_FILTEREN            (1 << 17)
+#define WRS_AEMPTY              (1 << 20)
+#define WRS_AFULL               (1 << 21)
+#define WRS_SPACE               (1 << 22)
+#define WRS_DATA                (1 << 23)
+
 /* General */
 #define W_RESET _IO('w', 1)
 #define W_LOCKED _IO('w', 2)
@@ -42,16 +75,6 @@ typedef struct whitebox_args {
 #define WE_SET _IOW('w', 5, whitebox_args_t*)
 
 #define WE_FIFO_SIZE    1024
-
-#define WES_CLEAR       0x00000001
-#define WES_TXSTOP      0x00000002
-#define WES_TXEN        0x00000100
-#define WES_DDSEN       0x00000200
-#define WES_FILTEREN    0x00000400
-#define WES_AEMPTY      0x00010000
-#define WES_AFULL       0x00020000
-#define WES_SPACE       0x00100000
-#define WES_DATA        0x00200000
 
 #define WER_OVERRUNS_MASK    0xffff0000
 #define WER_OVERRUNS_OFFSET  16
@@ -67,16 +90,6 @@ typedef struct whitebox_args {
 #define WR_SET _IOW('w', 8, whitebox_args_t*)
 
 #define WR_FIFO_SIZE    1024
-
-#define WRS_CLEAR       0x00000001
-#define WRS_RXSTOP      0x00000002
-#define WRS_RXEN        0x00000100
-#define WRS_DDSEN       0x00000200
-#define WRS_FILTEREN    0x00000400
-#define WRS_AEMPTY      0x00010000
-#define WRS_AFULL       0x00020000
-#define WRS_SPACE       0x00100000
-#define WRS_DATA        0x00200000
 
 #define WRR_OVERRUNS_MASK    0xffff0000
 #define WRR_OVERRUNS_OFFSET  16
@@ -97,5 +110,5 @@ typedef struct whitebox_args {
 /* Mock Commands */
 #define WM_CMD _IOW('w', 13, whitebox_args_t*)
 
-#define WMC_CAUSE_UNDERRUN    (1 << 0)
-#define WMC_CAUSE_OVERRUN    (1 << 1)
+#define WMC_CAUSE_UNDERRUN      (1 << 0)
+#define WMC_CAUSE_OVERRUN       (1 << 1)

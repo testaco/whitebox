@@ -5,13 +5,14 @@ from myhdl import \
         instance, always, always_comb, always_seq, \
         toVerilog
 
+from dsp import Signature
 from duc import duc as DUC
 from duc import duc_fake
-from duc import Signature
+from ddc import ddc as DDC
+from ddc import ddc_fake
 from rfe import rfe as RFE
 from rfe import rfe_fake
-from rfe import WES_CLEAR, WES_TXSTOP, WES_TXEN, WES_DDSEN, WES_FILTEREN, \
-        WES_AEMPTY, WES_AFULL, WES_SPACE, WES_DATA
+from rfe import print_rfe_ioctl
 
 class OverrunError(Exception):
     pass
@@ -123,18 +124,23 @@ def whitebox(
     interp_default = kwargs.get('interp', 1)
 
     ######### VARS AND FLAGS ###########
-    interp = Signal(intbv(interp_default)[32:])
-    correct_i = Signal(intbv(0, min=-2**9, max=2**9))
-    correct_q = Signal(intbv(0, min=-2**9, max=2**9))
-    fcw = Signal(intbv(1)[32:])
-    print 'interp=', interp
+    print 'interp=', interp_default
 
-    filteren = Signal(bool(0))
-    ddsen = Signal(bool(False))
+    interp = Signal(intbv(interp_default)[11:])
+    tx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
+    tx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
+    fcw = Signal(intbv(1)[32:])
     txen = Signal(bool(0))
     txstop = Signal(bool(0))
+    txfilteren = Signal(bool(0))
+    ddsen = Signal(bool(False))
+
+    decim = Signal(intbv(interp_default)[11:])
+    rx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
+    rx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
     rxen = Signal(bool(0))
     rxstop = Signal(bool(0))
+    rxfilteren = Signal(bool(0))
 
     ########### DIGITAL SIGNAL PROCESSING #######
     duc_underrun = Signal(modbv(0, min=0, max=2**16))
@@ -148,7 +154,8 @@ def whitebox(
 
     duc_args = (clearn, dac_clock, dac2x_clock,
             tx_fifo_empty, tx_fifo_re, tx_fifo_rdata,
-            txen, txstop, ddsen, filteren, interp, fcw, correct_i, correct_q,
+            txen, txstop, ddsen, txfilteren,
+            interp, fcw, tx_correct_i, tx_correct_q,
             duc_underrun, tx_sample,
             dac_en, dac_data, dac_last,)
 
@@ -164,7 +171,30 @@ def whitebox(
 
     ######## DIGITAL DOWN CONVERTER ########
     ddc_overrun = Signal(modbv(0, min=0, max=2**16))
+    ddc_flags = Signal(intbv(0)[4:])
     adc_last = Signal(bool(0))
+
+    rx_sample = Signature("rx_sample", True, bits=16)
+    rx_sample_valid = rx_sample.valid
+    rx_sample_last = rx_sample.last
+    rx_sample_i = rx_sample.i
+    rx_sample_q = rx_sample.q
+
+    ddc_args = (clearn, dac_clock,
+            rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
+            rxen, rxstop, rxfilteren,
+            decim, rx_correct_i, rx_correct_q,
+            ddc_overrun, rx_sample,
+            adc_idata, adc_qdata, adc_last,)
+
+    ddc_kwargs = dict(dspsim=dspsim,
+                    interp=interp_default,
+                    cic_enable=kwargs.get('cic_enable', True),
+                    conditioning_enable=kwargs.get('conditioning_enable', True))
+    if kwargs.get("ddc_enable", True):
+        ddc = DDC(*ddc_args, **ddc_kwargs)
+    else:
+        ddc = ddc_fake(*ddc_args, **ddc_kwargs)
 
     ########### RADIO FRONT END ##############
     rfe_args = (resetn,
@@ -178,9 +208,10 @@ def whitebox(
         rx_fifo_re, rx_fifo_rdata,
         rx_fifo_empty, rx_fifo_full,
         rx_fifo_afval, rx_fifo_aeval, rx_fifo_afull, rx_fifo_aempty,
-        interp, fcw, correct_i, correct_q,
-        txen, txstop, ddsen, filteren,
-        rxen, rxstop,
+        interp, fcw, tx_correct_i, tx_correct_q,
+        txen, txstop, ddsen, txfilteren,
+        decim, rx_correct_i, rx_correct_q,
+        rxen, rxstop, rxfilteren,
         duc_underrun, dac_last,
         ddc_overrun, adc_last)
 
@@ -189,7 +220,7 @@ def whitebox(
     else:
         rfe = rfe_fake(*rfe_args)
 
-    return rfe, duc
+    return rfe, duc, ddc
 
 if __name__ == '__main__':
     from apb3_utils import Apb3Bus
@@ -337,19 +368,10 @@ if __name__ == '__main__':
             rfe_enable=True,
             duc_enable=True,
             cic_enable=False,
-            dds_enable=False,
-            conditioning_enable=False)
+            conditioning_enable=False,
+            ddc_enable=False)
 
     toVerilog(whitebox_reset, bus_presetn,
             dac_clock, clear_enable, clearn)
 
-    print "#define WES_CLEAR\t%#010x" % WES_CLEAR
-    print "#define WES_TXSTOP\t%#010x" % WES_TXSTOP
-    print "#define WES_TXEN\t%#010x" % WES_TXEN
-    print "#define WES_DDSEN\t%#010x" % WES_DDSEN
-    print "#define WES_FILTEREN\t%#010x" % WES_FILTEREN
-    print "#define WES_AEMPTY\t%#010x" % WES_AEMPTY
-    print "#define WES_AFULL\t%#010x" % WES_AFULL
-    print "#define WES_SPACE\t%#010x" % WES_SPACE
-    print "#define WES_DATA\t%#010x" % WES_DATA
-
+    print_rfe_ioctl()

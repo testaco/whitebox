@@ -166,7 +166,7 @@ void _mock_exciter_set_state(struct whitebox_exciter *exciter, u32 state_mask)
     struct whitebox_mock_exciter *mock_exciter = 
         container_of(exciter, struct whitebox_mock_exciter, exciter);
     u32 state;
-    if (state_mask & WES_CLEAR) {
+    if (state_mask & WS_CLEAR) {
         WHITEBOX_EXCITER(exciter)->state = 0;
         mock_exciter->buf->head = 0;
         mock_exciter->buf->tail = 0;
