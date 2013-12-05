@@ -34,9 +34,9 @@ wire [11:0] tx_fifo_afval;
 wire [11:0] tx_fifo_aeval;
 
 wire rx_fifo_re;
-wire [31:0] rx_fifo_rdata;
+reg [31:0] rx_fifo_rdata;
 wire rx_fifo_we;
-reg [31:0] rx_fifo_wdata;
+wire [31:0] rx_fifo_wdata;
 reg rx_fifo_full;
 reg rx_fifo_empty;
 reg rx_fifo_afull;
@@ -51,7 +51,7 @@ initial begin
             dac2x_clock, dac_clock,
             pclk, paddr, psel, penable, pwrite, pwdata,
             tx_fifo_rdata, tx_fifo_full, tx_fifo_afull, tx_fifo_empty, tx_fifo_aempty,
-            rx_fifo_wdata, rx_fifo_full, rx_fifo_afull, rx_fifo_empty, rx_fifo_aempty);
+            rx_fifo_rdata, rx_fifo_full, rx_fifo_afull, rx_fifo_empty, rx_fifo_aempty);
     $to_myhdl(pready, prdata, //pslverr,
             dac_data, dac_en,
             tx_status_led, tx_dmaready,
@@ -59,7 +59,7 @@ initial begin
             clearn, clear_enable,
             tx_fifo_re, tx_fifo_we, tx_fifo_wdata,
             tx_fifo_afval, tx_fifo_aeval,
-            rx_fifo_re, rx_fifo_we, rx_fifo_rdata,
+            rx_fifo_re, rx_fifo_we, rx_fifo_wdata,
             rx_fifo_afval, rx_fifo_aeval);
 end
 

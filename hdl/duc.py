@@ -2,6 +2,8 @@ from myhdl import Signal, always, always_comb, always_seq, \
                   intbv, enum, concat, modbv, ResetSignal
 
 from dsp import Signature
+from dsp import offset_corrector, binary_offseter
+from dsp import iqmux, iqdemux
 
 from dds import dds as DDS
 DDS_NUM_SAMPLES=256
@@ -25,12 +27,11 @@ def truncator(clearn, in_clock, in_sign, out_sign):
 
     #print 'truncator from', in_sign.bits, 'to', out_sign.bits, 'and so', i_msb, i_lsb, i_msb - i_lsb
 
-
     @always_seq(in_clock.posedge, reset=clearn)
     def truncate():
         if in_valid:
             out_valid.next = True
-            # TODO: this adds DC bias
+            # TODO: is this right???
             out_i.next = in_i[i_msb:i_lsb].signed()
             out_q.next = in_q[q_msb:q_lsb].signed()
             out_last.next = in_last
@@ -339,101 +340,6 @@ def cic(clearn, clock,
 
     return instances
 
-def iqmux(clearn, clock,
-        channel,
-        in0_sign,
-        in1_sign,
-        out_sign):
-
-    in0_valid = in0_sign.valid
-    in0_i = in0_sign.i
-    in0_q = in0_sign.q
-    in0_last = in0_sign.last
-
-    in1_valid = in1_sign.valid
-    in1_i = in1_sign.i
-    in1_q = in1_sign.q
-    in1_last = in1_sign.last
-
-    out_valid = out_sign.valid
-    out_i = out_sign.i
-    out_q = out_sign.q
-    out_last = out_sign.last
-
-    @always_seq(clock.posedge, reset=clearn)
-    def mux():
-        if channel == 0:
-            out_valid.next = in0_valid
-            out_last.next = in0_last
-            out_i.next = in0_i
-            out_q.next = in0_q
-        else:
-            out_valid.next = in1_valid
-            out_last.next = in1_last
-            out_i.next = in1_i
-            out_q.next = in1_q
-
-    return mux
-
-def offset_corrector(clearn, clock,
-        correct_i, correct_q,
-        in_sign,
-        out_sign):
-
-    in_valid = in_sign.valid
-    in_last = in_sign.last
-    in_i = in_sign.i
-    in_q = in_sign.q
-
-    out_valid = out_sign.valid
-    out_last = out_sign.last
-    out_i = out_sign.i
-    out_q = out_sign.q
-
-    @always_seq(clock.posedge, reset=clearn)
-    def offset_correct():
-        if in_valid:
-            out_valid.next = in_valid
-            out_last.next = in_last
-            out_i.next = in_i + correct_i  # TODO: saturate!
-            out_q.next = in_q + correct_q
-        else:
-            out_valid.next = False
-            out_last.next = False
-            out_i.next = 0
-            out_q.next = 0
-
-    return offset_correct
-
-def binary_offseter(clearn, clock,
-                    in_sign,
-                    out_sign):
-
-    in_valid = in_sign.valid
-    in_last = in_sign.last
-    in_i = in_sign.i
-    in_q = in_sign.q
-
-    out_valid = out_sign.valid
-    out_last = out_sign.last
-    out_i = out_sign.i
-    out_q = out_sign.q
-
-    @always_seq(clock.posedge, reset=clearn)
-    def binary_offset():
-        if in_valid:
-            out_valid.next = True
-            out_last.next = in_last
-            out_i.next = intbv(concat(not in_i[len(in_i) - 1], in_i[len(in_i) - 1:]), min=0, max=2**len(in_i))
-            out_q.next = intbv(concat(not in_q[len(in_q) - 1], in_q[len(in_q) - 1:]), min=0, max=2**len(in_q))
-        else:
-            out_valid.next = False
-            out_last.next = False
-            out_i.next = 0
-            out_q.next = 0
-
-    return binary_offset
-
 def interleaver(clearn, clock, clock2x,
         in_sign,
         out_valid, out_data, out_last):
@@ -506,6 +412,7 @@ def duc_fake(clearn, dac_clock, dac2x_clock,
     return pass_through, pass_through2
 
 def duc(clearn, dac_clock, dac2x_clock,
+        loopen, loopback,
         fifo_empty, fifo_re, fifo_rdata,
         system_txen, system_txstop,
         system_ddsen, system_filteren,
@@ -602,8 +509,12 @@ def duc(clearn, dac_clock, dac2x_clock,
     else:
         offset = rf_out
 
+    conditioned = Signature("conditioned", True, bits=10)
+    loopback_0 = iqdemux(clearn, dac_clock, loopen, offset, conditioned, loopback)
+    chain.append(loopback_0)
+
     interleaver_0 = interleaver(clearn, dac_clock, dac2x_clock,
-            offset, 
+            conditioned, 
             dac_en, dac_data, dac_last)
     chain.append(interleaver_0)
 
@@ -652,5 +563,3 @@ def duc(clearn, dac_clock, dac2x_clock,
                 sample_valid.next = False
     
     return synchronizer, consumer, chain
-            #truncator_1, cic_0, upsampler_0, processed_mux, \
-            #dds, dds_mux, corrector, offseter, interleaver_0

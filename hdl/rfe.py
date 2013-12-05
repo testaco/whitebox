@@ -26,15 +26,14 @@ for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
 WHITEBOX_STATUS_REGISTER = dict(
     # BYTE 0 - CONTROL FLAGS - WRITE ONLY
     WS_CLEAR = 0,
-    WES_TXSTOP = 1,
-    WRS_RXSTOP = 2,
-    # 3 - 7 reserved
+    WS_LOOPEN = 1,
+    # 4 - 7 reserved
 
     # BYTE 1 NIBBLE 1 - TX DSP FLAGS - R/W
     WES_TXEN = 8,
     WES_FILTEREN = 9,
     WES_DDSEN = 10,
-    # 11 reserved
+    WES_TXSTOP = 11,
 
     # BYTE 1 NIBBLE 2 - TX FIFO FLAGS - READ ONLY
     WES_AEMPTY = 12,
@@ -45,7 +44,8 @@ WHITEBOX_STATUS_REGISTER = dict(
     # BYTE 2 NIBBLE 1 - RX DSP FLAGS - R/W
     WRS_RXEN = 16,
     WRS_FILTEREN = 17,
-    # 18, 19 reserved
+    # 18 reserved
+    WRS_RXSTOP = 19,
 
     # BYTE 2 NIBBLE 2 - RX FIFO FLAGS - READ ONLY
     WRS_AEMPTY = 20,
@@ -123,7 +123,7 @@ def rfe_fake(resetn, clearn, pclk,
                 if addr == WE_INTERP_ADDR:
                     interp.next = pwdata
                 elif addr == WE_FCW_ADDR:
-                    fcw.next = pwdata
+                    fcw.next = pwdata[len(fcw):]
             else:
                 if addr == WE_INTERP_ADDR:
                     prdata.next = interp
@@ -139,7 +139,7 @@ def rfe_fake(resetn, clearn, pclk,
 
 def rfe(resetn,
         pclk, paddr, psel, penable, pwrite, pwdata, pready, prdata, #pslverr,
-        clearn, clear_enable,
+        clearn, clear_enable, loopen,
         tx_status_led, tx_dmaready,
         rx_status_led, rx_dmaready,
         tx_fifo_we, tx_fifo_wdata,
@@ -223,12 +223,10 @@ def rfe(resetn,
 
         if not clear_ackn:
             clear_enable.next = False
-
             txen.next = 0
             txstop.next = 0
             ddsen.next = 0
             overrun.next = 0
-
             rxen.next = 0
             rxstop.next = 0
             underrun.next = 0
@@ -263,6 +261,7 @@ def rfe(resetn,
                     elif pwdata[WES_TXSTOP]:
                         txstop.next = True
                     else:
+                        loopen.next = pwdata[WS_LOOPEN]
                         txen.next = pwdata[WES_TXEN]
                         txfilteren.next = pwdata[WES_FILTEREN]
                         ddsen.next = pwdata[WES_DDSEN]
@@ -282,6 +281,7 @@ def rfe(resetn,
                     elif pwdata[WRS_RXSTOP]:
                         rxstop.next = True
                     else:
+                        loopen.next = pwdata[WS_LOOPEN]
                         rxen.next = pwdata[WRS_RXEN]
                         rxfilteren.next = pwdata[WRS_FILTEREN]
                 elif addr == WR_DECIM_ADDR:
@@ -307,7 +307,7 @@ def rfe(resetn,
                         # BYTE 1 NIBBLE 1 - TX DSP FLAGS
                         bool(0), ddsen, txfilteren, txen,
                         # BYTE 0 - RESERVED
-                        intbv(0)[7:], not clearn)
+                        intbv(0)[6:], loopen, not clearn)
                 elif addr == WE_INTERP_ADDR:
                     prdata.next = interp
                     prdata.next = concat(intbv(0)[32-len(interp):], interp)
@@ -325,7 +325,8 @@ def rfe(resetn,
                     if rx_fifo_empty:
                         underrun.next = underrun + 1
                     else:
-                        rx_fifo_rdata.next = prdata
+                        # TODO: I need a wait state here!
+                        prdata.next = rx_fifo_rdata
                         rx_fifo_re.next = True
                 elif addr == WR_STATUS_ADDR:
                     prdata.next = concat(
@@ -341,7 +342,7 @@ def rfe(resetn,
                         # BYTE 1 NIBBLE 1 - TX DSP FLAGS
                         intbv(0)[4:],
                         # BYTE 0 - Misc Flags
-                        intbv(0)[7:], not clearn)
+                        intbv(0)[6:], loopen, not clearn)
                 elif addr == WR_DECIM_ADDR:
                     prdata.next = concat(intbv(0)[32-len(decim):], decim)
                 elif addr == WR_RUNS_ADDR:

@@ -4,6 +4,8 @@ import struct
 import tempfile
 import unittest
 
+import numpy as np
+import matplotlib.pyplot as plt
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
         instance, always, always_comb, always_seq, \
@@ -14,14 +16,14 @@ from apb3_utils import Apb3Bus
 from fifo import fifo
 from whitebox import whitebox
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
+from test_dsp import figure_binary_offset
+from dds import freq_to_fcw
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
     globals()[name] = intbv(1 << bit)[32:]
 
 for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
     globals()[name] = addr
-
-FCW=int(200e6)
 
 APB3_DURATION = int(1e9 / 20e6)
 DAC_DURATION = int(1e9 / 10e6)
@@ -219,8 +221,8 @@ class TestApb3Transaction(unittest.TestCase):
 class TestDDS(unittest.TestCase):
     def test_dds(self):
         bus = Apb3Bus(duration=APB3_DURATION)
-
         s = WhiteboxSim(bus)
+        output_n, output_i, output_q = [], [], []
 
         fifo_args = {'width': 32, 'depth': 1024}
         whitebox_args = {'interp': 200,}
@@ -237,6 +239,7 @@ class TestDDS(unittest.TestCase):
             # Send a clear
             yield whitebox_clear(bus)
 
+            FCW=freq_to_fcw(1e6)
             yield bus.transmit(WE_FCW_ADDR, FCW)
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == FCW
@@ -246,11 +249,33 @@ class TestDDS(unittest.TestCase):
             yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_DDSEN
 
-            yield bus.delay(10000)
+            while len(output_n) < 2**14:
+                if s.dac_en:
+                    if s.dac_clock:
+                        output_q.append(int(s.dac_data[:]))
+                        output_n.append(now())
+                    else:
+                        output_i.append(int(s.dac_data[:]))
+                yield bus.delay(1)
 
             raise StopSimulation
 
         s.simulate(stimulus, test_whitebox_dds)
+
+        y = output_i
+        n = len(y)
+        k = np.arange(n)
+        T = n/10e6
+        frq = k/T
+        frq = frq[range(n/2)]
+        Y = np.fft.fft(y)/n
+        Y = Y[range(n/2)]
+        for f, m in zip(frq[1:], abs(Y[1:])):
+            if m > 100:
+                assert abs(f - 1e6) < 1e3
+        plt.plot(frq, abs(Y), 'x')
+        plt.xlabel('Freq (Hz)')
+        plt.savefig("test_whitebox_dds.png")
 
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):

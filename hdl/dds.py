@@ -2,7 +2,7 @@
 Direct Digital Synthesizer
 ==========================
 """
-from math import cos, pi, ceil
+from math import cos, pi, ceil, log, sin
 from myhdl import Signal, always, always_seq, intbv, modbv
 
 # Reference: http://www.daniweb.com/software-development/python/code/227432/a-floating-point-range-genertaor
@@ -18,6 +18,22 @@ def frange(start, stop=None, step=1.0, delta=0.0000001):
         while start < (stop - delta):
             yield start
             start += step
+
+def fcw_to_freq(fcw, **kwargs):
+    sample_rate = kwargs.get('sample_rate', 10e6)
+    pa_bitwidth = kwargs.get('phase_accumulator_bitwidth', 25)
+    pa_cnt = 2 ** pa_bitwidth
+    return fcw * (sample_rate / pa_cnt)
+
+def freq_to_fcw(freq, **kwargs):
+    sample_rate = kwargs.get('sample_rate', 10e6)
+    pa_bitwidth = kwargs.get('phase_accumulator_bitwidth', 25)
+    pa_cnt = 2 ** pa_bitwidth
+    fmin = fcw_to_freq(1, **kwargs)
+    fmax = fcw_to_freq((2 ** pa_bitwidth) - 1, **kwargs)
+    if freq < fmin or freq > fmax:
+        raise AttributeError, "Frequency is outside of range %d to %d" % (fmin, fmax)
+    return int(freq / (sample_rate / pa_cnt))
 
 def dds(resetn,
         clock,
@@ -37,12 +53,15 @@ def dds(resetn,
     output_i = output.i
     output_q = output.q
 
-    pa_bitwidth = kwargs.get('phase_accumulator_bitwidth', 40)
+    pa_bitwidth = kwargs.get('phase_accumulator_bitwidth', 25)
     lut_bitwidth = kwargs.get('lut_bitwidth', 10)
     num_samples = kwargs.get('num_samples', 1024)
+    lgsamples = int(ceil(log(num_samples, 2)))
     sample_resolution = len(output_i)
     half = pow(2, sample_resolution - 1)
-    samples = tuple([int(ceil(cos(i)*(half-1))) \
+    i_samples = tuple([int(ceil(cos(i)*(half-1))) \
+                for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
+    q_samples = tuple([int(ceil(sin(i)*(half-1))) \
                 for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
 
     phase_accumulator = Signal(modbv(0)[pa_bitwidth:])
@@ -63,9 +82,10 @@ def dds(resetn,
 
         if e:
             phase_accumulator.next = phase_accumulator + fcw
-            output_i.next = samples[phase_accumulator[
-                pa_bitwidth:pa_bitwidth-lut_bitwidth+1]]
-            output_q.next = 0
+            output_i.next = i_samples[phase_accumulator[
+                pa_bitwidth:pa_bitwidth-lgsamples]]
+            output_q.next = q_samples[phase_accumulator[
+                pa_bitwidth:pa_bitwidth-lgsamples]]
             output_valid.next = 1
             output_last.next = 0
         else:
@@ -75,4 +95,3 @@ def dds(resetn,
             output_last.next = 0
 
     return synthesizer
-

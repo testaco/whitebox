@@ -91,3 +91,142 @@ class Signature(object):
                 self.samples_q.append(np.nan)
         return recorder
 
+def offset_corrector(clearn, clock,
+        correct_i, correct_q,
+        in_sign,
+        out_sign):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
+
+    out_valid = out_sign.valid
+    out_last = out_sign.last
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    @always_seq(clock.posedge, reset=clearn)
+    def offset_correct():
+        if in_valid:
+            out_valid.next = in_valid
+            out_last.next = in_last
+            out_i.next = in_i + correct_i  # TODO: saturate!
+            out_q.next = in_q + correct_q
+        else:
+            out_valid.next = False
+            out_last.next = False
+            out_i.next = 0
+            out_q.next = 0
+
+    return offset_correct
+
+def binary_offseter(clearn, clock,
+                    in_sign,
+                    out_sign):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
+
+    out_valid = out_sign.valid
+    out_last = out_sign.last
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    @always_seq(clock.posedge, reset=clearn)
+    def binary_offset():
+        if in_valid:
+            out_valid.next = True
+            out_last.next = in_last
+            out_i.next = intbv(concat(not in_i[len(in_i) - 1], in_i[len(in_i) - 1:]), min=0, max=2**len(in_i))
+            out_q.next = intbv(concat(not in_q[len(in_q) - 1], in_q[len(in_q) - 1:]), min=0, max=2**len(in_q))
+        else:
+            out_valid.next = False
+            out_last.next = False
+            out_i.next = 0
+            out_q.next = 0
+
+    return binary_offset
+
+def iqmux(clearn, clock,
+        channel,
+        in0_sign,
+        in1_sign,
+        out_sign):
+
+    in0_valid = in0_sign.valid
+    in0_i = in0_sign.i
+    in0_q = in0_sign.q
+    in0_last = in0_sign.last
+
+    in1_valid = in1_sign.valid
+    in1_i = in1_sign.i
+    in1_q = in1_sign.q
+    in1_last = in1_sign.last
+
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+    out_last = out_sign.last
+
+    @always_seq(clock.posedge, reset=clearn)
+    def mux():
+        if channel == 0:
+            out_valid.next = in0_valid
+            out_last.next = in0_last
+            out_i.next = in0_i
+            out_q.next = in0_q
+        else:
+            out_valid.next = in1_valid
+            out_last.next = in1_last
+            out_i.next = in1_i
+            out_q.next = in1_q
+
+    return mux
+
+def iqdemux(clearn, clock,
+        channel,
+        in_sign,
+        out0_sign,
+        out1_sign):
+
+    in_valid = in_sign.valid
+    in_i = in_sign.i
+    in_q = in_sign.q
+    in_last = in_sign.last
+
+    out0_valid = out0_sign.valid
+    out0_i = out0_sign.i
+    out0_q = out0_sign.q
+    out0_last = out0_sign.last
+
+    out1_valid = out1_sign.valid
+    out1_i = out1_sign.i
+    out1_q = out1_sign.q
+    out1_last = out1_sign.last
+
+    @always_seq(clock.posedge, reset=clearn)
+    def demux():
+        if channel == 0:
+            out0_valid.next = in_valid
+            out0_last.next = in_last
+            out0_i.next = in_i
+            out0_q.next = in_q
+            out1_valid.next = False
+            out1_last.next = False
+            out1_i.next = 0
+            out1_q.next = 0
+        else:
+            out0_valid.next = False
+            out0_last.next = False
+            out0_i.next = 0
+            out0_q.next = 0
+            out1_valid.next = in_valid
+            out1_last.next = in_last
+            out1_i.next = in_i
+            out1_q.next = in_q
+
+    return demux
+

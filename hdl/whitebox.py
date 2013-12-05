@@ -122,6 +122,7 @@ def whitebox(
     """
     dspsim = kwargs.get('dspsim', None)
     interp_default = kwargs.get('interp', 1)
+    fcw_bitwidth = kwargs.get('fcw_bitwidth', 25)
 
     ######### VARS AND FLAGS ###########
     print 'interp=', interp_default
@@ -129,11 +130,12 @@ def whitebox(
     interp = Signal(intbv(interp_default)[11:])
     tx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
     tx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
-    fcw = Signal(intbv(1)[32:])
+    fcw = Signal(intbv(1)[fcw_bitwidth:])
     txen = Signal(bool(0))
     txstop = Signal(bool(0))
     txfilteren = Signal(bool(0))
     ddsen = Signal(bool(False))
+    loopen = Signal(bool(False))
 
     decim = Signal(intbv(interp_default)[11:])
     rx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
@@ -143,6 +145,7 @@ def whitebox(
     rxfilteren = Signal(bool(0))
 
     ########### DIGITAL SIGNAL PROCESSING #######
+    loopback = Signature("loopback", False, bits=10)
     duc_underrun = Signal(modbv(0, min=0, max=2**16))
     dac_last = Signal(bool(0))
 
@@ -153,6 +156,7 @@ def whitebox(
     tx_sample_q = tx_sample.q
 
     duc_args = (clearn, dac_clock, dac2x_clock,
+            loopen, loopback,
             tx_fifo_empty, tx_fifo_re, tx_fifo_rdata,
             txen, txstop, ddsen, txfilteren,
             interp, fcw, tx_correct_i, tx_correct_q,
@@ -181,6 +185,7 @@ def whitebox(
     rx_sample_q = rx_sample.q
 
     ddc_args = (clearn, dac_clock,
+            loopen, loopback,
             rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
             rxen, rxstop, rxfilteren,
             decim, rx_correct_i, rx_correct_q,
@@ -199,7 +204,7 @@ def whitebox(
     ########### RADIO FRONT END ##############
     rfe_args = (resetn,
         pclk, paddr, psel, penable, pwrite, pwdata, pready, prdata, #pslverr,
-        clearn, clear_enable,
+        clearn, clear_enable, loopen,
         tx_status_led, tx_dmaready,
         rx_status_led, rx_dmaready,
         tx_fifo_we, tx_fifo_wdata,
@@ -368,8 +373,8 @@ if __name__ == '__main__':
             rfe_enable=True,
             duc_enable=True,
             cic_enable=False,
-            conditioning_enable=False,
-            ddc_enable=False)
+            conditioning_enable=True,
+            ddc_enable=True)
 
     toVerilog(whitebox_reset, bus_presetn,
             dac_clock, clear_enable, clearn)
