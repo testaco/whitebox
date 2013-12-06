@@ -376,7 +376,7 @@ def interleaver(clearn, clock, clock2x,
             phase.next = not phase
             out_valid.next = True
             out_last.next = last
-            out_data.next = i if phase else q
+            out_data.next = q if phase else i
         else:
             out_valid.next = False
             out_last.next = False

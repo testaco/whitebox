@@ -16,7 +16,7 @@ from apb3_utils import Apb3Bus
 from fifo import fifo
 from whitebox import whitebox
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
-from test_dsp import figure_binary_offset
+from test_dsp import figure_discrete_quadrature, figure_fft
 from dds import freq_to_fcw
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
@@ -26,8 +26,6 @@ for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
     globals()[name] = addr
 
 APB3_DURATION = int(1e9 / 20e6)
-DAC_DURATION = int(1e9 / 10e6)
-DAC2X_DURATION = int(1e9 / 20e6)
 
 class WhiteboxSim(object):
     def __init__(self, bus):
@@ -45,17 +43,74 @@ class WhiteboxSim(object):
         self.rx_dmaready = Signal(bool(1))
 
     def simulate(self, stimulus, whitebox, **kwargs):
-        @always(delay(DAC2X_DURATION // 2))
-        def dac2x_clock():
-            self.dac2x_clock.next = not self.dac2x_clock
+        record_tx = kwargs.get('record_tx', None)
+        self.sample_rate = kwargs.get('sample_rate', 10e6)
+        DAC2X_DURATION = int(1e9 / (self.sample_rate * 2))
+        DAC_DURATION = int(1e9 / self.sample_rate)
 
-        @always(delay(DAC_DURATION // 2))
+        @instance
+        def dac2x_clock():
+            while True:
+                self.dac2x_clock.next = not self.dac2x_clock
+                yield delay(DAC2X_DURATION // 2)
+
+        @instance
         def dac_clock():
-            self.dac_clock.next = not self.dac_clock
+            yield delay(DAC2X_DURATION // 4)
+            while True:
+                self.dac_clock.next = not self.dac_clock
+                yield delay(DAC_DURATION // 2)
+
+        @always(self.dac_clock.posedge,
+                self.dac_clock.negedge,
+                self.bus.presetn.negedge)
+        def tx_recorder():
+            if not self.bus.presetn:
+                self.tx_q = []
+                self.tx_i = []
+                self.tx_n = []
+            elif self.dac_en:
+                if self.dac_clock:
+                    self.tx_q.append(int(self.dac_data[:]))
+                    self.tx_n.append(now())
+                else:
+                    self.tx_i.append(int(self.dac_data[:]))
+
+                if len(self.tx_i) == len(self.tx_q) and len(self.tx_i) == record_tx:
+                    raise StopSimulation
 
         traced = traceSignals(whitebox)
-        s = Simulation(dac_clock, dac2x_clock, stimulus, traced)
+        ss = [dac_clock, dac2x_clock, stimulus, traced]
+        if 'record_tx' in kwargs:
+            ss.append(tx_recorder)
+        s = Simulation(ss)
         s.run()
+
+    def fft_tx(self):
+        n = len(self.tx_i)
+        frq = np.fft.fftfreq(n, 1/self.sample_rate)
+        y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
+        Y = np.fft.fft(y)/n
+        return frq, Y
+
+    def plot_tx(self, name):
+        f_parent = plt.figure(name + "_tx")
+        f_parent.subplots_adjust(hspace=.5)
+        #plt.title(name + "_tx")
+
+        n = len(self.tx_i)
+        k = np.arange(n)
+
+        f1 = figure_discrete_quadrature("Signal", (2, 1, 1), f_parent,
+                self.dac_data, k, self.tx_i, self.tx_q)
+                
+        #frq = np.fft.fftfreq(n, 1/sample_rate)
+        #y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
+        #Y = np.fft.fft(y)/n
+        frq, Y = self.fft_tx()
+
+        f2 = figure_fft("Magnitude & Phase", (2, 1, 2), f_parent,
+                frq, Y)
      
     def cosim_dut(self, cosim_name, fifo_args, whitebox_args):
         bus_pclk = self.bus.pclk
@@ -239,7 +294,7 @@ class TestDDS(unittest.TestCase):
             # Send a clear
             yield whitebox_clear(bus)
 
-            FCW=freq_to_fcw(1e6)
+            FCW=freq_to_fcw(100e3)
             yield bus.transmit(WE_FCW_ADDR, FCW)
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == FCW
@@ -249,33 +304,27 @@ class TestDDS(unittest.TestCase):
             yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_DDSEN
 
-            while len(output_n) < 2**14:
-                if s.dac_en:
-                    if s.dac_clock:
-                        output_q.append(int(s.dac_data[:]))
-                        output_n.append(now())
-                    else:
-                        output_i.append(int(s.dac_data[:]))
-                yield bus.delay(1)
+            while True:
+                # Recorder will stop the simulation
+                yield bus.delay(100)
 
-            raise StopSimulation
+        s.simulate(stimulus, test_whitebox_dds, record_tx=2**9)
 
-        s.simulate(stimulus, test_whitebox_dds)
-
-        y = output_i
-        n = len(y)
-        k = np.arange(n)
-        T = n/10e6
-        frq = k/T
-        frq = frq[range(n/2)]
-        Y = np.fft.fft(y)/n
-        Y = Y[range(n/2)]
-        for f, m in zip(frq[1:], abs(Y[1:])):
-            if m > 100:
-                assert abs(f - 1e6) < 1e3
-        plt.plot(frq, abs(Y), 'x')
-        plt.xlabel('Freq (Hz)')
+        s.plot_tx("whitebox_dds")
         plt.savefig("test_whitebox_dds.png")
+
+        frq, Y = s.fft_tx()
+        bin_spacing = frq[1] - frq[0]
+        bins = 0
+        local_maximum = 0
+        for f, m in zip(frq, abs(Y)**2)[1:]:
+            if m > local_maximum:
+                local_maximum = m
+            else:
+                bins = bins + 1
+                assert abs(f - 100e3) < bin_spacing
+                break
+        assert bins == 1
 
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):

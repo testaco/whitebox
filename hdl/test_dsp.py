@@ -47,15 +47,17 @@ def figure_discrete_quadrature(title, axes, f_parent, signature, n, i, q):
     max_without_nan = lambda x: max([i for i in x if i is not np.nan])
     percent = float(max_without_nan(i) - min_without_nan(i)) / float(signature.max - signature.min) * 100.0
     t = title + ' (%.2f)' % percent
+
     f = f_parent.add_subplot(*axes, title=t)
+    ax1 = plt.gca()
+    ax1.set_autoscale_on(False)
+    plt.axis([n[0], n[-1], min_without_nan(i), max_without_nan(i)])
+    plt.xlabel('Sample')
+    plt.ylabel('Magnitude')
     plt.stem(n, i, linefmt='b-', markerfmt='b.', basefmt='b|')
+    ax2 = f.axes.twinx()
     plt.stem(n, q, linefmt='r-', markerfmt='r.', basefmt='r|')
-    #plt.axis([n[0], n[-1], signature.min, signature.max], figure=f)
-    plt.axis([n[0], n[-1],
-        min(min_without_nan(i), min_without_nan(q)),
-        max(max_without_nan(i), max_without_nan(q))],
-        figure=f)
-    #plt.legend()
+    plt.axis([n[0], n[-1], min_without_nan(q), max_without_nan(q)])
     return f
 
 def figure_binary_offset(title, axes, f_parent, signature, n, i):
@@ -63,6 +65,15 @@ def figure_binary_offset(title, axes, f_parent, signature, n, i):
     plt.stem(n, i, linefmt='b-', markerfmt='b.', basefmt='b|')
     plt.axis([n[0], n[-1], signature.min, signature.max],
         figure=f)
+    plt.xlabel('Time')
+    plt.ylabel('Magnitude')
+    return f
+
+def figure_fft(title, axes, f_parent, frq, Y):
+    f = f_parent.add_subplot(*axes, title=title)
+    plt.plot(frq, abs(Y))
+    plt.xlabel('Freq (Hz)')
+    plt.ylabel('Magnitude')
     return f
 
 class DSPSim(object):
