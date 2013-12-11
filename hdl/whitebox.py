@@ -372,7 +372,7 @@ if __name__ == '__main__':
             interp=interp,
             rfe_enable=True,
             duc_enable=True,
-            cic_enable=False,
+            cic_enable=True,
             conditioning_enable=True,
             ddc_enable=True)
 

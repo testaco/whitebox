@@ -80,6 +80,10 @@ add_test(NAME test_whitebox_halt
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestHalt
 )
 
+add_test(NAME test_whitebox_cic
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestCic
+)
+
 add_test(NAME test_whitebox_pipe_samples
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestPipeSamples
 )

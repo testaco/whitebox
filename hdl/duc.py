@@ -1,3 +1,5 @@
+import math
+
 from myhdl import Signal, always, always_comb, always_seq, \
                   intbv, enum, concat, modbv, ResetSignal
 
@@ -260,19 +262,11 @@ def accumulator(clearn, clock, in_sign, out_sign):
 
     return accumulate
 
-def cic_total_gain(interp, cic_delay, cic_order):
-    combed_gain = lambda i: (cic_delay * interp) ** (i)
-    return combed_gain(cic_order)/interp
-
-def cic_bit_gain(interp, cic_delay, cic_order):
-    return math.ceil(
-            math.log(((cic_delay * interp) ** cic_order)/interp, 2))
-
 def cic(clearn, clock,
         in_sign,
         out_sign,
         interp,
-        cic_order=3, cic_delay=5, **kwargs):
+        cic_order=4, cic_delay=2, **kwargs):
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -281,14 +275,30 @@ def cic(clearn, clock,
     out_valid = out_sign.valid
     out_i = out_sign.i
     out_q = out_sign.q
+    rates = kwargs.get('rates', [interp])
+    max_rate = max(rates)
 
     #print 'CIC order=%d delay=%d interp=%d' % (cic_order, cic_delay, interp)
 
-    combed_gain = lambda i: ((cic_delay * interp) ** (i+1))/interp
-    accum_gain = lambda i: combed_gain(cic_order-1)
+    def gain(stage, rate=None):
+        if rate is None:
+            rate = max_rate
+        if stage in range(1, cic_order + 1):
+            return 2 ** stage
+        else:
+            return (2 ** (2 * cic_order - stage) * (rate * cic_delay) ** (stage - cic_order)) / rate
+    
+    def bit_width(stage, rate=None):
+        if cic_delay == 1 and stage == cic_order:
+            return len(in_i) + cic_order - 1
+        else:
+            return len(in_i) + math.ceil(math.log(gain(stage, rate), 2))
 
-    combed = [in_sign.copy_with_gain('combed_%d' % i, combed_gain(i)) for i in range(cic_order)]
-    accumed = [in_sign.copy_with_gain('accumed_%d' % i, accum_gain(i)) for i in range(cic_order)]
+    def bit_truncation(rate):
+        return bit_width(2 * cic_order, rate) - len(out_i)
+
+    combed = [Signature('combed_%d' % i, True, bits=bit_width(i)) for i in range(1, cic_order + 1)]
+    accumed = [Signature('accumed_%d' % i, True, bits=bit_width(cic_order + i)) for i in range(1, cic_order + 1)]
 
     combs = []
     for n in range(cic_order):
@@ -330,6 +340,10 @@ def cic(clearn, clock,
     
     instances = combs, interpolator_0, accums, truncator_2
 
+    # NOTE: This only works when used with MyHDL's Simulation
+    # feature, not Cosimulation with an external Verilog tool.
+    # So, for the Whitebox codebase, this means DSP tests can use
+    # it but not Cosimulations of the Whitebox toplevel HDL.
     if kwargs.get('sim', None):
         sim = kwargs['sim']
         sim.record(in_sign)
@@ -356,7 +370,7 @@ def interleaver(clearn, clock, clock2x,
     last = Signal(bool(0))
 
     @always_seq(clock.posedge, reset=clearn)
-    def innie():
+    def producer():
         if in_valid:
             i.next = in_i
             q.next = in_q
@@ -371,7 +385,7 @@ def interleaver(clearn, clock, clock2x,
             last.next = False
 
     @always_seq(clock2x.posedge, reset=clearn)
-    def outie():
+    def consumer():
         if valid:
             phase.next = not phase
             out_valid.next = True
@@ -382,7 +396,7 @@ def interleaver(clearn, clock, clock2x,
             out_last.next = False
             out_data.next = 0
 
-    return innie, outie
+    return producer, consumer
 
 def duc_fake(clearn, dac_clock, dac2x_clock,
         fifo_empty, fifo_re, fifo_rdata,
@@ -423,6 +437,7 @@ def duc(clearn, dac_clock, dac2x_clock,
 
     dspsim = kwargs.get('dspsim', None)
     interp_default = kwargs.get('interp', 1)
+    print interp_default
 
     chain = []
 
@@ -449,9 +464,6 @@ def duc(clearn, dac_clock, dac2x_clock,
     sample_i = sample.i
     sample_q = sample.q
 
-    #truncated_0 = Signature("truncated0", True, bits=8)
-    #truncator_0 = truncator(clearn, dac_clock, sample, truncated_0)
-
     truncated_1 = Signature("truncated1", True, bits=10)
     truncator_1 = truncator(clearn, dac_clock, sample, truncated_1)
     chain.append(truncator_1)
@@ -462,7 +474,7 @@ def duc(clearn, dac_clock, dac2x_clock,
 
     if kwargs.get('cic_enable', True):
         filtered = Signature("filtered", True, bits=10)
-        cic_0 = cic(clearn, dac_clock, truncated_0, filtered,
+        cic_0 = cic(clearn, dac_clock, truncated_1, filtered,
                 interp,
                 cic_order=3, cic_delay=1,
                 sim=dspsim)

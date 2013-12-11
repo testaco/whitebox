@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from matplotlib.ticker import FuncFormatter
 import matplotlib.pyplot as plt
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
@@ -33,6 +34,11 @@ def load_quadrature_short_samples(filename, **options):
     final_i = np.array(si, dtype=np.int16)
     final_q = np.array(sq, dtype=np.int16)
     return final_i, final_q
+
+def frequency_response_chirp(tstart, tstop, sample_rate):
+    t = np.arange(tstart, tstop, 1./sample_rate)
+    y = signal.chirp(t)#, f0=0, f1=sample_rate/2., t1=tstop) + 1j * signal.chirp(t, f0=0, f1=sample_rate/2., t1=tstop, phi=-90)
+    return t, y
 
 def figure_continuous_complex(title, axes, f_parent, t, c):
     f = f_parent.add_subplot(axes, title=title)
@@ -69,11 +75,34 @@ def figure_binary_offset(title, axes, f_parent, signature, n, i):
     plt.ylabel('Magnitude')
     return f
 
-def figure_fft(title, axes, f_parent, frq, Y):
+def figure_fft_power(title, axes, f_parent, frq, Y):
     f = f_parent.add_subplot(*axes, title=title)
-    plt.plot(frq, abs(Y))
-    plt.xlabel('Freq (Hz)')
-    plt.ylabel('Magnitude')
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,3))
+    ax1 = plt.gca()
+    ax1.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: ('%.1f')%(x/1e6)))
+    plt.xlabel('Freq (MHz)')
+    plt.ylabel('Power (???)')
+    #amplitude_Y = 20*np.log10(np.abs(Y))
+    power_Y = np.abs(Y)**2
+    phase_Y = np.angle(Y)
+    plt.plot(frq, power_Y, 'b')
+    return f
+
+def figure_fft_phase(title, axes, f_parent, frq, Y):
+    f = f_parent.add_subplot(*axes, title=title)
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,3))
+    ax1 = plt.gca()
+    ax1.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: ('%.1f')%(x/1e6)))
+    plt.xlabel('Freq (MHz)')
+    plt.ylabel('Phase (radians)')
+    phase_Y = np.angle(Y)
+    plt.plot(frq, phase_Y, 'g')
+
+    y_tick = np.arange(-np.pi, np.pi, np.pi)
+    y_label = [r"$-\pi$", r"$0$", r"$+\pi$"]
+    ax1.set_yticks(y_tick*np.pi)
+    ax1.set_yticklabels(y_label)
+
     return f
 
 class DSPSim(object):

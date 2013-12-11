@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 import numpy as np
+from scipy import signal
 import matplotlib.pyplot as plt
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
@@ -16,7 +17,7 @@ from apb3_utils import Apb3Bus
 from fifo import fifo
 from whitebox import whitebox
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
-from test_dsp import figure_discrete_quadrature, figure_fft
+from test_dsp import figure_discrete_quadrature, figure_fft_power, figure_fft_phase
 from dds import freq_to_fcw
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
@@ -25,7 +26,7 @@ for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
 for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
     globals()[name] = addr
 
-APB3_DURATION = int(1e9 / 20e6)
+APB3_DURATION = int(1e9 / 40e6)
 
 class WhiteboxSim(object):
     def __init__(self, bus):
@@ -41,9 +42,13 @@ class WhiteboxSim(object):
         self.tx_dmaready = Signal(bool(1))
         self.rx_status_led = Signal(bool(0))
         self.rx_dmaready = Signal(bool(1))
+        self.tx_q = []
+        self.tx_i = []
+        self.tx_n = []
 
     def simulate(self, stimulus, whitebox, **kwargs):
         record_tx = kwargs.get('record_tx', None)
+        auto_stop = kwargs.get('auto_stop', False)
         self.sample_rate = kwargs.get('sample_rate', 10e6)
         DAC2X_DURATION = int(1e9 / (self.sample_rate * 2))
         DAC_DURATION = int(1e9 / self.sample_rate)
@@ -69,6 +74,9 @@ class WhiteboxSim(object):
                 self.tx_q = []
                 self.tx_i = []
                 self.tx_n = []
+            elif len(self.tx_i) == len(self.tx_q) and len(self.tx_i) == record_tx:
+                if auto_stop:
+                    raise StopSimulation
             elif self.dac_en:
                 if self.dac_clock:
                     self.tx_q.append(int(self.dac_data[:]))
@@ -76,8 +84,6 @@ class WhiteboxSim(object):
                 else:
                     self.tx_i.append(int(self.dac_data[:]))
 
-                if len(self.tx_i) == len(self.tx_q) and len(self.tx_i) == record_tx:
-                    raise StopSimulation
 
         traced = traceSignals(whitebox)
         ss = [dac_clock, dac2x_clock, stimulus, traced]
@@ -86,11 +92,14 @@ class WhiteboxSim(object):
         s = Simulation(ss)
         s.run()
 
-    def fft_tx(self):
-        n = len(self.tx_i)
-        frq = np.fft.fftfreq(n, 1/self.sample_rate)
+    def fft_tx(self, decim=1):
         y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
-        Y = np.fft.fft(y)/n
+        #y = signal.decimate(y, decim)
+        n = len(y)
+        frq = np.fft.fftfreq(n, 1/(self.sample_rate/decim))
+        Y = np.fft.fft(y)#/n
+        #return np.concatenate((frq[0:1+64], frq[n-64:])), \
+        #       np.concatenate((Y[0:1+64], Y[n-64:]))
         return frq, Y
 
     def plot_tx(self, name):
@@ -101,7 +110,7 @@ class WhiteboxSim(object):
         n = len(self.tx_i)
         k = np.arange(n)
 
-        f1 = figure_discrete_quadrature("Signal", (2, 1, 1), f_parent,
+        f1 = figure_discrete_quadrature("Signal", (3, 1, 1), f_parent,
                 self.dac_data, k, self.tx_i, self.tx_q)
                 
         #frq = np.fft.fftfreq(n, 1/sample_rate)
@@ -109,7 +118,10 @@ class WhiteboxSim(object):
         #Y = np.fft.fft(y)/n
         frq, Y = self.fft_tx()
 
-        f2 = figure_fft("Magnitude & Phase", (2, 1, 2), f_parent,
+        f2 = figure_fft_power("Power", (3, 1, 2), f_parent,
+                frq, Y)
+
+        f3 = figure_fft_phase("Phase", (3, 1, 3), f_parent,
                 frq, Y)
      
     def cosim_dut(self, cosim_name, fifo_args, whitebox_args):
@@ -308,11 +320,12 @@ class TestDDS(unittest.TestCase):
                 # Recorder will stop the simulation
                 yield bus.delay(100)
 
-        s.simulate(stimulus, test_whitebox_dds, record_tx=2**9)
+        s.simulate(stimulus, test_whitebox_dds, record_tx=2**9, auto_stop=True)
 
         s.plot_tx("whitebox_dds")
         plt.savefig("test_whitebox_dds.png")
 
+        # TODO: use a figure of merit for this check
         frq, Y = s.fft_tx()
         bin_spacing = frq[1] - frq[0]
         bins = 0
@@ -401,12 +414,18 @@ class TestOverrunUnderrun(unittest.TestCase):
 
 class TestHalt(unittest.TestCase):
     def test_halt(self):
-        INTERP = 200
-        FIFO_DEPTH = 4
-        BULK_SIZE = 2
+        INTERP = 1
+        FIFO_DEPTH = 64
+        BULK_SIZE = 16
+        CNT = 512
         bus = Apb3Bus(duration=APB3_DURATION)
-
         s = WhiteboxSim(bus)
+
+        sample_rate = 10.24e6
+        freq = 100e3
+        n = np.arange(0, CNT)
+        x = (np.cos(freq * (2 * pi) * n / sample_rate) * (2**15-1)) + \
+            (np.sin(freq * (2 * pi) * n / sample_rate) * (2**15-1)) * 1j;
 
         fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
         whitebox_args = { 'interp': INTERP }
@@ -423,6 +442,11 @@ class TestHalt(unittest.TestCase):
             # Send a clear
             yield whitebox_clear(bus)
 
+            # Set the threshold
+            afval = intbv(FIFO_DEPTH - BULK_SIZE)[16:]
+            aeval = intbv(BULK_SIZE)[16:]
+            yield bus.transmit(WE_THRESHOLD_ADDR, concat(afval, aeval))
+
             # Check the fifo flags
             yield bus.receive(WE_STATUS_ADDR)
             assert bus.rdata & WES_SPACE
@@ -432,10 +456,15 @@ class TestHalt(unittest.TestCase):
             yield bus.receive(WE_INTERP_ADDR)
             assert bus.rdata == INTERP
 
+            def quadrature_bit_vector(x, N):
+                return \
+                intbv(int(x[int(N)].real), min=-2**15, max=2**15)[16:], \
+                intbv(int(x[int(N)].imag), min=-2**15, max=2**15)[16:]
+
             ## Insert some samples
-            for i in range(BULK_SIZE):
-                x = intbv(int(sin(1000 * (2 * pi) * N / 50000) * 2**15), min=-2**15, max=2**15)[16:]
-                yield bus.transmit(WE_SAMPLE_ADDR, concat(x, x))
+            for j in range(BULK_SIZE):
+                i, q = quadrature_bit_vector(x, N)
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
                 N.next = N + 1
 
             ## Now start transmitting
@@ -444,9 +473,32 @@ class TestHalt(unittest.TestCase):
             assert bus.rdata & WES_TXEN
 
             ## Insert some more samples
-            for i in range(BULK_SIZE):
-                x = intbv(int(sin(1000 * (2 * pi) * N / 50000) * 2**15), min=-2**15, max=2**15)[16:]
-                yield bus.transmit(WE_SAMPLE_ADDR, concat(x, x))
+            while len(n) - N > BULK_SIZE-1:
+                ## Make sure there were no overruns or underruns
+                yield bus.receive(WE_RUNS_ADDR)
+                assert bus.rdata == 0
+
+                ## Wait for space
+                yield bus.receive(WE_STATUS_ADDR)
+                while bus.rdata & WES_AFULL:
+                    yield bus.delay(2)
+                    yield bus.receive(WE_STATUS_ADDR)
+
+                for j in range(BULK_SIZE):
+                    i, q = quadrature_bit_vector(x, N)
+                    yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                    N.next = N + 1
+
+            ## Insert remaining samples
+            while N < len(n)-1:
+                ## Wait for space
+                yield bus.receive(WE_STATUS_ADDR)
+                while not (bus.rdata & WES_SPACE):
+                    yield bus.delay(2)
+                    yield bus.receive(WE_STATUS_ADDR)
+
+                i, q = quadrature_bit_vector(x, N)
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
                 N.next = N + 1
 
             ## Stop the transmission
@@ -464,7 +516,124 @@ class TestHalt(unittest.TestCase):
 
             raise StopSimulation
 
-        s.simulate(stimulus, test_whitebox_halt)
+        s.simulate(stimulus, test_whitebox_halt, sample_rate=sample_rate,
+                record_tx=CNT)
+
+        s.plot_tx("whitebox_halt")
+        plt.savefig("test_whitebox_halt.png")
+
+class TestCic(unittest.TestCase):
+    def test_cic(self):
+        interp = 20
+        FIFO_DEPTH = 64
+        BULK_SIZE = 16
+        CNT = 512
+        bus = Apb3Bus(duration=APB3_DURATION)
+        s = WhiteboxSim(bus)
+
+        input_sample_rate = 500e3
+        output_sample_rate = 10e6
+        interp = int(output_sample_rate / input_sample_rate)
+        assert interp == 20
+        freq = 100e3
+        n = np.arange(0, CNT/interp)
+        x = (np.cos(freq * (2 * pi) * n / input_sample_rate) * (2**15-1)) + \
+            (np.sin(freq * (2 * pi) * n / input_sample_rate) * (2**15-1)) * 1j;
+
+        fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
+        whitebox_args = { 'interp': interp }
+
+        def test_whitebox_cic():
+            return s.cosim_dut("cosim_whitebox_cic",
+                    fifo_args, whitebox_args)
+
+        @instance
+        def stimulus():
+            N = Signal(intbv(0)[32:])
+
+            yield bus.reset()
+            # Send a clear
+            yield whitebox_clear(bus)
+
+            # Set the threshold
+            afval = intbv(FIFO_DEPTH - BULK_SIZE)[16:]
+            aeval = intbv(BULK_SIZE)[16:]
+            yield bus.transmit(WE_THRESHOLD_ADDR, concat(afval, aeval))
+
+            # Check the fifo flags
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_DATA)
+
+            yield bus.transmit(WE_INTERP_ADDR, interp)
+            yield bus.receive(WE_INTERP_ADDR)
+            assert bus.rdata == interp
+
+            def quadrature_bit_vector(x, N):
+                return \
+                intbv(int(x[int(N)].real), min=-2**15, max=2**15)[16:], \
+                intbv(int(x[int(N)].imag), min=-2**15, max=2**15)[16:]
+
+            ## Insert some samples
+            for j in range(BULK_SIZE):
+                i, q = quadrature_bit_vector(x, N)
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                N.next = N + 1
+
+            ## Now start transmitting
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXEN | WES_FILTEREN)
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_TXEN
+
+            ## Insert some more samples
+            while len(n) - N > BULK_SIZE-1:
+                ## Make sure there were no overruns or underruns
+                yield bus.receive(WE_RUNS_ADDR)
+                assert bus.rdata == 0
+
+                ## Wait for space
+                yield bus.receive(WE_STATUS_ADDR)
+                while bus.rdata & WES_AFULL:
+                    yield bus.delay(2)
+                    yield bus.receive(WE_STATUS_ADDR)
+
+                for j in range(BULK_SIZE):
+                    i, q = quadrature_bit_vector(x, N)
+                    yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                    N.next = N + 1
+
+            ## Insert remaining samples
+            while N < len(n)-1:
+                ## Wait for space
+                yield bus.receive(WE_STATUS_ADDR)
+                while not (bus.rdata & WES_SPACE):
+                    yield bus.delay(2)
+                    yield bus.receive(WE_STATUS_ADDR)
+
+                i, q = quadrature_bit_vector(x, N)
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                N.next = N + 1
+
+            ## Stop the transmission
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
+
+            ## Wait for TXEN to go low
+            yield bus.receive(WE_STATUS_ADDR)
+            while bus.rdata & WES_TXEN:
+                yield bus.delay(2)
+                yield bus.receive(WE_STATUS_ADDR)
+
+            ## Make sure there were no overruns or underruns
+            yield bus.receive(WE_RUNS_ADDR)
+            assert bus.rdata == 0
+
+            raise StopSimulation
+
+        s.simulate(stimulus, test_whitebox_cic, sample_rate=output_sample_rate,
+                record_tx=CNT)
+
+        s.plot_tx("whitebox_cic")
+        plt.savefig("test_whitebox_cic.png")
 
 class TestPipeSamples(unittest.TestCase):
     def test_pipe_samples(self):
