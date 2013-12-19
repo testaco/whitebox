@@ -64,8 +64,9 @@ void _exciter_get_runs(struct whitebox_exciter *exciter,
 {
     u32 runs;
     runs = WHITEBOX_EXCITER(exciter)->runs;
-    *overruns = (u16)((runs & WER_OVERRUNS_MASK) >> WER_OVERRUNS_OFFSET);
-    *underruns = (u16)(runs & WER_UNDERRUNS_MASK);
+    // TODO: swap these in the HDL or fix the constants
+    *underruns = (u16)((runs & WER_OVERRUNS_MASK) >> WER_OVERRUNS_OFFSET);
+    *overruns = (u16)(runs & WER_UNDERRUNS_MASK);
 }
 
 long _exciter_space_available(struct whitebox_exciter *exciter,
@@ -73,17 +74,25 @@ long _exciter_space_available(struct whitebox_exciter *exciter,
 {
     u32 state;
     state = exciter->ops->get_state(exciter);
+    /*d_printk(0, "%08x auto_tx=%d, afull=%d, aempty=%d, txen=%d\n",
+            state, exciter->auto_tx,
+            state & WES_AFULL, state & WES_AEMPTY, state & WES_TXEN);*/
     *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
     if (!(state & WES_AFULL))
         return exciter->quantum;
-    if (state & WES_SPACE)
-        return 1;
-    return 0;
+    else if (state & WES_SPACE)
+        return 4;
+    else
+        return 0;
 }
 
 int _exciter_produce(struct whitebox_exciter *exciter,
         size_t count)
 {
+    u32 state = exciter->ops->get_state(exciter);
+    if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN))
+        exciter->ops->set_state(exciter, WES_TXEN);
+
     return 0;
 }
 
@@ -107,6 +116,7 @@ int whitebox_exciter_create(struct whitebox_exciter *exciter,
         unsigned long regs_start, size_t regs_size)
 {
     exciter->ops = &_exciter_ops;
+    exciter->incr_dest = 0;
     exciter->regs = ioremap(regs_start, regs_size);
     if (!exciter->regs) {
         d_printk(0, "unable to map registers for "
@@ -143,7 +153,7 @@ u32 _mock_exciter_get_state(struct whitebox_exciter *exciter)
     head = mock_exciter->buf->head;
     tail = ACCESS_ONCE(mock_exciter->buf->tail);
     space = CIRC_SPACE(head, tail, mock_exciter->buf_size);
-    if (space)
+    if (space >> 2)
         state |= WES_SPACE;
     if (space < exciter->quantum)
         state |= WES_AFULL;
@@ -151,7 +161,7 @@ u32 _mock_exciter_get_state(struct whitebox_exciter *exciter)
     head2 = mock_exciter->buf->head;
     tail2 = ACCESS_ONCE(mock_exciter->buf->tail);
     data = CIRC_CNT(head2, tail2, mock_exciter->buf_size);
-    if (data)
+    if (data >> 2)
         state |= WES_DATA;
     if (data < exciter->quantum)
         state |= WES_AEMPTY;
@@ -239,6 +249,7 @@ int whitebox_mock_exciter_create(struct whitebox_mock_exciter *mock_exciter,
 {
     struct whitebox_exciter *exciter = &mock_exciter->exciter;
     exciter->ops = &_mock_exciter_ops;
+    exciter->incr_dest = 1;
     exciter->regs = vmalloc(regs_size);
     if (!exciter->regs) {
         d_printk(0, "unable to alloc registers for "

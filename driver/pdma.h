@@ -66,6 +66,6 @@ void pdma_release(u8 ch);
 
 int pdma_start(u8 ch, u32 src, u32 dst, u16 cnt);
 
-int pdma_active(u8 ch);
+int pdma_busy(u8 ch);
 
 #endif /* __PDMA_H__ */

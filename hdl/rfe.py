@@ -248,6 +248,7 @@ def rfe(resetn,
                 pready.next = False
         if state == state_t.ACCESS:
             state.next = state_t.DONE
+            pready.next = False
             if pwrite:
                 if addr == WE_SAMPLE_ADDR:
                     if tx_fifo_full:

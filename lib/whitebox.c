@@ -56,7 +56,7 @@ int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
     whitebox_reset(wb);
 
     whitebox_tx_set_interp(wb, wb->interp);
-    whitebox_tx_set_buffer_threshold(wb, rate/10, WE_FIFO_SIZE - rate/10);
+    //whitebox_tx_set_buffer_threshold(wb, rate/10, WE_FIFO_SIZE - rate/10);
 
     free(filename);
 
@@ -77,28 +77,33 @@ int whitebox_close(whitebox_t* wb) {
     return 0;
 }
 
-void whitebox_print_to_file(whitebox_t* wb, FILE* f) {
+void whitebox_debug_to_file(whitebox_t* wb, FILE* f) {
     uint32_t value;
     whitebox_args_t w;
-    fprintf(f, "########## EXCITER\n");
+    //fprintf(f, "########## EXCITER\n");
     ioctl(wb->fd, WE_GET, &w);
     value = w.flags.exciter.state;
-    if (value & WES_AFULL) fprintf(f, "almost_full=TRUE\n");
-    else fprintf(f, "almost_full=FALSE\n");
-    if (value & WES_AEMPTY) fprintf(f, "almost_empty=TRUE\n");
-    else fprintf(f, "almost_empty=FALSE\n");
-    if (value & WES_TXEN) fprintf(f, "tx_enabled=TRUE\n");
-    else fprintf(f, "tx_enabled=FALSE\n");
-    if (value & WES_DDSEN) fprintf(f, "dds_enabled=TRUE\n");
-    else fprintf(f, "dds_enabled=FALSE\n");
-    if (value & WES_FILTEREN) fprintf(f, "filter_enabled=TRUE\n");
-    else fprintf(f, "filter_enabled=FALSE\n");
+    if (value & WES_DATA) fprintf(f, "data ");
+    else fprintf(f, "     ");
+    if (value & WES_AFULL) fprintf(f, "afull ");
+    else fprintf(f, "     ");
+    if (value & WES_SPACE) fprintf(f, "space ");
+    else fprintf(f, "      ");
+    if (value & WES_AEMPTY) fprintf(f, "aempty ");
+    else fprintf(f, "       ");
+    if (value & WES_TXEN) fprintf(f, "txen ");
+    else fprintf(f, "     ");
+    if (value & WES_DDSEN) fprintf(f, "ddsen ");
+    else fprintf(f, "      ");
+    if (value & WES_FILTEREN) fprintf(f, "filen ");
+    else fprintf(f, "      ");
+    fprintf(f, "\n");
 
-    fprintf(f, "interp=%d\n", w.flags.exciter.interp);
+    /*fprintf(f, "interp=%d\n", w.flags.exciter.interp);
     fprintf(f, "aeval=%d\n", w.flags.exciter.threshold & WET_AEVAL_MASK);
-    fprintf(f, "afval=%d\n", (w.flags.exciter.threshold & WET_AFVAL_MASK) >> WET_AFVAL_OFFSET);
+    fprintf(f, "afval=%d\n", (w.flags.exciter.threshold & WET_AFVAL_MASK) >> WET_AFVAL_OFFSET);*/
 
-    ioctl(wb->fd, WC_GET, &w);
+    /*ioctl(wb->fd, WC_GET, &w);
     cmx991_ioctl_get(&wb->cmx991, &w);
     fprintf(f, "########## CMX991\n");
     cmx991_print_to_file(&wb->cmx991, f);
@@ -106,7 +111,7 @@ void whitebox_print_to_file(whitebox_t* wb, FILE* f) {
     ioctl(wb->fd, WA_GET, &w);
     adf4351_ioctl_get(&wb->adf4351, &w);
     fprintf(f, "########## ADF4351\n");
-    adf4351_print_to_file(&wb->adf4351, f);
+    adf4351_print_to_file(&wb->adf4351, f);*/
 }
 
 
@@ -213,4 +218,10 @@ void whitebox_tx_flags_disable(whitebox_t* wb, uint32_t flags) {
     ioctl(wb->fd, WE_GET, &w);
     w.flags.exciter.state &= ~flags;
     ioctl(wb->fd, WE_SET, &w);
+}
+
+void whitebox_tx_dds_enable(whitebox_t* wb, float fdes) {
+    uint32_t fcw = (uint32_t)(fdes / ((float)W_DAC_RATE_HZ / (float)W_DDS_PA_COUNT));
+    whitebox_tx_set_dds_fcw(wb, fcw);
+    whitebox_tx_flags_enable(wb, WES_DDSEN);
 }

@@ -72,6 +72,11 @@ add_test(NAME test_whitebox_dds
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestDDS
 )
 
+add_test(NAME test_whitebox_tx_fifo
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestTxFifo
+)
+
+
 add_test(NAME test_whitebox_overrun_underrun
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestOverrunUnderrun
 )

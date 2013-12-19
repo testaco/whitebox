@@ -339,6 +339,117 @@ class TestDDS(unittest.TestCase):
                 break
         assert bins == 1
 
+class TestTxFifo(unittest.TestCase):
+    def test_tx_fifo(self):
+        INTERP = 200
+        FIFO_DEPTH = 1024
+        quantum = 64
+        bus = Apb3Bus(duration=APB3_DURATION)
+
+        s = WhiteboxSim(bus)
+
+        fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
+        whitebox_args = { 'interp': INTERP }
+        def test_whitebox_tx_fifo():
+            return s.cosim_dut("cosim_whitebox_tx_fifo",
+                    fifo_args, whitebox_args)
+
+        @instance
+        def stimulus():
+            N = Signal(intbv(0)[32:])
+
+            yield bus.reset()
+            # Send a clear
+            yield whitebox_clear(bus)
+
+            yield bus.transmit(WE_INTERP_ADDR, INTERP)
+            yield bus.receive(WE_INTERP_ADDR)
+            assert bus.rdata == INTERP
+
+            # Setup the threshold
+            yield bus.transmit(WE_THRESHOLD_ADDR,
+                concat(intbv(FIFO_DEPTH - quantum)[16:], intbv(quantum)[16:]))
+            yield bus.receive(WE_THRESHOLD_ADDR)
+            assert bus.rdata == concat(intbv(FIFO_DEPTH - quantum)[16:], intbv(quantum)[16:])
+
+            # Check the fifo flags
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert bus.rdata & WES_AEMPTY
+            assert not (bus.rdata & WES_DATA)
+            assert not (bus.rdata & WES_AFULL)
+
+            ## Insert a sample
+            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+            N.next = N + 1
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert bus.rdata & WES_AEMPTY
+            assert bus.rdata & WES_DATA
+            assert not (bus.rdata & WES_AFULL)
+
+            while N < quantum:
+                yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+                N.next = N + 1
+                yield bus.receive(WE_STATUS_ADDR)
+                assert bus.rdata & WES_SPACE
+                assert bus.rdata & WES_AEMPTY
+                assert bus.rdata & WES_DATA
+                assert not (bus.rdata & WES_AFULL)
+                
+            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+            N.next = N + 1
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_AEMPTY)
+            assert bus.rdata & WES_DATA
+            assert not (bus.rdata & WES_AFULL)
+
+            while N < FIFO_DEPTH - quantum - 1:
+                yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+                N.next = N + 1
+                yield bus.receive(WE_STATUS_ADDR)
+                assert bus.rdata & WES_SPACE
+                assert not (bus.rdata & WES_AEMPTY)
+                assert bus.rdata & WES_DATA
+                assert not (bus.rdata & WES_AFULL)
+
+            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+            N.next = N + 1
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_AEMPTY)
+            assert bus.rdata & WES_DATA
+            assert bus.rdata & WES_AFULL
+
+            while N < FIFO_DEPTH - 1:
+                yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+                N.next = N + 1
+                yield bus.receive(WE_STATUS_ADDR)
+                assert bus.rdata & WES_SPACE
+                assert not (bus.rdata & WES_AEMPTY)
+                assert bus.rdata & WES_DATA
+                assert bus.rdata & WES_AFULL
+
+            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+            N.next = N + 1
+            yield bus.receive(WE_STATUS_ADDR)
+            assert not (bus.rdata & WES_SPACE)
+            assert not (bus.rdata & WES_AEMPTY)
+            assert bus.rdata & WES_DATA
+            assert bus.rdata & WES_AFULL
+
+            yield bus.receive(WE_RUNS_ADDR)
+            assert bus.rdata == 0
+            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+            N.next = N + 1
+            yield bus.receive(WE_RUNS_ADDR)
+            assert bus.rdata
+
+            raise StopSimulation
+
+        s.simulate(stimulus, test_whitebox_tx_fifo)
+
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):
         INTERP = 200

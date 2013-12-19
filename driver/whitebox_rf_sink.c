@@ -54,8 +54,24 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
         unsigned long dest, size_t dest_count)
 {
     rf_sink->dma_count = min(src_count, dest_count);
-    if (rf_sink->dma_count == 0)
-        return 0;
+    // If empty, just return
+    if (rf_sink->dma_count >> 2 == 0)
+        return -1;
+
+    // If less than a quantum, do it in a tight loop.
+    if (rf_sink->dma_count < rf_sink->exciter->quantum) {
+        int i;
+        for (i = 0; i < rf_sink->dma_count >> 2; ++i) {
+            if (!rf_sink->exciter->incr_dest) {
+                *(u32*)dest = ((u32*)src)[i];
+            } else {
+                ((u32*)dest)[i] = ((u32*)src)[i];
+            }
+        }
+        return rf_sink->dma_count;
+    }
+
+    // Else, use the DMA to transfer the data
 
     d_printk(1, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu\n",
             src, src_count, dest, dest_count);

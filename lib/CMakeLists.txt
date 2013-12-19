@@ -16,8 +16,7 @@ set(WHITEBOX_SRCS
     whitebox.c
     adf4351.c
     cmx991.c
-    radio.c
-    gpio.c
+    dsp.c
 )
 
 add_library(whitebox ${WHITEBOX_SRCS})
@@ -29,8 +28,7 @@ set(WHITEBOX_PUBLIC_HEADERS
     whitebox.h
     adf4351.h
     cmx991.h
-    radio.h
-    gpio.h
+    dsp.h
 )
 
 #install(FILES ${WHITEBOX_PUBLIC_HEADERS}
@@ -60,8 +58,11 @@ target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(gnuradio_peripheral gnuradio_peripheral.c)
 target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(qa_tx qa_tx.c)
+target_link_libraries(qa_tx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 add_custom_target(apps
-    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral)
+    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx)
 
 add_test(NAME target_netboot
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot

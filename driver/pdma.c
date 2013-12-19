@@ -175,8 +175,8 @@ done_pdma_start:
 } EXPORT_SYMBOL(pdma_start);
 
 int pdma_busy(u8 ch) {
-    // TODO
-    return 0;
+    // TODO: There must be a cleaner way to check this.
+    return PDMA(pdma_device)->chan[ch].buf[0].cnt || PDMA(pdma_device)->chan[ch].buf[1].cnt;
 } EXPORT_SYMBOL(pdma_busy);
 
 int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_adj, u32 flags) {

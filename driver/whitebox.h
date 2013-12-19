@@ -63,6 +63,25 @@ enum whitebox_device_state {
     WDS_RX,
 };
 
+#define W_ERROR_PLL_LOCK_LOST 1
+#define W_ERROR_TX_OVERRUN    2
+#define W_ERROR_TX_UNDERRUN   3
+
+struct whitebox_stats {
+    long bytes;
+    long exec_calls;
+    long exec_busy;
+    long exec_nop_src;
+    long exec_nop_dest;
+    long exec_failed;
+    long exec_success_slow;
+    long exec_dma_start;
+    long exec_dma_finished;
+    long stop;
+    long error;
+    int last_error;
+};
+
 /*
  * Book-keeping for the device
  */
@@ -70,6 +89,7 @@ struct whitebox_device {
     struct semaphore sem;
     struct cdev cdev;
     struct device* device;
+    struct dentry *debugfs_root;
     enum whitebox_device_state state;
     int irq;
     int irq_disabled;
@@ -94,6 +114,8 @@ struct whitebox_device {
     struct whitebox_rf_source rf_source;
     struct whitebox_rf_sink rf_sink;
 
+    struct whitebox_stats tx_stats;
+    struct whitebox_stats rx_stats;
 };
 
 /*

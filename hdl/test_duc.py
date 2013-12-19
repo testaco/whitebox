@@ -77,9 +77,7 @@ class TestCicImpulse(unittest.TestCase):
 
         in_sign = Signature("in", True, bits=2)
 
-        cic_gain = cic_total_gain(interp, cic_delay, cic_order)
-
-        out_sign = in_sign.copy_with_gain("out", cic_gain)
+        out_sign = Signature("in", True, bits=4)
 
         s = DSPSim(
                 in_sign=in_sign,
@@ -127,7 +125,6 @@ class TestCicSin(unittest.TestCase):
         decim = Signal(intbv(1, min=0, max=2**10))
 
         in_sign = Signature("in", True, bits=8)
-        cic_gain = cic_total_gain(interp, cic_delay, cic_order)
         out_sign = Signature("out", True, bits=8)
 
         s = DSPSim(
@@ -177,7 +174,6 @@ class TestCicInterpolate20(unittest.TestCase):
         decim = Signal(intbv(1, min=0, max=2**10))
 
         in_sign = Signature("in", True, bits=16)
-        cic_gain = cic_total_gain(interp, cic_delay, cic_order)
         out_sign = Signature("out", True, bits=10)
 
         s = DSPSim(

@@ -109,15 +109,15 @@ EXPORT_SYMBOL(whitebox_gpio_request);
 void whitebox_gpio_dac_enable(struct whitebox_platform_data_t* platform_data) {
     d_printk(2, "\n");
     gpio_set_value(platform_data->dac_pd_pin, 0);
-    gpio_set_value(platform_data->dac_en_pin, 1);
+    //gpio_set_value(platform_data->dac_en_pin, 1);
     gpio_set_value(platform_data->dac_cs_pin, 0);
 }
 EXPORT_SYMBOL(whitebox_gpio_dac_enable);
 
 void whitebox_gpio_dac_disable(struct whitebox_platform_data_t* platform_data) {
     d_printk(2, "\n");
-    gpio_set_value(platform_data->dac_cs_pin, 0);
-    gpio_set_value(platform_data->dac_en_pin, 0);
+    gpio_set_value(platform_data->dac_cs_pin, 1);
+    //gpio_set_value(platform_data->dac_en_pin, 0);
     gpio_set_value(platform_data->dac_pd_pin, 1);
 }
 EXPORT_SYMBOL(whitebox_gpio_dac_disable);

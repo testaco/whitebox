@@ -301,7 +301,7 @@ void udp_peripheral_print_to_file(udp_peripheral_t* p, FILE* f) {
         fprintf(stderr, "sample_rate=%d\n", p->rate);
         fprintf(stderr, "samples_per_frame=%d\n", p->samples_per_res);
         fprintf(stderr, "page_size=%d\n", sysconf(_SC_PAGESIZE));
-        whitebox_print_to_file(p->wb, stderr);
+        whitebox_debug_to_file(p->wb, stderr);
     }
 }
 

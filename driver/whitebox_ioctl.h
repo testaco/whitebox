@@ -3,6 +3,10 @@
 // DAC Rate
 #define W_DAC_RATE_HZ   10000000
 
+// DDS Constants
+#define W_DDS_PA_BITWIDTH 25
+#define W_DDS_PA_COUNT    (1 << W_DDS_PA_BITWIDTH)
+
 // Number of registers for the CMX991
 #define WC_REGS_COUNT   10U
 
@@ -75,7 +79,7 @@ typedef struct whitebox_args {
 #define WE_GET  _IOR('w', 4, whitebox_args_t*)
 #define WE_SET _IOW('w', 5, whitebox_args_t*)
 
-#define WE_FIFO_SIZE    1024
+#define WE_FIFO_SIZE    1024L
 
 #define WER_OVERRUNS_MASK    0xffff0000
 #define WER_OVERRUNS_OFFSET  16

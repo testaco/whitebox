@@ -41,7 +41,11 @@ The IC is conrolled via a 4-wire serial interface called the C-BUS which is actu
 Example
 =======
 
-This example sets up the CMX991 to transmit by the frequency set for the ADF4351, by the following formula: :math:`45MHz + F / 4`
+This example sets up the CMX991 to transmit by the frequency set for the ADF4351, by the following formula:
+
+:math:`F_{vco} = 2 F_{des} - 90`
+
+Where :math:`F_{des}` and :math:`F_{vco}` are both in MHz.
 
 .. code-block:: c
     

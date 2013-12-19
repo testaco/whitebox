@@ -23,6 +23,8 @@ struct whitebox_exciter_operations;
 struct whitebox_exciter {
     void *regs;
     size_t quantum;
+    int incr_dest;
+    int auto_tx;
     u32 pdma_config;
     struct whitebox_exciter_operations *ops;
 };

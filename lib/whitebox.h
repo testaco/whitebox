@@ -9,6 +9,7 @@
 
 #include "cmx991.h"
 #include "adf4351.h"
+#include "dsp.h"
 
 typedef struct whitebox {
     int fd;
@@ -40,5 +41,7 @@ int whitebox_tx_get_ring_buffer_size(whitebox_t* wb);
 
 void whitebox_tx_flags_enable(whitebox_t* wb, uint32_t flags);
 void whitebox_tx_flags_disable(whitebox_t* wb, uint32_t flags);
+
+void whitebox_tx_dds_enable(whitebox_t* wb, float fdes);
 
 #endif /* __WHITEBOX_H__ */

@@ -31,6 +31,23 @@ int whitebox_parameter_set(const char *param, int value)
     return 0;
 }
 
+int whitebox_parameter_get(const char *param)
+{
+    char name[512];
+    char final_value[128];
+    int fd;
+    snprintf(name, 512, "/sys/module/whitebox/parameters/whitebox_%s", param);
+    fd = open(name, O_RDONLY);
+    if (fd < 0)
+        return fd;
+    if (read(fd, &final_value, 127) < 0) {
+        close(fd);
+        return 1;
+    }
+    close(fd);
+    return atoi(final_value);
+}
+
 int test_blocking_open_close(void* data) {
     int fd;
     fd = open(WHITEBOX_DEV, O_WRONLY);
@@ -193,7 +210,7 @@ int test_blocking_xfer(void *data) {
     assert(fd > 0);
 
     for (i = 0; i < 4; ++i)
-        buf[i] = rand();
+        buf[i] = i;
 
     ret = write(fd, buf, sizeof(uint32_t) * 4);
     assert(ret == sizeof(uint32_t) * 4);
@@ -240,6 +257,147 @@ int test_blocking_xfer2(void *data) {
     assert(memcmp(buf_in2, buf_out + 4, sizeof(uint32_t) * 4) == 0);
 
     close(fd);
+    assert(whitebox_parameter_set("check_plls", 1) == 0);
+    return 0;
+}
+
+int test_blocking_xfer3(void *data) {
+    int fd;
+    int ret;
+    uint32_t buf_in1[128], buf_in2[128];
+    uint32_t buf_out[256];
+    int i;
+    whitebox_args_t w;
+    assert(whitebox_parameter_set("check_plls", 0) == 0);
+    fd = open(WHITEBOX_DEV, O_RDWR);
+    assert(fd > 0);
+
+    for (i = 0; i < 128; ++i) {
+        buf_in1[i] = rand();
+        buf_in2[i] = rand();
+    }
+
+    ret = write(fd, buf_in1, sizeof(uint32_t) * 128);
+    assert(ret == sizeof(uint32_t) * 128);
+    ret = write(fd, buf_in2, sizeof(uint32_t) * 128);
+    assert(ret == sizeof(uint32_t) * 128);
+    assert(fsync(fd) == 0);
+
+    ret = read(fd, buf_out, sizeof(uint32_t) * 256);
+    assert(ret == sizeof(uint32_t) * 256);
+    assert(fsync(fd) == 0);
+
+    assert(memcmp(buf_in1, buf_out, sizeof(uint32_t) * 128) == 0);
+    assert(memcmp(buf_in2, buf_out + 128, sizeof(uint32_t) * 128) == 0);
+
+    close(fd);
+    assert(whitebox_parameter_set("check_plls", 1) == 0);
+    return 0;
+}
+
+int test_blocking_xfer4(void *data) {
+    int fd;
+    int ret;
+    uint32_t buf_in1[200], buf_in2[200];
+    uint32_t buf_out[400];
+    int i;
+    whitebox_args_t w;
+    assert(whitebox_parameter_set("check_plls", 0) == 0);
+    fd = open(WHITEBOX_DEV, O_RDWR);
+    assert(fd > 0);
+
+    for (i = 0; i < 200; ++i) {
+        buf_in1[i] = rand();
+        buf_in2[i] = rand();
+    }
+
+    ret = write(fd, buf_in1, sizeof(uint32_t) * 200);
+    assert(ret == sizeof(uint32_t) * 200);
+    ret = write(fd, buf_in2, sizeof(uint32_t) * 200);
+    assert(ret == sizeof(uint32_t) * 200);
+    assert(fsync(fd) == 0);
+
+    ret = read(fd, buf_out, sizeof(uint32_t) * 400);
+    assert(ret == sizeof(uint32_t) * 400);
+    assert(fsync(fd) == 0);
+
+    assert(memcmp(buf_in1, buf_out, sizeof(uint32_t) * 200) == 0);
+    assert(memcmp(buf_in2, buf_out + 200, sizeof(uint32_t) * 200) == 0);
+
+    close(fd);
+    assert(whitebox_parameter_set("check_plls", 1) == 0);
+    return 0;
+}
+
+int test_tx_fifo(void *data) {
+    int fd;
+    int ret;
+    uint32_t sample = 0xdeadbeef;
+    int i = 0;
+    int quantum = whitebox_parameter_get("exciter_quantum");
+    whitebox_args_t w;
+    assert(whitebox_parameter_set("check_plls", 0) == 0);
+    fd = open(WHITEBOX_DEV, O_RDWR);
+    assert(fd > 0);
+
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(w.flags.exciter.state & WES_SPACE);
+    assert(w.flags.exciter.state & WES_AEMPTY);
+    assert(!(w.flags.exciter.state & WES_DATA));
+    assert(!(w.flags.exciter.state & WES_AFULL));
+
+    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+
+    while (++i < (quantum >> 2) - 1) {
+        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+        assert(ioctl(fd, WE_GET, &w) == 0);
+        assert(w.flags.exciter.state & WES_SPACE);
+        assert(w.flags.exciter.state & WES_AEMPTY);
+        assert(w.flags.exciter.state & WES_DATA);
+        assert(!(w.flags.exciter.state & WES_AFULL));
+    }
+
+    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(w.flags.exciter.state & WES_SPACE);
+    assert(!(w.flags.exciter.state & WES_AEMPTY));
+    assert(w.flags.exciter.state & WES_DATA);
+    assert(!(w.flags.exciter.state & WES_AFULL));
+
+    while (++i < WE_FIFO_SIZE - (quantum >> 2) - 1) {
+        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+        assert(ioctl(fd, WE_GET, &w) == 0);
+        assert(w.flags.exciter.state & WES_SPACE);
+        assert(!(w.flags.exciter.state & WES_AEMPTY));
+        assert(w.flags.exciter.state & WES_DATA);
+        assert(!(w.flags.exciter.state & WES_AFULL));
+    }
+
+    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(w.flags.exciter.state & WES_SPACE);
+    assert(!(w.flags.exciter.state & WES_AEMPTY));
+    assert(w.flags.exciter.state & WES_DATA);
+    assert(w.flags.exciter.state & WES_AFULL);
+
+    while (++i < WE_FIFO_SIZE - 2) {
+        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+        assert(ioctl(fd, WE_GET, &w) == 0);
+        assert(w.flags.exciter.state & WES_SPACE);
+        assert(!(w.flags.exciter.state & WES_AEMPTY));
+        assert(w.flags.exciter.state & WES_DATA);
+        assert(w.flags.exciter.state & WES_AFULL);
+    }
+
+    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(!(w.flags.exciter.state & WES_SPACE));
+    assert(!(w.flags.exciter.state & WES_AEMPTY));
+    assert(w.flags.exciter.state & WES_DATA);
+    assert(w.flags.exciter.state & WES_AFULL);
+
+    close(fd);
+
     assert(whitebox_parameter_set("check_plls", 1) == 0);
     return 0;
 }
@@ -370,6 +528,9 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_write_underrun),
         WHITEBOX_TEST(test_blocking_xfer),
         WHITEBOX_TEST(test_blocking_xfer2),
+        WHITEBOX_TEST(test_blocking_xfer3),
+        WHITEBOX_TEST(test_blocking_xfer4),
+        WHITEBOX_TEST(test_tx_fifo),
 #if 0
         WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_mmap_success),

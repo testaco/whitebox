@@ -1,6 +1,7 @@
 #!/bin/sh
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
+mount -t debugfs none /sys/kernel/debug
 mount -t devpts none /dev/pts
 mkdir /mnt
 mount -o nolock,rsize=1024 192.168.220.1:/srv/home /mnt
