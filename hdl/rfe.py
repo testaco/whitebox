@@ -11,6 +11,8 @@ WHITEBOX_REGISTER_FILE = dict(
     WE_RUNS_ADDR       = 0x10,
     WE_THRESHOLD_ADDR  = 0x14,
     WE_CORRECTION_ADDR = 0x18,
+    WE_AVAILABLE_ADDR  = 0x1c,
+    WE_DEBUG_ADDR      = 0x20,
 
     WR_SAMPLE_ADDR     = 0x80,
     WR_STATUS_ADDR     = 0x84,
@@ -19,6 +21,8 @@ WHITEBOX_REGISTER_FILE = dict(
     WR_RUNS_ADDR       = 0x90,
     WR_THRESHOLD_ADDR  = 0x94,
     WR_CORRECTION_ADDR = 0x98,
+    WR_AVAILABLE_ADDR  = 0x9c,
+    WR_DEBUG_ADDR      = 0xa0,
 )
 for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
     globals()[name] = addr
@@ -145,9 +149,15 @@ def rfe(resetn,
         tx_fifo_we, tx_fifo_wdata,
         tx_fifo_empty, tx_fifo_full,
         tx_fifo_afval, tx_fifo_aeval, tx_fifo_afull, tx_fifo_aempty,
+        tx_fifo_wack, tx_fifo_dvld,
+        tx_fifo_overflow, tx_fifo_underflow,
+        tx_fifo_rdcnt, tx_fifo_wrcnt,
         rx_fifo_re, rx_fifo_rdata,
         rx_fifo_empty, rx_fifo_full,
         rx_fifo_afval, rx_fifo_aeval, rx_fifo_afull, rx_fifo_aempty,
+        rx_fifo_wack, rx_fifo_dvld,
+        rx_fifo_overflow, rx_fifo_underflow,
+        rx_fifo_rdcnt, rx_fifo_wrcnt,
         interp, fcw, tx_correct_i, tx_correct_q,
         txen, txstop, ddsen, txfilteren,
         decim, rx_correct_i, rx_correct_q,
@@ -189,6 +199,8 @@ def rfe(resetn,
     sync_rxlast = Signal(bool(0))
     rxlast = Signal(bool(0))
 
+    write_count = Signal(intbv(0)[32:])
+
     @always_seq(pclk.posedge, reset=resetn)
     def synchronizer():
         sync_clearn.next = clearn
@@ -215,10 +227,10 @@ def rfe(resetn,
     @always_seq(pclk.posedge, reset=resetn)
     def controller():
         #pslverr.next = 0
-        tx_dmaready.next = not tx_afull
-        rx_dmaready.next = not rx_aempty
+        tx_dmaready.next = not tx_fifo_full
+        rx_dmaready.next = not rx_fifo_empty
 
-        tx_status_led.next = txen
+        tx_status_led.next = txen or ddsen
         rx_status_led.next = rxen
 
         if not clear_ackn:
@@ -230,6 +242,7 @@ def rfe(resetn,
             rxen.next = 0
             rxstop.next = 0
             underrun.next = 0
+            write_count.next = 0
 
         if txlast:
             txen.next = 0
@@ -248,9 +261,10 @@ def rfe(resetn,
                 pready.next = False
         if state == state_t.ACCESS:
             state.next = state_t.DONE
-            pready.next = False
+            pready.next = True
             if pwrite:
                 if addr == WE_SAMPLE_ADDR:
+                    write_count.next = write_count + 1
                     if tx_fifo_full:
                         overrun.next = overrun + 1
                     else:
@@ -259,10 +273,11 @@ def rfe(resetn,
                 elif addr == WE_STATUS_ADDR:
                     if pwdata[WS_CLEAR]:
                         clear_enable.next = True
+                    elif pwdata[WS_LOOPEN]:
+                        loopen.next = pwdata[WS_LOOPEN]
                     elif pwdata[WES_TXSTOP]:
                         txstop.next = True
                     else:
-                        loopen.next = pwdata[WS_LOOPEN]
                         txen.next = pwdata[WES_TXEN]
                         txfilteren.next = pwdata[WES_FILTEREN]
                         ddsen.next = pwdata[WES_DDSEN]
@@ -271,25 +286,26 @@ def rfe(resetn,
                 elif addr == WE_FCW_ADDR:
                     fcw.next = pwdata
                 elif addr == WE_THRESHOLD_ADDR:
-                    tx_fifo_afval.next = pwdata[28:16]
-                    tx_fifo_aeval.next = pwdata[12:]
+                    tx_fifo_afval.next = pwdata[26:16]
+                    tx_fifo_aeval.next = pwdata[10:]
                 elif addr == WE_CORRECTION_ADDR:
                     tx_correct_q.next = pwdata[26:16].signed()
                     tx_correct_i.next = pwdata[10:].signed()
                 elif addr == WR_STATUS_ADDR:
                     if pwdata[WS_CLEAR]:
                         clear_enable.next = True
+                    elif pwdata[WS_LOOPEN]:
+                        loopen.next = pwdata[WS_LOOPEN]
                     elif pwdata[WRS_RXSTOP]:
                         rxstop.next = True
                     else:
-                        loopen.next = pwdata[WS_LOOPEN]
                         rxen.next = pwdata[WRS_RXEN]
                         rxfilteren.next = pwdata[WRS_FILTEREN]
                 elif addr == WR_DECIM_ADDR:
                     decim.next = pwdata[len(interp):]
                 elif addr == WR_THRESHOLD_ADDR:
-                    rx_fifo_afval.next = pwdata[28:16]
-                    rx_fifo_aeval.next = pwdata[12:]
+                    rx_fifo_afval.next = pwdata[26:16]
+                    rx_fifo_aeval.next = pwdata[10:]
                 elif addr == WR_CORRECTION_ADDR:
                     rx_correct_q.next = pwdata[26:16].signed()
                     rx_correct_i.next = pwdata[10:].signed()
@@ -310,18 +326,21 @@ def rfe(resetn,
                         # BYTE 0 - RESERVED
                         intbv(0)[6:], loopen, not clearn)
                 elif addr == WE_INTERP_ADDR:
-                    prdata.next = interp
                     prdata.next = concat(intbv(0)[32-len(interp):], interp)
                 elif addr == WE_FCW_ADDR:
                     prdata.next = fcw
                 elif addr == WE_RUNS_ADDR:
                     prdata.next = concat(tx_underrun, overrun)
                 elif addr == WE_THRESHOLD_ADDR:
-                    prdata.next = concat(intbv(0)[4:], tx_fifo_afval,
-                        intbv(0)[4:], tx_fifo_aeval)
+                    prdata.next = concat(intbv(0)[6:], tx_fifo_afval,
+                        intbv(0)[6:], tx_fifo_aeval)
                 elif addr == WE_CORRECTION_ADDR:
                     prdata.next = concat(intbv(0)[6:], tx_correct_q,
                             intbv(0)[6:], tx_correct_i)
+                elif addr == WE_AVAILABLE_ADDR:
+                    prdata.next = concat(intbv(0)[32-len(tx_fifo_wrcnt):], tx_fifo_wrcnt)
+                elif addr == WE_DEBUG_ADDR:
+                    prdata.next = write_count
                 elif addr == WR_SAMPLE_ADDR:
                     if rx_fifo_empty:
                         underrun.next = underrun + 1
@@ -349,11 +368,15 @@ def rfe(resetn,
                 elif addr == WR_RUNS_ADDR:
                     prdata.next = concat(rx_overrun, underrun)
                 elif addr == WR_THRESHOLD_ADDR:
-                    prdata.next = concat(intbv(0)[4:], rx_fifo_afval,
-                        intbv(0)[4:], rx_fifo_aeval)
+                    prdata.next = concat(intbv(0)[6:], rx_fifo_afval,
+                        intbv(0)[6:], rx_fifo_aeval)
                 elif addr == WR_CORRECTION_ADDR:
                     prdata.next = concat(intbv(0)[6:], rx_correct_q,
                             intbv(0)[6:], rx_correct_i)
+                elif addr == WR_AVAILABLE_ADDR:
+                    prdata.next = concat(intbv(0)[32-len(rx_fifo_rdcnt):], rx_fifo_rdcnt)
+                elif addr == WR_DEBUG_ADDR:
+                    prdata.next = intbv(0)[32:]
                 else:
                     prdata.next = 0
         elif state == state_t.DONE:

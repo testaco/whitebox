@@ -14,6 +14,9 @@ struct whitebox_exciter_regs {
     u32 fcw;
     u32 runs;
     u32 threshold;
+    u32 correction;
+    u32 available;
+    u32 debug;
 };
 
 #define WHITEBOX_EXCITER(e) ((volatile struct whitebox_exciter_regs *)((e)->regs))
@@ -25,6 +28,8 @@ struct whitebox_exciter {
     size_t quantum;
     int incr_dest;
     int auto_tx;
+    int dma_enable;
+    int copy_enable;
     u32 pdma_config;
     struct whitebox_exciter_operations *ops;
 };
@@ -58,6 +63,8 @@ struct whitebox_exciter_operations {
             unsigned long *dest);
     int (*produce)(struct whitebox_exciter *exciter,
             size_t count);
+
+    u32 (*get_debug)(struct whitebox_exciter *exctier);
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,

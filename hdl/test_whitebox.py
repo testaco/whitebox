@@ -135,7 +135,7 @@ class WhiteboxSim(object):
         bus_pready = self.bus.pready
         bus_prdata = self.bus.prdata
 
-        clearn = Signal(bool(1))
+        clearn = ResetSignal(0, 0, async=True)
 
         fifo_depth = fifo_args['depth']
 
@@ -147,10 +147,16 @@ class WhiteboxSim(object):
         tx_fifo_wdata = Signal(intbv(0)[32:])
         tx_fifo_full = Signal(bool(False))
         tx_fifo_afull = Signal(bool(False))
-        tx_fifo_empty = Signal(bool(False))
-        tx_fifo_aempty = Signal(bool(False))
-        tx_fifo_afval = Signal(intbv(fifo_depth)[12:])
-        tx_fifo_aeval = Signal(intbv(0)[12:])
+        tx_fifo_empty = Signal(bool(True))
+        tx_fifo_aempty = Signal(bool(True))
+        tx_fifo_afval = Signal(intbv(fifo_depth - 1)[10:])
+        tx_fifo_aeval = Signal(intbv(0)[10:])
+        tx_fifo_wack = Signal(bool(False))
+        tx_fifo_dvld = Signal(bool(False))
+        tx_fifo_overflow = Signal(bool(False))
+        tx_fifo_underflow = Signal(bool(False))
+        tx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
+        tx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
         tx_fifo_signals = (
             clearn,
             tx_fifo_re,
@@ -164,7 +170,13 @@ class WhiteboxSim(object):
             tx_fifo_empty,
             tx_fifo_aempty,
             tx_fifo_afval,
-            tx_fifo_aeval)
+            tx_fifo_aeval,
+            tx_fifo_wack,
+            tx_fifo_dvld,
+            tx_fifo_overflow,
+            tx_fifo_underflow,
+            tx_fifo_rdcnt,
+            tx_fifo_wrcnt)
         tx_fifo = fifo(*tx_fifo_signals, **fifo_args)
 
         rx_fifo_depth = fifo_args['depth']
@@ -176,10 +188,16 @@ class WhiteboxSim(object):
         rx_fifo_wdata = Signal(intbv(0)[32:])
         rx_fifo_full = Signal(bool(False))
         rx_fifo_afull = Signal(bool(False))
-        rx_fifo_empty = Signal(bool(False))
-        rx_fifo_aempty = Signal(bool(False))
-        rx_fifo_afval = Signal(intbv(fifo_depth)[12:])
-        rx_fifo_aeval = Signal(intbv(0)[12:])
+        rx_fifo_empty = Signal(bool(True))
+        rx_fifo_aempty = Signal(bool(True))
+        rx_fifo_afval = Signal(intbv(fifo_depth - 1)[10:])
+        rx_fifo_aeval = Signal(intbv(0)[10:])
+        rx_fifo_wack = Signal(bool(False))
+        rx_fifo_dvld = Signal(bool(False))
+        rx_fifo_overflow = Signal(bool(False))
+        rx_fifo_underflow = Signal(bool(False))
+        rx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
+        rx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
         rx_fifo_signals = (
             clearn,
             rx_fifo_re,
@@ -193,7 +211,13 @@ class WhiteboxSim(object):
             rx_fifo_empty,
             rx_fifo_aempty,
             rx_fifo_afval,
-            rx_fifo_aeval)
+            rx_fifo_aeval,
+            rx_fifo_wack,
+            rx_fifo_dvld,
+            rx_fifo_overflow,
+            rx_fifo_underflow,
+            rx_fifo_rdcnt,
+            rx_fifo_wrcnt)
         rx_fifo = fifo(*rx_fifo_signals, **fifo_args)
 
         config_file = tempfile.NamedTemporaryFile(delete=False)
@@ -239,6 +263,12 @@ class WhiteboxSim(object):
                     tx_fifo_aempty=tx_fifo_aempty,
                     tx_fifo_afval=tx_fifo_afval,
                     tx_fifo_aeval=tx_fifo_aeval,
+                    tx_fifo_wack=tx_fifo_wack,
+                    tx_fifo_dvld=tx_fifo_dvld,
+                    tx_fifo_overflow=tx_fifo_overflow,
+                    tx_fifo_underflow=tx_fifo_underflow,
+                    tx_fifo_rdcnt=tx_fifo_rdcnt,
+                    tx_fifo_wrcnt=tx_fifo_wrcnt,
                     rx_fifo_re=rx_fifo_re,
                     rx_fifo_rclk=rx_fifo_rclk,
                     rx_fifo_rdata=rx_fifo_rdata,
@@ -251,6 +281,12 @@ class WhiteboxSim(object):
                     rx_fifo_aempty=rx_fifo_aempty,
                     rx_fifo_afval=rx_fifo_afval,
                     rx_fifo_aeval=rx_fifo_aeval,
+                    rx_fifo_wack=rx_fifo_wack,
+                    rx_fifo_dvld=rx_fifo_dvld,
+                    rx_fifo_overflow=rx_fifo_overflow,
+                    rx_fifo_underflow=rx_fifo_underflow,
+                    rx_fifo_rdcnt=rx_fifo_rdcnt,
+                    rx_fifo_wrcnt=rx_fifo_wrcnt,
         )
         return tx_fifo, rx_fifo, whitebox_test
 
@@ -341,9 +377,12 @@ class TestDDS(unittest.TestCase):
 
 class TestTxFifo(unittest.TestCase):
     def test_tx_fifo(self):
-        INTERP = 200
-        FIFO_DEPTH = 1024
-        quantum = 64
+        symbols = np.linspace(-(2**15-1), 2**15-1, 1024)
+        sequence = [concat(intbv(int(symbols[i]))[16:],
+                    intbv(int(symbols[i]))[16:]) for i in range(len(symbols))]
+        INTERP = 1
+        FIFO_DEPTH = len(symbols)
+        quantum = len(symbols) // 4
         bus = Apb3Bus(duration=APB3_DURATION)
 
         s = WhiteboxSim(bus)
@@ -378,77 +417,63 @@ class TestTxFifo(unittest.TestCase):
             assert bus.rdata & WES_AEMPTY
             assert not (bus.rdata & WES_DATA)
             assert not (bus.rdata & WES_AFULL)
-
-            ## Insert a sample
-            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
-            N.next = N + 1
-            yield bus.receive(WE_STATUS_ADDR)
-            assert bus.rdata & WES_SPACE
-            assert bus.rdata & WES_AEMPTY
-            assert bus.rdata & WES_DATA
-            assert not (bus.rdata & WES_AFULL)
-
-            while N < quantum:
-                yield bus.transmit(WE_SAMPLE_ADDR, int(N))
-                N.next = N + 1
-                yield bus.receive(WE_STATUS_ADDR)
-                assert bus.rdata & WES_SPACE
-                assert bus.rdata & WES_AEMPTY
-                assert bus.rdata & WES_DATA
-                assert not (bus.rdata & WES_AFULL)
-                
-            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
-            N.next = N + 1
-            yield bus.receive(WE_STATUS_ADDR)
-            assert bus.rdata & WES_SPACE
-            assert not (bus.rdata & WES_AEMPTY)
-            assert bus.rdata & WES_DATA
-            assert not (bus.rdata & WES_AFULL)
-
-            while N < FIFO_DEPTH - quantum - 1:
-                yield bus.transmit(WE_SAMPLE_ADDR, int(N))
-                N.next = N + 1
-                yield bus.receive(WE_STATUS_ADDR)
-                assert bus.rdata & WES_SPACE
-                assert not (bus.rdata & WES_AEMPTY)
-                assert bus.rdata & WES_DATA
-                assert not (bus.rdata & WES_AFULL)
-
-            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
-            N.next = N + 1
-            yield bus.receive(WE_STATUS_ADDR)
-            assert bus.rdata & WES_SPACE
-            assert not (bus.rdata & WES_AEMPTY)
-            assert bus.rdata & WES_DATA
-            assert bus.rdata & WES_AFULL
+            yield bus.receive(WE_AVAILABLE_ADDR)
+            assert bus.rdata == FIFO_DEPTH
 
             while N < FIFO_DEPTH - 1:
-                yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+                yield bus.transmit(WE_SAMPLE_ADDR, sequence[int(N)])
                 N.next = N + 1
+                yield bus.receive(WE_AVAILABLE_ADDR)
+                assert bus.rdata == FIFO_DEPTH - N
+
                 yield bus.receive(WE_STATUS_ADDR)
                 assert bus.rdata & WES_SPACE
-                assert not (bus.rdata & WES_AEMPTY)
                 assert bus.rdata & WES_DATA
-                assert bus.rdata & WES_AFULL
+                if N <= quantum:
+                    assert bus.rdata & WES_AEMPTY
+                else:
+                    assert not (bus.rdata & WES_AEMPTY)
+                if N < FIFO_DEPTH - quantum:
+                    assert not (bus.rdata & WES_AFULL)
+                else:
+                    assert bus.rdata & WES_AFULL
 
-            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+            yield bus.transmit(WE_SAMPLE_ADDR, sequence[int(N)])
             N.next = N + 1
+            yield bus.receive(WE_AVAILABLE_ADDR)
+            assert bus.rdata == 0
             yield bus.receive(WE_STATUS_ADDR)
             assert not (bus.rdata & WES_SPACE)
-            assert not (bus.rdata & WES_AEMPTY)
             assert bus.rdata & WES_DATA
+            assert not (bus.rdata & WES_AEMPTY)
             assert bus.rdata & WES_AFULL
 
             yield bus.receive(WE_RUNS_ADDR)
             assert bus.rdata == 0
-            yield bus.transmit(WE_SAMPLE_ADDR, int(N))
+
+            yield bus.transmit(WE_SAMPLE_ADDR, sequence[int(N) - 1])
             N.next = N + 1
             yield bus.receive(WE_RUNS_ADDR)
             assert bus.rdata
 
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXEN)
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_TXEN
+
+            ## Wait until underrun
+            yield bus.receive(WE_RUNS_ADDR)
+            while not (bus.rdata & 0xffff0000):
+                yield bus.delay(1000)
+                yield bus.receive(WE_RUNS_ADDR)
+
+            ## Make sure we're both over and underrun
+            assert bus.rdata & 0xffff0000 and bus.rdata & 0x0000ffff
+
             raise StopSimulation
 
-        s.simulate(stimulus, test_whitebox_tx_fifo)
+        s.simulate(stimulus, test_whitebox_tx_fifo, record_tx=FIFO_DEPTH)
+        for j in range(FIFO_DEPTH):
+            assert s.tx_i[j] == j and s.tx_q[j] == j
 
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):
@@ -532,13 +557,13 @@ class TestHalt(unittest.TestCase):
         bus = Apb3Bus(duration=APB3_DURATION)
         s = WhiteboxSim(bus)
 
-        sample_rate = 10.24e6
+        sample_rate = 10.00e6
         freq = 100e3
         n = np.arange(0, CNT)
         x = (np.cos(freq * (2 * pi) * n / sample_rate) * (2**15-1)) + \
             (np.sin(freq * (2 * pi) * n / sample_rate) * (2**15-1)) * 1j;
 
-        fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
+        fifo_args = { 'width': 32, 'depth': FIFO_DEPTH }
         whitebox_args = { 'interp': INTERP }
 
         def test_whitebox_halt():
@@ -628,10 +653,73 @@ class TestHalt(unittest.TestCase):
             raise StopSimulation
 
         s.simulate(stimulus, test_whitebox_halt, sample_rate=sample_rate,
-                record_tx=CNT)
+                record_tx=CNT, auto_stop=False)
 
         s.plot_tx("whitebox_halt")
         plt.savefig("test_whitebox_halt.png")
+
+class TestLoop(unittest.TestCase):
+    def test_loop(self):
+        INTERP = 1
+        FIFO_DEPTH = 64
+        BULK_SIZE = 16
+        CNT = 512
+        bus = Apb3Bus(duration=APB3_DURATION)
+        s = WhiteboxSim(bus)
+
+        sample_rate = 10.24e6
+        freq = 100e3
+        n = np.arange(0, CNT)
+        x = (np.cos(freq * (2 * pi) * n / sample_rate) * (2**15-1)) + \
+            (np.sin(freq * (2 * pi) * n / sample_rate) * (2**15-1)) * 1j;
+
+        fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
+        whitebox_args = { 'interp': INTERP }
+
+        def test_whitebox_loop():
+            return s.cosim_dut("cosim_whitebox_loop",
+                    fifo_args, whitebox_args)
+
+        @instance
+        def stimulus():
+            N = Signal(intbv(0)[32:])
+
+            yield bus.reset()
+            # Send a clear
+            yield whitebox_clear(bus)
+
+            yield bus.transmit(WE_STATUS_ADDR, WS_LOOPEN)
+
+            yield bus.receive(WR_STATUS_ADDR)
+            assert bus.rdata & WS_LOOPEN
+
+            yield bus.transmit(WE_INTERP_ADDR, 1)
+            sample = concat(intbv(1 << 6)[16:], intbv(1 << 6)[16:])
+            yield bus.transmit(WE_SAMPLE_ADDR, sample)
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXEN)
+            
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WS_LOOPEN
+
+            yield bus.transmit(WR_DECIM_ADDR, 1)
+            yield bus.transmit(WR_STATUS_ADDR, WRS_RXSTOP)
+            yield bus.transmit(WR_STATUS_ADDR, WRS_RXEN)
+            yield bus.receive(WR_STATUS_ADDR)
+            while not bus.rdata & WRS_DATA:
+                yield bus.delay(1)
+                yield bus.receive(WR_STATUS_ADDR)
+            #assert not (bus.rdata & WRS_RXEN)
+
+            yield bus.receive(WR_SAMPLE_ADDR)
+            print bus.rdata
+
+            #yield bus.receive(WR_SAMPLE_ADDR)
+            #assert bus.rdata == 0xdeadbeef
+
+            raise StopSimulation
+
+        s.simulate(stimulus, test_whitebox_loop, sample_rate=sample_rate)
 
 class TestCic(unittest.TestCase):
     def test_cic(self):
@@ -738,10 +826,15 @@ class TestCic(unittest.TestCase):
             yield bus.receive(WE_RUNS_ADDR)
             assert bus.rdata == 0
 
-            raise StopSimulation
+            while True:
+                yield bus.delay(1)
+
+            #raise StopSimulation
 
         s.simulate(stimulus, test_whitebox_cic, sample_rate=output_sample_rate,
-                record_tx=CNT)
+                record_tx=CNT, auto_stop=True)
+
+        print len(s.tx_i), len(s.tx_q)
 
         s.plot_tx("whitebox_cic")
         plt.savefig("test_whitebox_cic.png")
@@ -749,11 +842,11 @@ class TestCic(unittest.TestCase):
 class TestPipeSamples(unittest.TestCase):
     def test_pipe_samples(self):
         bus = Apb3Bus(duration=APB3_DURATION)
-        BULK_SIZE=1 #
+        BULK_SIZE=4 #
         FIFO_DEPTH=BULK_SIZE*4
         AFVAL = BULK_SIZE*3 #
         AEVAL = BULK_SIZE*2 #
-        SAMPLES_TO_SIMULATE=FIFO_DEPTH*2
+        SAMPLES_TO_SIMULATE=FIFO_DEPTH << 6
         INTERP=20
         CORRECT_I = intbv(0, min=-2**9, max=2**9)
         CORRECT_Q = intbv(0, min=-2**9, max=2**9)
@@ -851,12 +944,14 @@ class TestPipeSamples(unittest.TestCase):
             while bus.rdata & WES_TXEN:
                 yield bus.receive(WE_STATUS_ADDR)
 
-            yield bus.delay(40)
-            assert not s.dac_en
+            while True:
+                yield bus.delay(40)
 
             raise StopSimulation
 
-        s.simulate(stimulus, test_whitebox_pipe_samples)
+        s.simulate(stimulus, test_whitebox_pipe_samples, record_tx=SAMPLES_TO_SIMULATE, auto_stop=True)
+        s.plot_tx("whitebox_pipe")
+        plt.savefig("test_whitebox_pipe.png")
 
 if __name__ == '__main__':
     unittest.main()

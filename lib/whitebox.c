@@ -97,6 +97,8 @@ void whitebox_debug_to_file(whitebox_t* wb, FILE* f) {
     else fprintf(f, "      ");
     if (value & WES_FILTEREN) fprintf(f, "filen ");
     else fprintf(f, "      ");
+    fprintf(f, "space=%d ", w.flags.exciter.available);
+    fprintf(f, "debug=%08x ", w.flags.exciter.debug);
     fprintf(f, "\n");
 
     /*fprintf(f, "interp=%d\n", w.flags.exciter.interp);
@@ -188,6 +190,15 @@ int whitebox_tx_set_buffer_threshold(whitebox_t* wb,
     w.flags.exciter.threshold = (uint32_t)aeval |
                     (uint32_t)(afval << WET_AFVAL_OFFSET);
     ioctl(wb->fd, WE_SET, &w);
+}
+
+void whitebox_tx_get_buffer_threshold(whitebox_t *wb,
+            uint16_t *aeval, uint16_t *afval)
+{
+    whitebox_args_t w;            
+    ioctl(wb->fd, WE_GET, &w);
+    *aeval = (uint16_t)(w.flags.exciter.threshold & WET_AEVAL_MASK);
+    *afval = (uint16_t)((w.flags.exciter.threshold & WET_AFVAL_MASK) >> WET_AFVAL_OFFSET);
 }
 
 int whitebox_tx_get_buffer_runs(whitebox_t* wb,

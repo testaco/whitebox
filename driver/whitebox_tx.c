@@ -41,7 +41,7 @@ int tx_exec(struct whitebox_device* wb)
         return 0;
     }
     count = min(src_count, dest_count);
-    
+
     result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
 
     if (result < 0) {
@@ -75,8 +75,8 @@ void tx_dma_cb(void *data)
     size_t count;
 
     count = whitebox_rf_sink_work_done(rf_sink);
-    whitebox_user_source_consume(user_source, count);
     whitebox_rf_sink_produce(rf_sink, count);
+    whitebox_user_source_consume(user_source, count);
 
     stats->exec_dma_finished++;
     stats->bytes += count;

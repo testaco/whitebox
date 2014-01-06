@@ -74,13 +74,13 @@ module_param(whitebox_mock_order, int, S_IRUSR | S_IWUSR);
 /*
  * Block size of dma xfers to the exciter peripheral in bytes.
  */
-static int whitebox_exciter_quantum = (64 << 2);
+static int whitebox_exciter_quantum = (3 << 2);
 module_param(whitebox_exciter_quantum, int, S_IRUSR | S_IWUSR);
 
 /*
  * Block size of dma xfers to the receiver peripheral.
  */
-static int whitebox_receiver_quantum = (64 << 2);
+static int whitebox_receiver_quantum = (3 << 2);
 module_param(whitebox_receiver_quantum, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -339,7 +339,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
     if ((ret = tx_error(whitebox_device))) {
         dest_count = whitebox_user_source_data_available(user_source, &dest);
-        d_printk(0, "tx_error=%d user_source_data=%zd\n", ret, dest_count);
+        d_printk(2, "tx_error=%d user_source_data=%zd\n", ret, dest_count);
         up(&whitebox_device->sem);
         return -EIO;
     }
@@ -357,7 +357,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     }
 
     if (err) {
-        d_printk(0, "tx_error=%d user_source_data=%zd\n", err, dest_count);
+        d_printk(1, "tx_error=%d user_source_data=%zd\n", err, dest_count);
         up(&whitebox_device->sem);
         return -EIO;
     }
@@ -453,12 +453,15 @@ long whitebox_ioctl_exciter_get(unsigned long arg) {
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
     whitebox_args_t w;
     u16 o, u;
+    unsigned long src;
     w.flags.exciter.state = exciter->ops->get_state(exciter);
     w.flags.exciter.interp = exciter->ops->get_interp(exciter);
     w.flags.exciter.fcw = exciter->ops->get_fcw(exciter);
     exciter->ops->get_runs(exciter, &o, &u);
     w.flags.exciter.runs = ((u32)o << WER_OVERRUNS_OFFSET) | (u32)u;
     w.flags.exciter.threshold = exciter->ops->get_threshold(exciter);
+    w.flags.exciter.available = exciter->ops->space_available(exciter, &src);
+    w.flags.exciter.debug = exciter->ops->get_debug(exciter);
     if (copy_to_user((whitebox_args_t*)arg, &w,
             sizeof(whitebox_args_t)))
         return -EACCES;
@@ -487,11 +490,13 @@ long whitebox_ioctl_receiver_clear(void) {
 long whitebox_ioctl_receiver_get(unsigned long arg) {
     struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
     whitebox_args_t w;
+    unsigned long dest;
     w.flags.receiver.state = receiver->ops->get_state(receiver);
     w.flags.receiver.interp = receiver->ops->get_interp(receiver);
     w.flags.receiver.fcw = receiver->ops->get_fcw(receiver);
     // TODO w.flags.receiver.runs = receiver->ops->get_runs(receiver);
     w.flags.receiver.threshold = receiver->ops->get_threshold(receiver);
+    w.flags.receiver.available = receiver->ops->data_available(receiver, &dest);
     if (copy_to_user((whitebox_args_t*)arg, &w,
             sizeof(whitebox_args_t)))
         return -EACCES;
@@ -897,7 +902,7 @@ static struct resource whitebox_platform_device_resources[] = {
 
 /*
  * These whitebox pin to Linux kernel GPIO mappings are derived from the
- * Whitebox Libero SmartDesign.
+ * Whitebox Libero SmartDesign, as is the DMA channel allocations.
  */
 static struct whitebox_platform_data_t whitebox_platform_data = {
     .adc_s1_pin         = 36,

@@ -86,6 +86,12 @@ def whitebox(
         tx_fifo_aempty,
         tx_fifo_afval,
         tx_fifo_aeval,
+        tx_fifo_wack,
+        tx_fifo_dvld,
+        tx_fifo_overflow,
+        tx_fifo_underflow,
+        tx_fifo_rdcnt,
+        tx_fifo_wrcnt,
         rx_fifo_re,
         rx_fifo_rdata,
         rx_fifo_we,
@@ -96,6 +102,12 @@ def whitebox(
         rx_fifo_aempty,
         rx_fifo_afval,
         rx_fifo_aeval,
+        rx_fifo_wack,
+        rx_fifo_dvld,
+        rx_fifo_overflow,
+        rx_fifo_underflow,
+        rx_fifo_rdcnt,
+        rx_fifo_wrcnt,
         **kwargs):
     """The whitebox.
 
@@ -157,7 +169,7 @@ def whitebox(
 
     duc_args = (clearn, dac_clock, dac2x_clock,
             loopen, loopback,
-            tx_fifo_empty, tx_fifo_re, tx_fifo_rdata,
+            tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
             txen, txstop, ddsen, txfilteren,
             interp, fcw, tx_correct_i, tx_correct_q,
             duc_underrun, tx_sample,
@@ -178,18 +190,12 @@ def whitebox(
     ddc_flags = Signal(intbv(0)[4:])
     adc_last = Signal(bool(0))
 
-    rx_sample = Signature("rx_sample", True, bits=16)
-    rx_sample_valid = rx_sample.valid
-    rx_sample_last = rx_sample.last
-    rx_sample_i = rx_sample.i
-    rx_sample_q = rx_sample.q
-
     ddc_args = (clearn, dac_clock,
             loopen, loopback,
             rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
             rxen, rxstop, rxfilteren,
             decim, rx_correct_i, rx_correct_q,
-            ddc_overrun, rx_sample,
+            ddc_overrun,
             adc_idata, adc_qdata, adc_last,)
 
     ddc_kwargs = dict(dspsim=dspsim,
@@ -205,14 +211,23 @@ def whitebox(
     rfe_args = (resetn,
         pclk, paddr, psel, penable, pwrite, pwdata, pready, prdata, #pslverr,
         clearn, clear_enable, loopen,
+
         tx_status_led, tx_dmaready,
         rx_status_led, rx_dmaready,
         tx_fifo_we, tx_fifo_wdata,
         tx_fifo_empty, tx_fifo_full,
         tx_fifo_afval, tx_fifo_aeval, tx_fifo_afull, tx_fifo_aempty,
+        tx_fifo_wack, tx_fifo_dvld,
+        tx_fifo_overflow, tx_fifo_underflow,
+        tx_fifo_rdcnt, tx_fifo_wrcnt,
+
         rx_fifo_re, rx_fifo_rdata,
         rx_fifo_empty, rx_fifo_full,
         rx_fifo_afval, rx_fifo_aeval, rx_fifo_afull, rx_fifo_aempty,
+        rx_fifo_wack, rx_fifo_dvld,
+        rx_fifo_overflow, rx_fifo_underflow,
+        rx_fifo_rdcnt, rx_fifo_wrcnt,
+
         interp, fcw, tx_correct_i, tx_correct_q,
         txen, txstop, ddsen, txfilteren,
         decim, rx_correct_i, rx_correct_q,
@@ -269,10 +284,16 @@ if __name__ == '__main__':
     tx_fifo_wdata = Signal(intbv(0)[32:])
     tx_fifo_full = Signal(bool(False))
     tx_fifo_afull = Signal(bool(False))
-    tx_fifo_empty = Signal(bool(False))
-    tx_fifo_aempty = Signal(bool(False))
-    tx_fifo_afval = Signal(intbv(fifo_depth)[12:])
-    tx_fifo_aeval = Signal(intbv(0)[12:])
+    tx_fifo_empty = Signal(bool(True))
+    tx_fifo_aempty = Signal(bool(True))
+    tx_fifo_afval = Signal(intbv(fifo_depth - 1)[10:])
+    tx_fifo_aeval = Signal(intbv(0)[10:])
+    tx_fifo_wack = Signal(bool(False))
+    tx_fifo_dvld = Signal(bool(False))
+    tx_fifo_overflow = Signal(bool(False))
+    tx_fifo_underflow = Signal(bool(False))
+    tx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
+    tx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
 
     tx_fifo_args = (
         clearn,
@@ -287,7 +308,13 @@ if __name__ == '__main__':
         tx_fifo_empty,
         tx_fifo_aempty,
         tx_fifo_afval,
-        tx_fifo_aeval)
+        tx_fifo_aeval,
+        tx_fifo_wack,
+        tx_fifo_dvld,
+        tx_fifo_overflow,
+        tx_fifo_underflow,
+        tx_fifo_rdcnt,
+        tx_fifo_wrcnt)
     tx_fifo = FIFO(*tx_fifo_args,
         width=fifo_width,
         depth=fifo_depth)
@@ -300,10 +327,16 @@ if __name__ == '__main__':
     rx_fifo_wdata = Signal(intbv(0)[32:])
     rx_fifo_full = Signal(bool(False))
     rx_fifo_afull = Signal(bool(False))
-    rx_fifo_empty = Signal(bool(False))
-    rx_fifo_aempty = Signal(bool(False))
-    rx_fifo_afval = Signal(intbv(fifo_depth)[12:])
-    rx_fifo_aeval = Signal(intbv(0)[12:])
+    rx_fifo_empty = Signal(bool(True))
+    rx_fifo_aempty = Signal(bool(True))
+    rx_fifo_afval = Signal(intbv(fifo_depth - 1)[10:])
+    rx_fifo_aeval = Signal(intbv(0)[10:])
+    rx_fifo_wack = Signal(bool(False))
+    rx_fifo_dvld = Signal(bool(False))
+    rx_fifo_overflow = Signal(bool(False))
+    rx_fifo_underflow = Signal(bool(False))
+    rx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
+    rx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
 
     rx_fifo_args = (
         clearn,
@@ -318,7 +351,13 @@ if __name__ == '__main__':
         rx_fifo_empty,
         rx_fifo_aempty,
         rx_fifo_afval,
-        rx_fifo_aeval)
+        rx_fifo_aeval,
+        rx_fifo_wack,
+        rx_fifo_dvld,
+        rx_fifo_overflow,
+        rx_fifo_underflow,
+        rx_fifo_rdcnt,
+        rx_fifo_wrcnt)
     rx_fifo = FIFO(*rx_fifo_args,
         width=fifo_width,
         depth=fifo_depth)
@@ -357,6 +396,13 @@ if __name__ == '__main__':
                 tx_fifo_aempty,
                 tx_fifo_afval,
                 tx_fifo_aeval,
+                tx_fifo_wack,
+                tx_fifo_dvld,
+                tx_fifo_overflow,
+                tx_fifo_underflow,
+                tx_fifo_rdcnt,
+                tx_fifo_wrcnt,
+
                 rx_fifo_re,
                 rx_fifo_rdata,
                 rx_fifo_we,
@@ -366,7 +412,13 @@ if __name__ == '__main__':
                 rx_fifo_empty,
                 rx_fifo_aempty,
                 rx_fifo_afval,
-                rx_fifo_aeval)
+                rx_fifo_aeval,
+                rx_fifo_wack,
+                rx_fifo_dvld,
+                rx_fifo_overflow,
+                rx_fifo_underflow,
+                rx_fifo_rdcnt,
+                rx_fifo_wrcnt)
 
     toVerilog(whitebox, *signals,
             interp=interp,

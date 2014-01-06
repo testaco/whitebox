@@ -60,7 +60,7 @@ def ddc(clearn, dac_clock,
         fifo_full, fifo_we, fifo_wdata,
         system_rxen, system_rxstop, system_filteren, 
         system_decim, system_correct_i, system_correct_q,
-        overrun, sample,
+        overrun,
         adc_idata, adc_qdata, adc_last, **kwargs):
     dspsim = kwargs.get('dspsim', None)
     decim_default = kwargs.get('decim', 1)
@@ -79,11 +79,6 @@ def ddc(clearn, dac_clock,
     correct_q = Signal(intbv(0)[len(system_correct_q):])
     we = Signal(bool(0))
 
-    sample_valid = sample.valid
-    sample_last = sample.last
-    sample_i = sample.i
-    sample_q = sample.q
-
     #if kwargs.get('conditioning_enable', True):
     #    offset = Signature("offset", True, bits=10)
     #    offseter = binary_offseter(clearn, dac_clock,
@@ -96,10 +91,11 @@ def ddc(clearn, dac_clock,
     #            rf_out, corrected)
     #    chain.append(corrector)
     #else:
-    corrected = sample
+    adc = Signature("adc", True, bits=10, valid=rxen,
+            i=adc_idata, q=adc_qdata)
 
     conditioned = Signature("conditioned", True, bits=10)
-    loopback_0 = iqmux(clearn, dac_clock, loopen, corrected, loopback,
+    loopback_0 = iqmux(clearn, dac_clock, loopen, adc, loopback,
             conditioned)
     chain.append(loopback_0)
 
@@ -107,6 +103,13 @@ def ddc(clearn, dac_clock,
     downsampler_0 = downsampler(clearn, dac_clock, conditioned,
             downsampled, decim)
     chain.append(downsampler_0)
+
+    rx = downsampled
+    rx_i = rx.i
+    rx_q = rx.q
+    rx_valid = rx.valid
+    rx_last = rx.last
+    adc_last = rx_last
 
     @always_seq(dac_clock.posedge, reset=clearn)
     def synchronizer():
@@ -121,30 +124,24 @@ def ddc(clearn, dac_clock,
         sync_correct_q.next = system_correct_q
         correct_q.next = sync_correct_q
 
-    decim_counter = Signal(intbv(0)[32:])
-
     @always_seq(dac_clock.posedge, reset=clearn)
     def producer():
-        if rxen and sample_valid:
-            if decim_counter == 0:
-                decim_counter.next = decim - 1
-                # Sign extension
-                fifo_wdata.next = concat(
-                    sample_q[10], sample_q[10], sample_q[10],
-                    sample_q[10], sample_q[10], sample_q[10],
-                    sample_q[10:],
-                    sample_i[10], sample_i[10], sample_i[10],
-                    sample_i[10], sample_i[10], sample_i[10],
-                    sample_i[10:])
-                fifo_we.next = True
-                we.next = True
-            else:
-                decim_counter.next = decim_counter - 1
+        if rxen and rx_valid:
+            # Sign extension
+            fifo_wdata.next = concat(
+                rx_q[10], rx_q[10], rx_q[10],
+                rx_q[10], rx_q[10], rx_q[10],
+                rx_q[10:],
+                rx_i[10], rx_i[10], rx_i[10],
+                rx_i[10], rx_i[10], rx_i[10],
+                rx_i[10:])
+            fifo_we.next = True
+            we.next = True
 
             if we:
-                if fifo_full and not rxstop:
-                    overrun.next = overrun + 1
                 fifo_we.next = False
                 we.next = False
+                if fifo_full and not rxstop:
+                    overrun.next = overrun + 1
 
     return synchronizer, producer, chain

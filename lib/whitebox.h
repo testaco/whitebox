@@ -36,6 +36,7 @@ int whitebox_tx_clear(whitebox_t* wb);
 int whitebox_tx(whitebox_t* wb, float frequency);
 int whitebox_tx_set_interp(whitebox_t* wb, uint32_t interp);
 int whitebox_tx_set_buffer_threshold(whitebox_t* wb, uint16_t aeval, uint16_t afval);
+void whitebox_tx_get_buffer_threshold(whitebox_t *wb, uint16_t *aeval, uint16_t *afval);
 int whitebox_tx_get_buffer_runs(whitebox_t* wb, uint16_t* overruns, uint16_t* underruns);
 int whitebox_tx_get_ring_buffer_size(whitebox_t* wb);
 

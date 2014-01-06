@@ -56,11 +56,13 @@ int test_dds(void *data) {
     confirm("Is there no more signal");
 }
 
-#define N 128
-#define TOTAL_SAMPLES 5e6
+#define N 512
+#define SAMPLE_RATE 400e3 
+#define DURATION_IN_SECS 3
+#define TOTAL_SAMPLES (DURATION_IN_SECS * SAMPLE_RATE)
 int test_cic(void * data) {
-    float freq = 100e3;
-    float sample_rate = 500e3;
+    float freq = SAMPLE_RATE / 4;
+    float sample_rate = SAMPLE_RATE;
     float carrier_freq = 144.00e6;
     uint32_t fcw = freq_to_fcw(freq, sample_rate);
     uint32_t last_phase = 0;
@@ -75,12 +77,16 @@ int test_cic(void * data) {
     assert(whitebox_tx(&wb, carrier_freq) == 0);
 
     for (n = 0; n < TOTAL_SAMPLES; n += N) {
-        accum32(N, fcw, last_phase, phases);
-        sincos16c(N, phases, c);
-        last_phase = phases[N-1];
+        //accum32(N, fcw, last_phase, phases);
+        //sincos16c(N, phases, c);
+        //last_phase = phases[N-1];
 
         ret = write(whitebox_fd(&wb), c, sizeof(uint32_t) * N);
-        assert(ret == sizeof(uint32_t) * N);
+        if (ret == sizeof(uint32_t) * N) {
+            printf("."); fflush(stdout);
+        } else {
+            printf("U"); fflush(stdout);
+        }
     }
 
     assert(fsync(fd) == 0);
@@ -90,7 +96,7 @@ int test_cic(void * data) {
 
 int main(int argc, char **argv) {
     whitebox_test_t tests[] = {
-        WHITEBOX_TEST(test_dds),
+        //WHITEBOX_TEST(test_dds),
         WHITEBOX_TEST(test_cic),
         WHITEBOX_TEST(0),
     };

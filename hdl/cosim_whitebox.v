@@ -30,8 +30,16 @@ reg tx_fifo_full;
 reg tx_fifo_empty;
 reg tx_fifo_afull;
 reg tx_fifo_aempty;
-wire [11:0] tx_fifo_afval;
-wire [11:0] tx_fifo_aeval;
+wire [9:0] tx_fifo_afval;
+wire [9:0] tx_fifo_aeval;
+reg tx_fifo_wack;
+reg tx_fifo_dvld;
+reg tx_fifo_overflow;
+reg tx_fifo_underflow;
+reg [10:0] tx_fifo_rdcnt;
+reg [10:0] tx_fifo_wrcnt;
+reg tx_fifo_wclk;
+reg tx_fifo_rclk;
 
 wire rx_fifo_re;
 reg [31:0] rx_fifo_rdata;
@@ -41,8 +49,16 @@ reg rx_fifo_full;
 reg rx_fifo_empty;
 reg rx_fifo_afull;
 reg rx_fifo_aempty;
-wire [11:0] rx_fifo_afval;
-wire [11:0] rx_fifo_aeval;
+wire [9:0] rx_fifo_afval;
+wire [9:0] rx_fifo_aeval;
+reg rx_fifo_wack;
+reg rx_fifo_dvld;
+reg rx_fifo_overflow;
+reg rx_fifo_underflow;
+reg [10:0] rx_fifo_rdcnt;
+reg [10:0] rx_fifo_wrcnt;
+reg rx_fifo_wclk;
+reg rx_fifo_rclk;
 
 initial begin
     $dumpfile({`COSIM_NAME, ".vcd"});
@@ -51,7 +67,13 @@ initial begin
             dac2x_clock, dac_clock,
             pclk, paddr, psel, penable, pwrite, pwdata,
             tx_fifo_rdata, tx_fifo_full, tx_fifo_afull, tx_fifo_empty, tx_fifo_aempty,
-            rx_fifo_rdata, rx_fifo_full, rx_fifo_afull, rx_fifo_empty, rx_fifo_aempty);
+            tx_fifo_wack, tx_fifo_dvld, tx_fifo_overflow, tx_fifo_underflow,
+            tx_fifo_rdcnt, tx_fifo_wrcnt,
+            tx_fifo_rclk, tx_fifo_wclk,
+            rx_fifo_rdata, rx_fifo_full, rx_fifo_afull, rx_fifo_empty, rx_fifo_aempty,
+            rx_fifo_wack, rx_fifo_dvld, rx_fifo_overflow, rx_fifo_underflow,
+            rx_fifo_rdcnt, rx_fifo_wrcnt,
+            rx_fifo_rclk, rx_fifo_wclk);
     $to_myhdl(pready, prdata, //pslverr,
             dac_data, dac_en,
             tx_status_led, tx_dmaready,
@@ -105,6 +127,13 @@ whitebox whitebox_0 (
     .tx_fifo_aempty(tx_fifo_aempty),
     .tx_fifo_afval(tx_fifo_afval),
     .tx_fifo_aeval(tx_fifo_aeval),
+    .tx_fifo_wack(tx_fifo_wack),
+    .tx_fifo_dvld(tx_fifo_dvld),
+    .tx_fifo_overflow(tx_fifo_overflow),
+    .tx_fifo_underflow(tx_fifo_underflow),
+    .tx_fifo_rdcnt(tx_fifo_rdcnt),
+    .tx_fifo_wrcnt(tx_fifo_wrcnt),
+
     .rx_fifo_re(rx_fifo_re),
     .rx_fifo_rdata(rx_fifo_rdata),
     .rx_fifo_we(rx_fifo_we),
@@ -114,7 +143,13 @@ whitebox whitebox_0 (
     .rx_fifo_afull(rx_fifo_afull),
     .rx_fifo_aempty(rx_fifo_aempty),
     .rx_fifo_afval(rx_fifo_afval),
-    .rx_fifo_aeval(rx_fifo_aeval)
+    .rx_fifo_aeval(rx_fifo_aeval),
+    .rx_fifo_wack(rx_fifo_wack),
+    .rx_fifo_dvld(rx_fifo_dvld),
+    .rx_fifo_overflow(rx_fifo_overflow),
+    .rx_fifo_underflow(rx_fifo_underflow),
+    .rx_fifo_rdcnt(rx_fifo_rdcnt),
+    .rx_fifo_wrcnt(rx_fifo_wrcnt)
 );
 
 endmodule

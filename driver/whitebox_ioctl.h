@@ -21,6 +21,8 @@ typedef struct whitebox_args {
             uint32_t fcw;
             uint32_t runs;
             uint32_t threshold;
+            uint32_t available;
+            uint32_t debug;
         } exciter;
         struct {
             uint32_t state;
@@ -28,6 +30,8 @@ typedef struct whitebox_args {
             uint32_t fcw;
             uint32_t runs;
             uint32_t threshold;
+            uint32_t available;
+            uint32_t debug;
         } receiver;
         uint8_t cmx991[WC_REGS_COUNT];
         uint32_t adf4351[WA_REGS_COUNT];
@@ -35,6 +39,10 @@ typedef struct whitebox_args {
     uint8_t locked;
     uint32_t mock_command;
 } whitebox_args_t;
+
+// Location of the register files
+#define WHITEBOX_EXCITER_REGS          0x40050400
+#define WHITEBOX_RECEIVER_REGS         0x40050480
 
 /* Register File */
 #define WE_SAMPLE_ADDR          0x0
@@ -44,12 +52,14 @@ typedef struct whitebox_args {
 #define WE_RUNS_ADDR            0x10
 #define WE_THRESHOLD_ADDR       0x14
 #define WE_CORRECTION_ADDR      0x18
+#define WE_AVAILABLE_ADDR       0x1c
 #define WR_SAMPLE_ADDR          0x80
 #define WR_STATUS_ADDR          0x84
 #define WR_DECIM_ADDR           0x88
 #define WR_RUNS_ADDR            0x90
 #define WR_THRESHOLD_ADDR       0x94
 #define WR_CORRECTION_ADDR      0x98
+#define WR_AVAILABLE_ADDR       0x9c
 
 /* Status Flags */
 #define WS_CLEAR                (1 << 0)

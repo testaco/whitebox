@@ -42,6 +42,10 @@ add_custom_target(hdl
 add_test(NAME test_apb3_simple_slave
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/apb3_utils.py
 )
+
+add_test(NAME test_fifo
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fifo.py
+)
     
 add_test(NAME test_dsp_offset_corrector
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_dsp.py TestOffsetCorrector
@@ -83,6 +87,10 @@ add_test(NAME test_whitebox_overrun_underrun
 
 add_test(NAME test_whitebox_halt
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestHalt
+)
+
+add_test(NAME test_whitebox_loop
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestLoop
 )
 
 add_test(NAME test_whitebox_cic

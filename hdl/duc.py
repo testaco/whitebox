@@ -33,7 +33,6 @@ def truncator(clearn, in_clock, in_sign, out_sign):
     def truncate():
         if in_valid:
             out_valid.next = True
-            # TODO: is this right???
             out_i.next = in_i[i_msb:i_lsb].signed()
             out_q.next = in_q[q_msb:q_lsb].signed()
             out_last.next = in_last
@@ -427,7 +426,7 @@ def duc_fake(clearn, dac_clock, dac2x_clock,
 
 def duc(clearn, dac_clock, dac2x_clock,
         loopen, loopback,
-        fifo_empty, fifo_re, fifo_rdata,
+        fifo_empty, fifo_re, fifo_dvld, fifo_rdata, fifo_underflow,
         system_txen, system_txstop,
         system_ddsen, system_filteren,
         system_interp, system_fcw,
@@ -476,7 +475,7 @@ def duc(clearn, dac_clock, dac2x_clock,
         filtered = Signature("filtered", True, bits=10)
         cic_0 = cic(clearn, dac_clock, truncated_1, filtered,
                 interp,
-                cic_order=3, cic_delay=1,
+                cic_order=4, cic_delay=1,
                 sim=dspsim)
         chain.append(cic_0)
 
@@ -563,15 +562,21 @@ def duc(clearn, dac_clock, dac2x_clock,
 
             if re:
                 # Watch for underrun
-                if fifo_empty and not txstop:
-                    underrun.next = underrun + 1
+                fifo_re.next = False
+                re.next = False
+
+            if fifo_dvld:
                 sample_i.next = fifo_rdata[16:].signed()
                 sample_q.next = fifo_rdata[32:16].signed()
                 sample_valid.next = True
-                sample_last.next = txstop if fifo_empty else False
-                fifo_re.next = False
-                re.next = False
+                sample_last.next = False
+            elif fifo_underflow and txstop:
+                sample_valid.next = True
+                sample_last.next = True
             else:
                 sample_valid.next = False
+                sample_last.next = False
+                if fifo_underflow:
+                    underrun.next = underrun + 1
     
     return synchronizer, consumer, chain

@@ -141,135 +141,42 @@ int test_tx_fifo(void *data) {
     whitebox_t wb;
     int quantum = whitebox_parameter_get("exciter_quantum");
     whitebox_args_t w;
+    uint16_t aeval, afval;
 
     whitebox_parameter_set("auto_tx", 0);
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 10e3)) > 0);
+    whitebox_tx_get_buffer_threshold(&wb, &aeval, &afval);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    printf("aeval=%d\n", w.flags.exciter.threshold & WET_AEVAL_MASK);
-    printf("afval=%d\n", (w.flags.exciter.threshold & WET_AFVAL_MASK) >> WET_AFVAL_OFFSET);
-    i = 0;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(w.flags.exciter.state & WES_AEMPTY);
-    assert(!(w.flags.exciter.state & WES_DATA));
-    assert(!(w.flags.exciter.state & WES_AFULL));
-
-    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-    ++i;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    //assert(w.flags.exciter.state & WES_SPACE);
-    //assert(w.flags.exciter.state & WES_AEMPTY);
-    //assert(w.flags.exciter.state & WES_DATA);
-    //assert(!(w.flags.exciter.state & WES_AFULL));
-
-    while (i < (quantum >> 3)) {
-        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-        ++i;
-        printf("%d ", i);
-        whitebox_debug_to_file(&wb, stdout);
+    for (i = 0; i < WE_FIFO_SIZE; ++i) {
         assert(ioctl(fd, WE_GET, &w) == 0);
-        //assert(w.flags.exciter.state & WES_SPACE);
-        //assert(w.flags.exciter.state & WES_AEMPTY);
-        //assert(w.flags.exciter.state & WES_DATA);
-        //assert(!(w.flags.exciter.state & WES_AFULL));
-    }
 
-    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-    ++i;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    //assert(w.flags.exciter.state & WES_SPACE);
-    //assert(!(w.flags.exciter.state & WES_AEMPTY));
-    //assert(w.flags.exciter.state & WES_DATA);
-    //assert(!(w.flags.exciter.state & WES_AFULL));
+        assert(w.flags.exciter.available >> 2 == WE_FIFO_SIZE - i);
 
-    while (i < WE_FIFO_SIZE / 2 /* - quantum - 1 */) {
+        if (i == WE_FIFO_SIZE)
+            assert(!(w.flags.exciter.state & WES_SPACE));
+        else
+            assert(w.flags.exciter.state & WES_SPACE);
+
+        if (i == 0)
+            assert(!(w.flags.exciter.state & WES_DATA));
+        else
+            assert(w.flags.exciter.state & WES_DATA);
+
+        if (i < afval)
+            assert(!(w.flags.exciter.state & WES_AFULL));
+        else
+            assert(w.flags.exciter.state & WES_AFULL);
+
+        if (i > aeval)
+            assert(!(w.flags.exciter.state & WES_AEMPTY));
+        else
+            assert(w.flags.exciter.state & WES_AEMPTY);
+
         assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-        ++i;
-        printf("%d ", i);
-        whitebox_debug_to_file(&wb, stdout);
-        //assert(ioctl(fd, WE_GET, &w) == 0);
-        //assert(w.flags.exciter.state & WES_SPACE);
-        //assert(!(w.flags.exciter.state & WES_AEMPTY));
-        //assert(w.flags.exciter.state & WES_DATA);
-        //assert(!(w.flags.exciter.state & WES_AFULL));
     }
 
-#if 0
-
-    // TODO: what I'm doing here is verifying that the TX FIFO's flags
-    // behave as one would expect; they don't behave as I expect just yet!
-
-    while (i < quantum - 1) {
-        printf("\ni=%d, quantum=%d\n", i, quantum >> 2);
-        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-        ++i;
-        whitebox_debug_to_file(&wb, stdout);
-        assert(ioctl(fd, WE_GET, &w) == 0);
-        assert(w.flags.exciter.state & WES_SPACE);
-        assert(w.flags.exciter.state & WES_AEMPTY);
-        assert(w.flags.exciter.state & WES_DATA);
-        assert(!(w.flags.exciter.state & WES_AFULL));
-    }
-
-
-    printf("\ni=%d, quantum=%d\n", i, quantum >> 2);
-    assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-    ++i;
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
-
-    while (++i < WE_FIFO_SIZE - ((quantum >> 2)) - 1) {
-        printf("\ni=%d, quantum=%d\n", i, quantum >> 2);
-        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-        whitebox_debug_to_file(&wb, stdout);
-        assert(ioctl(fd, WE_GET, &w) == 0);
-        //assert(w.flags.exciter.state & WES_SPACE);
-        //assert(!(w.flags.exciter.state & WES_AEMPTY));
-        assert(w.flags.exciter.state & WES_DATA);
-        //assert(!(w.flags.exciter.state & WES_AFULL));
-        if (w.flags.exciter.state & WES_AFULL)
-            break;
-    }
-
-    /*assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(w.flags.exciter.state & WES_AFULL);*/
-
-    while (++i < WE_FIFO_SIZE + 10) {
-        printf("\ni=%d, quantum=%d\n", i, quantum >> 2);
-        assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-        whitebox_debug_to_file(&wb, stdout);
-        assert(ioctl(fd, WE_GET, &w) == 0);
-        //assert(w.flags.exciter.state & WES_SPACE);
-        assert(!(w.flags.exciter.state & WES_AEMPTY));
-        assert(w.flags.exciter.state & WES_DATA);
-        assert(w.flags.exciter.state & WES_AFULL);
-    }
-
-    //assert(write(fd, &sample, sizeof(uint32_t)) == sizeof(uint32_t));
-    //assert(ioctl(fd, WE_GET, &w) == 0);
-    //assert(!(w.flags.exciter.state & WES_SPACE));
-    //assert(!(w.flags.exciter.state & WES_AEMPTY));
-    //assert(w.flags.exciter.state & WES_DATA);
-    //assert(w.flags.exciter.state & WES_AFULL);*/
-#endif
     whitebox_close(&wb);
     whitebox_parameter_set("auto_tx", 1);
     return 0;
@@ -278,109 +185,46 @@ int test_tx_fifo(void *data) {
 int test_tx_fifo_dma(void *data) {
     int fd;
     int ret;
-    uint32_t sample[64];
+    uint32_t samples[] = { 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef };
     int i = 0;
     whitebox_t wb;
     int quantum = whitebox_parameter_get("exciter_quantum");
     whitebox_args_t w;
+    uint16_t aeval, afval;
 
     whitebox_parameter_set("auto_tx", 0);
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 10e3)) > 0);
+    whitebox_tx_get_buffer_threshold(&wb, &aeval, &afval);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    printf("aeval=%d\n", w.flags.exciter.threshold & WET_AEVAL_MASK);
-    printf("afval=%d\n", (w.flags.exciter.threshold & WET_AFVAL_MASK) >> WET_AFVAL_OFFSET);
-    i = 0;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
+    for (i = 0; i < WE_FIFO_SIZE; i += 4) {
+        assert(ioctl(fd, WE_GET, &w) == 0);
 
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(w.flags.exciter.state & WES_AEMPTY);
-    assert(!(w.flags.exciter.state & WES_DATA));
-    assert(!(w.flags.exciter.state & WES_AFULL));
+        assert(w.flags.exciter.available >> 2 == WE_FIFO_SIZE - i);
 
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(w.flags.exciter.state & WES_AEMPTY);
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
+        if (i == WE_FIFO_SIZE)
+            assert(!(w.flags.exciter.state & WES_SPACE));
+        else
+            assert(w.flags.exciter.state & WES_SPACE);
 
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
+        if (i == 0)
+            assert(!(w.flags.exciter.state & WES_DATA));
+        else
+            assert(w.flags.exciter.state & WES_DATA);
 
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
+        if (i < afval)
+            assert(!(w.flags.exciter.state & WES_AFULL));
+        else
+            assert(w.flags.exciter.state & WES_AFULL);
 
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
+        if (i > aeval)
+            assert(!(w.flags.exciter.state & WES_AEMPTY));
+        else
+            assert(w.flags.exciter.state & WES_AEMPTY);
 
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
-
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(!(w.flags.exciter.state & WES_AFULL));
-
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(w.flags.exciter.state & WES_AFULL);
-
-    assert(write(fd, sample, sizeof(uint32_t)*64) == sizeof(uint32_t)*64);
-    i += 64;
-    printf("%d ", i);
-    whitebox_debug_to_file(&wb, stdout);
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(w.flags.exciter.state & WES_SPACE);
-    assert(!(w.flags.exciter.state & WES_AEMPTY));
-    assert(w.flags.exciter.state & WES_DATA);
-    assert(w.flags.exciter.state & WES_AFULL);
+        assert(write(fd, &samples, 4 * sizeof(uint32_t)) == 4 * sizeof(uint32_t));
+    }
 
     whitebox_close(&wb);
     whitebox_parameter_set("auto_tx", 1);
@@ -439,7 +283,7 @@ int test_tx_halt(void* data) {
 
 
     whitebox_debug_to_file(&wb, stdout);
-    for (j = 0; j < 100; ++j) {
+    for (j = 0; j < 1000; ++j) {
         ret = write(whitebox_fd(&wb), buf, sizeof(uint32_t) * i);
         if (ret != sizeof(uint32_t) * i) {
             whitebox_debug_to_file(&wb, stdout);
@@ -466,10 +310,10 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_tx_420_pll),
         WHITEBOX_TEST(test_tx_902_pll),
         WHITEBOX_TEST(test_ioctl_exciter),
-        WHITEBOX_TEST(test_tx_overrun_underrun),
-        /*WHITEBOX_TEST(test_tx_fifo),
+        WHITEBOX_TEST(test_tx_fifo),
         WHITEBOX_TEST(test_tx_fifo_dma),
-        //WHITEBOX_TEST(test_tx_halt),*/
+        WHITEBOX_TEST(test_tx_overrun_underrun),
+        WHITEBOX_TEST(test_tx_halt),
         WHITEBOX_TEST(0),
     };
     return whitebox_test_main(tests, NULL, argc, argv);

@@ -50,8 +50,14 @@ module whitebox_toplevel(
     wire tx_fifo_empty;
     wire tx_fifo_afull;
     wire tx_fifo_aempty;
-    wire [11:0] tx_fifo_afval;
-    wire [11:0] tx_fifo_aeval;
+    wire [9:0] tx_fifo_afval;
+    wire [9:0] tx_fifo_aeval;
+    wire tx_fifo_wack;
+    wire tx_fifo_dvld;
+    wire tx_fifo_overflow;
+    wire tx_fifo_underflow;
+    wire [10:0] tx_fifo_rdcnt;
+    wire [10:0] tx_fifo_wrcnt;
     wire rx_fifo_re;
     wire [31:0] rx_fifo_rdata;
     wire rx_fifo_we;
@@ -60,8 +66,14 @@ module whitebox_toplevel(
     wire rx_fifo_empty;
     wire rx_fifo_afull;
     wire rx_fifo_aempty;
-    wire [11:0] rx_fifo_afval;
-    wire [11:0] rx_fifo_aeval;
+    wire [9:0] rx_fifo_afval;
+    wire [9:0] rx_fifo_aeval;
+    wire rx_fifo_wack;
+    wire rx_fifo_dvld;
+    wire rx_fifo_overflow;
+    wire rx_fifo_underflow;
+    wire [10:0] rx_fifo_rdcnt;
+    wire [10:0] rx_fifo_wrcnt;
 
     // Whitebox Reset
     whitebox_reset whitebox_reset_0(
@@ -71,7 +83,7 @@ module whitebox_toplevel(
         .clearn(clearn)
     );
     // tx fifo
-    actel_fifo_32_1024 tx_fifo(
+    actel_soft_fifo_32_1024 tx_fifo(
         .DATA(tx_fifo_wdata),
         .Q(tx_fifo_rdata),
         .WE(tx_fifo_we),
@@ -84,10 +96,16 @@ module whitebox_toplevel(
         .AEMPTY(tx_fifo_aempty),
         .AFULL(tx_fifo_afull),
         .AFVAL(tx_fifo_afval),
-        .AEVAL(tx_fifo_aeval)
+        .AEVAL(tx_fifo_aeval),
+        .WACK(tx_fifo_wack),
+        .DVLD(tx_fifo_dvld),
+        .OVERFLOW(tx_fifo_overflow),
+        .UNDERFLOW(tx_fifo_underflow),
+        .RDCNT(tx_fifo_rdcnt),
+        .WRCNT(tx_fifo_wrcnt)
     );
     // rx fifo
-    actel_fifo_32_1024 rx_fifo(
+    actel_soft_fifo_32_1024 rx_fifo(
         .DATA(rx_fifo_wdata),
         .Q(rx_fifo_rdata),
         .WE(rx_fifo_we),
@@ -100,7 +118,13 @@ module whitebox_toplevel(
         .AEMPTY(rx_fifo_aempty),
         .AFULL(rx_fifo_afull),
         .AFVAL(rx_fifo_afval),
-        .AEVAL(rx_fifo_aeval)
+        .AEVAL(rx_fifo_aeval),
+        .WACK(rx_fifo_wack),
+        .DVLD(rx_fifo_dvld),
+        .OVERFLOW(rx_fifo_overflow),
+        .UNDERFLOW(rx_fifo_underflow),
+        .RDCNT(rx_fifo_rdcnt),
+        .WRCNT(rx_fifo_wrcnt)
     );
     // APB3 WRAPPER, DUC, DDC
     whitebox whitebox_0(
@@ -135,6 +159,12 @@ module whitebox_toplevel(
         .tx_fifo_aempty(tx_fifo_aempty),
         .tx_fifo_afval(tx_fifo_afval),
         .tx_fifo_aeval(tx_fifo_aeval),
+        .tx_fifo_wack(tx_fifo_wack),
+        .tx_fifo_dvld(tx_fifo_dvld),
+        .tx_fifo_overflow(tx_fifo_overflow),
+        .tx_fifo_underflow(tx_fifo_underflow),
+        .tx_fifo_rdcnt(tx_fifo_rdcnt),
+        .tx_fifo_wrcnt(tx_fifo_wrcnt),
         .rx_fifo_re(rx_fifo_re),
         .rx_fifo_rdata(rx_fifo_rdata),
         .rx_fifo_we(rx_fifo_we),
@@ -144,6 +174,12 @@ module whitebox_toplevel(
         .rx_fifo_afull(rx_fifo_afull),
         .rx_fifo_aempty(rx_fifo_aempty),
         .rx_fifo_afval(rx_fifo_afval),
-        .rx_fifo_aeval(rx_fifo_aeval)
+        .rx_fifo_aeval(rx_fifo_aeval),
+        .rx_fifo_wack(rx_fifo_wack),
+        .rx_fifo_dvld(rx_fifo_dvld),
+        .rx_fifo_overflow(rx_fifo_overflow),
+        .rx_fifo_underflow(rx_fifo_underflow),
+        .rx_fifo_rdcnt(rx_fifo_rdcnt),
+        .rx_fifo_wrcnt(rx_fifo_wrcnt)
     );
 endmodule

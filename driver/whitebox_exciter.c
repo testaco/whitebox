@@ -72,18 +72,8 @@ void _exciter_get_runs(struct whitebox_exciter *exciter,
 long _exciter_space_available(struct whitebox_exciter *exciter,
         unsigned long *dest)
 {
-    u32 state;
-    state = exciter->ops->get_state(exciter);
-    /*d_printk(0, "%08x auto_tx=%d, afull=%d, aempty=%d, txen=%d\n",
-            state, exciter->auto_tx,
-            state & WES_AFULL, state & WES_AEMPTY, state & WES_TXEN);*/
     *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
-    if (!(state & WES_AFULL))
-        return exciter->quantum;
-    else if (state & WES_SPACE)
-        return 4;
-    else
-        return 0;
+    return (WE_FIFO_SIZE << 2) - (long)((WHITEBOX_EXCITER(exciter)->available) << 2);
 }
 
 int _exciter_produce(struct whitebox_exciter *exciter,
@@ -94,6 +84,11 @@ int _exciter_produce(struct whitebox_exciter *exciter,
         exciter->ops->set_state(exciter, WES_TXEN);
 
     return 0;
+}
+
+u32 _exciter_get_debug(struct whitebox_exciter *exciter)
+{
+    return WHITEBOX_EXCITER(exciter)->debug;
 }
 
 struct whitebox_exciter_operations _exciter_ops = {
@@ -110,6 +105,7 @@ struct whitebox_exciter_operations _exciter_ops = {
     .get_runs = _exciter_get_runs,
     .space_available = _exciter_space_available,
     .produce = _exciter_produce,
+    .get_debug = _exciter_get_debug,
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,
@@ -203,14 +199,12 @@ long _mock_exciter_space_available(struct whitebox_exciter *exciter,
 {
     struct whitebox_mock_exciter *mock_exciter = 
         container_of(exciter, struct whitebox_mock_exciter, exciter);
-    u32 state = exciter->ops->get_state(exciter);
+    long tail, head;
     d_printk(1, "\n");
-    *dest = (unsigned long)mock_exciter->buf->buf + mock_exciter->buf->head;
-    if (!(state & WES_AFULL))
-        return exciter->quantum;
-    if (state & WES_SPACE)
-        return 4;
-    return 0;
+    head = mock_exciter->buf->head;
+    *dest = (unsigned long)mock_exciter->buf->buf + head;
+    tail = ACCESS_ONCE(mock_exciter->buf->tail);
+    return CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
 }
 
 int _mock_exciter_produce(struct whitebox_exciter *exciter,
@@ -228,6 +222,11 @@ int _mock_exciter_produce(struct whitebox_exciter *exciter,
     return 0;
 }
 
+u32 _mock_exciter_get_debug(struct whitebox_exciter *exciter)
+{
+    return 0;
+}
+
 struct whitebox_exciter_operations _mock_exciter_ops = {
     .free = _mock_exciter_free,
     .get_state = _mock_exciter_get_state,
@@ -242,6 +241,7 @@ struct whitebox_exciter_operations _mock_exciter_ops = {
     .get_runs = _exciter_get_runs,
     .space_available = _mock_exciter_space_available,
     .produce = _mock_exciter_produce,
+    .get_debug = _mock_exciter_get_debug,
 };
 
 int whitebox_mock_exciter_create(struct whitebox_mock_exciter *mock_exciter,

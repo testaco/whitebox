@@ -58,8 +58,8 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
     if (rf_sink->dma_count >> 2 == 0)
         return -1;
 
-    // If less than a quantum, do it in a tight loop.
-    if (rf_sink->dma_count < rf_sink->exciter->quantum) {
+    // If there's less than a quantum at the source, do it in a tight loop.
+    /*if (rf_sink->dma_count < rf_sink->exciter->quantum) {
         int i;
         for (i = 0; i < rf_sink->dma_count >> 2; ++i) {
             if (!rf_sink->exciter->incr_dest) {
@@ -69,7 +69,7 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
             }
         }
         return rf_sink->dma_count;
-    }
+    }*/
 
     // Else, use the DMA to transfer the data
 
