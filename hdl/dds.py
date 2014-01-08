@@ -58,7 +58,8 @@ def dds(resetn,
     num_samples = kwargs.get('num_samples', 1024)
     lgsamples = int(ceil(log(num_samples, 2)))
     sample_resolution = len(output_i)
-    half = pow(2, sample_resolution - 1)
+    scale_factor = 0.8  # To compensate for the DC Offset Correction
+    half = scale_factor*pow(2, sample_resolution - 1)
     i_samples = tuple([int(ceil(cos(i)*(half-1))) \
                 for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
     q_samples = tuple([int(ceil(sin(i)*(half-1))) \

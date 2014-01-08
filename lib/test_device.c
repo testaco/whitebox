@@ -80,6 +80,7 @@ int test_tx_902_pll(void* data) {
 
 int test_ioctl_exciter(void *data) {
     int fd;
+    int16_t ic, qc;
     whitebox_t wb;
     whitebox_args_t w;
     whitebox_init(&wb);
@@ -92,6 +93,11 @@ int test_ioctl_exciter(void *data) {
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(w.flags.exciter.interp == 100);
     assert(w.flags.exciter.fcw == 32);
+
+    whitebox_tx_set_correction(&wb, -1, 1);
+    whitebox_tx_get_correction(&wb, &ic, &qc);
+    assert(ic == -1 && qc == 1);
+
     assert(whitebox_close(&wb) == 0);
     return 0;
 }

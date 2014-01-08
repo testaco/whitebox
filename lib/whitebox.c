@@ -71,6 +71,11 @@ int whitebox_close(whitebox_t* wb) {
     if (wb->fd < 0) {
         return -EBADF;
     }
+    whitebox_args_t w;
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    cmx991_suspend(&wb->cmx991);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
 
     close(wb->fd);
     wb->fd = -EINVAL;
@@ -147,7 +152,7 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
         return 1;
     }
     cmx991_tx_tune(&wb->cmx991, 198.00e6, IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
-        TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P6DB);
+        TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P0DB);
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
 
@@ -235,4 +240,23 @@ void whitebox_tx_dds_enable(whitebox_t* wb, float fdes) {
     uint32_t fcw = (uint32_t)(fdes / ((float)W_DAC_RATE_HZ / (float)W_DDS_PA_COUNT));
     whitebox_tx_set_dds_fcw(wb, fcw);
     whitebox_tx_flags_enable(wb, WES_DDSEN);
+}
+
+void whitebox_tx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t correct_q)
+{
+    whitebox_args_t w;
+    ioctl(wb->fd, WE_GET, &w);
+    w.flags.exciter.correction = (uint32_t)(((int32_t)correct_i & WEC_I_MASK) |
+                        (((int32_t)correct_q << WEC_Q_OFFSET) & WEC_Q_MASK));
+    ioctl(wb->fd, WE_SET, &w);
+}
+
+void whitebox_tx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q)
+{
+    whitebox_args_t w;
+    ioctl(wb->fd, WE_GET, &w);
+    *correct_i = ((int16_t)(w.flags.exciter.correction & WEC_I_MASK)) << 6;
+    *correct_i >>= 6;
+    *correct_q = (int16_t)(((w.flags.exciter.correction & WEC_Q_MASK)) >> WEC_Q_OFFSET) << 6;
+    *correct_q >>= 6;
 }

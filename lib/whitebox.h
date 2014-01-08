@@ -45,4 +45,8 @@ void whitebox_tx_flags_disable(whitebox_t* wb, uint32_t flags);
 
 void whitebox_tx_dds_enable(whitebox_t* wb, float fdes);
 
+void whitebox_tx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t correct_q);
+void whitebox_tx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q);
+
+
 #endif /* __WHITEBOX_H__ */

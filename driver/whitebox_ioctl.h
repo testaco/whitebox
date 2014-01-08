@@ -21,6 +21,7 @@ typedef struct whitebox_args {
             uint32_t fcw;
             uint32_t runs;
             uint32_t threshold;
+            uint32_t correction;
             uint32_t available;
             uint32_t debug;
         } exciter;
@@ -30,6 +31,7 @@ typedef struct whitebox_args {
             uint32_t fcw;
             uint32_t runs;
             uint32_t threshold;
+            uint32_t correction;
             uint32_t available;
             uint32_t debug;
         } receiver;
@@ -98,6 +100,10 @@ typedef struct whitebox_args {
 #define WET_AFVAL_MASK       0xffff0000
 #define WET_AFVAL_OFFSET     16
 #define WET_AEVAL_MASK       0x0000ffff
+
+#define WEC_I_MASK           0x000003ff
+#define WEC_Q_OFFSET         16
+#define WEC_Q_MASK           0x03ff0000
 
 /* Receiver */
 #define WR_CLEAR _IO('w', 6)

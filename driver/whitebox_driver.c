@@ -89,6 +89,11 @@ module_param(whitebox_receiver_quantum, int, S_IRUSR | S_IWUSR);
 static int whitebox_auto_tx = 1;
 module_param(whitebox_auto_tx, int, S_IRUSR | S_IWUSR);
 
+static int whitebox_tx_i_correction = 17;
+module_param(whitebox_tx_i_correction, int, S_IRUSR | S_IWUSR);
+static int whitebox_tx_q_correction = -51;
+module_param(whitebox_tx_q_correction, int, S_IRUSR | S_IWUSR);
+
 /*
  * Register mappings for the CMX991 register file.
  */
@@ -153,13 +158,11 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
 
     exciter->quantum = whitebox_exciter_quantum;
     exciter->auto_tx = whitebox_auto_tx;
-    // TODO: somehow, this is very wrong.  I'm expecting there to be a 1024
-    // word-deep FIFO, but it's only 512 big.  To top it all off, the afval
-    // and aeval numbers are off by 1 factor of 2.  This is the best I have
-    // so far.
-    /*exciter->ops->set_threshold(exciter, (u32)((whitebox_exciter_quantum)) |
-        ((u32)((WE_FIFO_SIZE - whitebox_exciter_quantum))) << WET_AFVAL_OFFSET);*/
-    exciter->ops->set_threshold(exciter, ((((1023-128) << 2) << WET_AFVAL_OFFSET) | (128 << 2)));
+    exciter->ops->set_threshold(exciter, (u32)((whitebox_exciter_quantum)) |
+        ((u32)((WE_FIFO_SIZE - whitebox_exciter_quantum))) << WET_AFVAL_OFFSET);
+    exciter->ops->set_correction(exciter,
+            (u32)(((s32)whitebox_tx_i_correction & WEC_I_MASK) |
+                (((s32)whitebox_tx_q_correction << WEC_Q_OFFSET) & WEC_Q_MASK)));
 
     ret = whitebox_rf_sink_alloc(rf_sink);
     if (ret < 0) {
@@ -460,6 +463,7 @@ long whitebox_ioctl_exciter_get(unsigned long arg) {
     exciter->ops->get_runs(exciter, &o, &u);
     w.flags.exciter.runs = ((u32)o << WER_OVERRUNS_OFFSET) | (u32)u;
     w.flags.exciter.threshold = exciter->ops->get_threshold(exciter);
+    w.flags.exciter.correction = exciter->ops->get_correction(exciter);
     w.flags.exciter.available = exciter->ops->space_available(exciter, &src);
     w.flags.exciter.debug = exciter->ops->get_debug(exciter);
     if (copy_to_user((whitebox_args_t*)arg, &w,
@@ -478,6 +482,7 @@ long whitebox_ioctl_exciter_set(unsigned long arg) {
     exciter->ops->set_interp(exciter, w.flags.exciter.interp);
     exciter->ops->set_fcw(exciter, w.flags.exciter.fcw);
     exciter->ops->set_threshold(exciter, w.flags.exciter.threshold);
+    exciter->ops->set_correction(exciter, w.flags.exciter.correction);
     return 0;
 }
 

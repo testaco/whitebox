@@ -47,46 +47,63 @@ int test_dds(void *data) {
     int fd;
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 1e6)) > 0);
-    confirm("Is there no carrier at 144.00e6");
-    assert(whitebox_tx(&wb, 144.00e6) == 0);
-    confirm("Is there a carrier at 144.00e6");
+    confirm("Is there no carrier at 144.95e6");
     whitebox_tx_dds_enable(&wb, 100e3);
     confirm("Is there a USB tone visible now");
+    assert(whitebox_tx(&wb, 144.95e6) == 0);
+    confirm("Is there a carrier at 144.95e6");
     whitebox_close(&wb);
     confirm("Is there no more signal");
 }
 
 #define N 512
-#define SAMPLE_RATE 400e3 
+#define SAMPLE_RATE 100e3 
 #define DURATION_IN_SECS 3
 #define TOTAL_SAMPLES (DURATION_IN_SECS * SAMPLE_RATE)
 int test_cic(void * data) {
     float freq = SAMPLE_RATE / 4;
     float sample_rate = SAMPLE_RATE;
-    float carrier_freq = 144.00e6;
+    float carrier_freq = 144.95e6;
     uint32_t fcw = freq_to_fcw(freq, sample_rate);
     uint32_t last_phase = 0;
     uint32_t phases[N];
     uint32_t c[N];
-    int i, n;
+    int16_t i, q;
+    int n;
     int fd, ret;
     whitebox_t wb;
 
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
     assert(whitebox_tx(&wb, carrier_freq) == 0);
+    whitebox_debug_to_file(&wb, stdout);
 
-    for (n = 0; n < TOTAL_SAMPLES; n += N) {
-        //accum32(N, fcw, last_phase, phases);
-        //sincos16c(N, phases, c);
-        //last_phase = phases[N-1];
+    /*uint32_t phase_sequence = {
+        0 << 30,
+        1 << 30,
+        2 << 30,
+        3 << 30
+    };*/
 
-        ret = write(whitebox_fd(&wb), c, sizeof(uint32_t) * N);
-        if (ret == sizeof(uint32_t) * N) {
-            printf("."); fflush(stdout);
-        } else {
-            printf("U"); fflush(stdout);
+    whitebox_tx_dds_enable(&wb, 100e3);
+
+    while (1) {
+
+        for (i = -53; i <= -47; i += 1) {
+            /*for (n = 0; n < N; ++n) {
+                c[n] =  ((uint32_t)i & 0x0000ffff) << 16;
+            }*/
+
+            printf("%d\n", i);
+            whitebox_tx_set_correction(&wb, 16, -51);
+            for (n = 0; n < TOTAL_SAMPLES; n += N) {
+                ret = write(whitebox_fd(&wb), c, sizeof(uint32_t) * N);
+                if (ret != sizeof(uint32_t) * N) {
+                    printf("U"); fflush(stdout);
+                }
+            }
         }
+
     }
 
     assert(fsync(fd) == 0);
@@ -96,7 +113,7 @@ int test_cic(void * data) {
 
 int main(int argc, char **argv) {
     whitebox_test_t tests[] = {
-        //WHITEBOX_TEST(test_dds),
+        WHITEBOX_TEST(test_dds),
         WHITEBOX_TEST(test_cic),
         WHITEBOX_TEST(0),
     };

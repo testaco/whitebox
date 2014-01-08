@@ -121,6 +121,58 @@ def offset_corrector(clearn, clock,
 
     return offset_correct
 
+def offset_corrector_with_saturate(clearn, clock,
+        correct_i, correct_q,
+        in_sign,
+        out_sign, saturated):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
+
+    internal_valid = Signal(bool(0))
+    internal_last = Signal(bool(0))
+    internal_i = Signal(intbv(0, min=-2**(len(in_i)+1), max=2**(len(in_i)+1)))
+    internal_q = Signal(intbv(0, min=-2**(len(in_q)+1), max=2**(len(in_q)+1)))
+
+    out_valid = out_sign.valid
+    out_last = out_sign.last
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    @always_seq(clock.posedge, reset=clearn)
+    def offset_correct():
+        if in_valid:
+            internal_valid.next = in_valid
+            internal_last.next = in_last
+            internal_i.next = in_i + correct_i
+            internal_q.next = in_q + correct_q
+        else:
+            internal_valid.next = False
+            internal_last.next = False
+            internal_i.next = 0
+            internal_q.next = 0
+
+        if internal_valid:
+            out_valid.next = internal_valid
+            out_last.next = internal_last
+            if internal_i[len(in_i)+1:len(in_i)]:
+                out_i.next = out_i.max
+            else:
+                out_i.next = internal_i[len(in_i):].signed()
+            if internal_q[len(in_q)+1:len(in_q)]:
+                out_q.next = out_q.max
+            else:
+                out_q.next = internal_q[len(in_q):].signed()
+        else:
+            out_valid.next = False
+            out_last.next = False
+            out_i.next = 0
+            out_q.next = 0
+
+    return offset_correct
+
 def binary_offseter(clearn, clock,
                     in_sign,
                     out_sign):

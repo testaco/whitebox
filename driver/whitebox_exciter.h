@@ -56,6 +56,9 @@ struct whitebox_exciter_operations {
     u32 (*get_threshold)(struct whitebox_exciter *exciter);
     void (*set_threshold)(struct whitebox_exciter *exciter, u32 threshold);
 
+    u32 (*get_correction)(struct whitebox_exciter *exciter);
+    void (*set_correction)(struct whitebox_exciter *exciter, u32 correction);
+
     void (*get_runs)(struct whitebox_exciter *exciter,
             u16 *overruns, u16 *underruns);
 
