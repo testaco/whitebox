@@ -65,6 +65,17 @@ enum whitebox_device_state {
 #define W_ERROR_TX_OVERRUN    2
 #define W_ERROR_TX_UNDERRUN   3
 
+/* Must be a power of two. */
+#define W_EXEC_DETAIL_COUNT    (1 << 6)
+
+struct whitebox_stats_exec_detail {
+    int time;
+    size_t src;
+    size_t dest;
+    int bytes;
+    int result;
+};
+
 struct whitebox_stats {
     long bytes;
     long exec_calls;
@@ -75,6 +86,8 @@ struct whitebox_stats {
     long exec_success_slow;
     long exec_dma_start;
     long exec_dma_finished;
+    struct whitebox_stats_exec_detail exec_detail[W_EXEC_DETAIL_COUNT];
+    int exec_detail_index;
     long stop;
     long error;
     int last_error;

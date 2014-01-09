@@ -644,7 +644,18 @@ static int tx_stats_show(struct seq_file *m, void *private)
 {
     struct whitebox_device *wb = (struct whitebox_device*)m->private;
     struct whitebox_stats *stats = &wb->tx_stats;
+    int i;
     seq_printf(m, "bytes=%ld\n", stats->bytes);
+    seq_printf(m, "bytes_per_call=[");
+    for (i = 0; i < W_EXEC_DETAIL_COUNT; ++i) {
+        int offset = (stats->exec_detail_index - i) & (W_EXEC_DETAIL_COUNT - 1);
+        struct whitebox_stats_exec_detail *detail = &stats->exec_detail[offset];
+        
+        if (detail->time > 0)
+            seq_printf(m, "(%d, %zu, %zu, %d, %d), ", detail->time, detail->src, detail->dest, detail->bytes, detail->result);
+    }
+    seq_printf(m, "]\n");
+
     seq_printf(m, "exec_calls=%ld\n", stats->exec_calls);
     seq_printf(m, "exec_busy=%ld\n", stats->exec_busy);
     seq_printf(m, "exec_nop_src=%ld\n", stats->exec_nop_src);

@@ -3,18 +3,29 @@
 #include "whitebox_gpio.h"
 #include "pdma.h"
 
+// ARM Cortex-M3 SysTick interface
+int *STCSR = (int *)0xE000E010;
+int *STRVR = (int *)0xE000E014;
+int *STCVR = (int *)0xE000E018;
+
 int tx_start(struct whitebox_device *wb)
 {
     struct whitebox_stats *stats = &wb->tx_stats;
     struct whitebox_exciter *exciter = wb->rf_sink.exciter;
     memset(stats, 0, sizeof(struct whitebox_stats));
     exciter->ops->get_runs(exciter, &wb->cur_overruns, &wb->cur_underruns);
+
+    // Reset the SysTick interface
+    *STRVR = 0xFFFFFF;
+    *STCVR = 0;
+    *STCSR = 5;
     return 0;
 }
 
 int tx_exec(struct whitebox_device* wb)
 {
     struct whitebox_stats *stats = &wb->tx_stats;
+    struct whitebox_stats_exec_detail *stats_detail;
     struct whitebox_user_source *user_source = &wb->user_source;
     struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
     size_t src_count, dest_count;
@@ -28,6 +39,9 @@ int tx_exec(struct whitebox_device* wb)
         stats->exec_busy++;
         return -EBUSY;
     }
+
+    stats_detail = &stats->exec_detail[stats->exec_detail_index];
+    stats_detail->time = *STCVR; // Get the current SysTick count
 
     src_count = whitebox_user_source_data_available(user_source, &src);
     dest_count = whitebox_rf_sink_space_available(rf_sink, &dest);
@@ -43,6 +57,11 @@ int tx_exec(struct whitebox_device* wb)
     count = min(src_count, dest_count);
 
     result = whitebox_rf_sink_work(rf_sink, src, src_count, dest, dest_count);
+    stats_detail->src = src_count;
+    stats_detail->dest = dest_count;
+    stats_detail->bytes = count;
+    stats_detail->result = result;
+    stats->exec_detail_index = (stats->exec_detail_index + 1) & (W_EXEC_DETAIL_COUNT - 1);
 
     if (result < 0) {
         stats->exec_failed++;
