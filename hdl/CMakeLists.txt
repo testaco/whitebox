@@ -32,7 +32,7 @@ find_python_module(numpy REQUIRED)
 add_custom_command(
     OUTPUT whitebox.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/whitebox.py
-    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py dds.py rfe.py
+    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py dds.py rfe.py dsp.py
 ) 
 
 add_custom_target(hdl
@@ -49,6 +49,10 @@ add_test(NAME test_fifo
     
 add_test(NAME test_dsp_offset_corrector
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_dsp.py TestOffsetCorrector
+)
+
+add_test(NAME test_dsp_gain_corrector
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_dsp.py TestGainCorrector
 )
 
 add_test(NAME test_dsp_binary_offseter

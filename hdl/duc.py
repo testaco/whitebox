@@ -4,7 +4,7 @@ from myhdl import Signal, always, always_comb, always_seq, \
                   intbv, enum, concat, modbv, ResetSignal
 
 from dsp import Signature
-from dsp import offset_corrector, binary_offseter
+from dsp import offset_corrector, binary_offseter, gain_corrector
 from dsp import iqmux, iqdemux
 
 from dds import dds as DDS
@@ -431,6 +431,7 @@ def duc(clearn, dac_clock, dac2x_clock,
         system_ddsen, system_filteren,
         system_interp, system_fcw,
         system_correct_i, system_correct_q,
+        system_gain_i, system_gain_q,
         underrun, sample,
         dac_en, dac_data, dac_last, **kwargs):
 
@@ -456,6 +457,10 @@ def duc(clearn, dac_clock, dac2x_clock,
     correct_i = Signal(intbv(0)[len(system_correct_i):])
     sync_correct_q = Signal(intbv(0)[len(system_correct_q):])
     correct_q = Signal(intbv(0)[len(system_correct_q):])
+    sync_gain_i = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    gain_i = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    sync_gain_q = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    gain_q = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
     re = Signal(bool(0))
 
     sample_valid = sample.valid
@@ -507,15 +512,21 @@ def duc(clearn, dac_clock, dac2x_clock,
         rf_out = processed
 
     if kwargs.get('conditioning_enable', True):
-        corrected = Signature("corrected", True, bits=10)
-        corrector = offset_corrector(clearn, dac_clock,
+        gain_corrected = Signature("gain_corrected", True, bits=10)
+        gain_corrector_0 = gain_corrector(clearn, dac_clock,
+                gain_i, gain_q,
+                rf_out, gain_corrected)
+        chain.append(gain_corrector_0)
+
+        offset_corrected = Signature("offset_corrected", True, bits=10)
+        offset_corrector_0 = offset_corrector(clearn, dac_clock,
                 correct_i, correct_q,
-                rf_out, corrected)
-        chain.append(corrector)
+                gain_corrected, offset_corrected)
+        chain.append(offset_corrector_0)
         
-        offset = Signature("offset", True, bits=10)
+        offset = Signature("binary_offset", True, bits=10)
         offseter = binary_offseter(clearn, dac_clock,
-                corrected, offset)
+                offset_corrected, offset)
         chain.append(offseter)
     else:
         offset = rf_out
@@ -547,6 +558,10 @@ def duc(clearn, dac_clock, dac2x_clock,
         correct_i.next = sync_correct_i
         sync_correct_q.next = system_correct_q
         correct_q.next = sync_correct_q
+        sync_gain_i.next = system_gain_i
+        gain_i.next = sync_gain_i
+        sync_gain_q.next = system_gain_q
+        gain_q.next = sync_gain_q
 
     interp_counter = Signal(intbv(0)[32:])
 

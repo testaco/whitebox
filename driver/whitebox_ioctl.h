@@ -24,6 +24,7 @@ typedef struct whitebox_args {
             uint32_t correction;
             uint32_t available;
             uint32_t debug;
+            uint32_t gain;
         } exciter;
         struct {
             uint32_t state;
@@ -55,6 +56,8 @@ typedef struct whitebox_args {
 #define WE_THRESHOLD_ADDR       0x14
 #define WE_CORRECTION_ADDR      0x18
 #define WE_AVAILABLE_ADDR       0x1c
+#define WE_DEBUG_ADDR           0x20
+#define WE_GAIN_ADDR            0x24
 #define WR_SAMPLE_ADDR          0x80
 #define WR_STATUS_ADDR          0x84
 #define WR_DECIM_ADDR           0x88
@@ -104,6 +107,11 @@ typedef struct whitebox_args {
 #define WEC_I_MASK           0x000003ff
 #define WEC_Q_OFFSET         16
 #define WEC_Q_MASK           0x03ff0000
+
+#define WEG_COEFF            ((float)(1 << 9))
+#define WEG_I_MASK           0x000003ff
+#define WEG_Q_OFFSET         16
+#define WEG_Q_MASK           0x03ff0000
 
 /* Receiver */
 #define WR_CLEAR _IO('w', 6)

@@ -53,17 +53,19 @@ def figure_discrete_quadrature(title, axes, f_parent, signature, n, i, q):
     max_without_nan = lambda x: max([i for i in x if i is not np.nan])
     percent = float(max_without_nan(i) - min_without_nan(i)) / float(signature.max - signature.min) * 100.0
     t = title + ' (%.2f)' % percent
+    y_min = min(min_without_nan(i), min_without_nan(q))
+    y_max = max(max_without_nan(i), max_without_nan(q))
 
     f = f_parent.add_subplot(*axes, title=t)
     ax1 = plt.gca()
     ax1.set_autoscale_on(False)
-    plt.axis([n[0], n[-1], min_without_nan(i), max_without_nan(i)])
+    plt.axis([n[0], n[-1], y_min, y_max])
     plt.xlabel('Sample')
     plt.ylabel('Magnitude')
     plt.stem(n, i, linefmt='b-', markerfmt='b.', basefmt='b|')
     ax2 = f.axes.twinx()
     plt.stem(n, q, linefmt='r-', markerfmt='r.', basefmt='r|')
-    plt.axis([n[0], n[-1], min_without_nan(q), max_without_nan(q)])
+    plt.axis([n[0], n[-1], y_min, y_max])
     return f
 
 def figure_binary_offset(title, axes, f_parent, signature, n, i):
@@ -257,6 +259,44 @@ class TestOffsetCorrector(unittest.TestCase):
         f_in = figure_discrete_quadrature("in", (2, 1, 1), f, in_sign, in_t, in_i, in_q)
         f_out = figure_discrete_quadrature("out", (2, 1, 2), f, out_sign, out_t, out_i, out_q)
         plt.savefig("test_offset_corrector.png")
+
+class TestGainCorrector(unittest.TestCase):
+    def test_gain(self):
+        Ai = float(0.75)
+        Aq = float(1.25)
+        gain_i = Signal(intbv(int(Ai * 2**9 + .5))[10:])
+        gain_q = Signal(intbv(int(Aq * 2**9 + .5))[10:])
+
+        in_sign = Signature("in", True, bits=10)
+        out_sign = Signature("out", True, bits=10)
+
+        s = DSPSim(in_sign=in_sign, out_sign=out_sign)
+        def test_gain_corrector():
+            gain_corrector_0 = gain_corrector(s.clearn, s.clock,
+                gain_i, gain_q,
+                s.input, s.output)
+            return gain_corrector_0
+
+        in_t = in_i = in_q = np.arange(in_sign.min/2, in_sign.max/2)
+        
+        out_i, out_q = s.simulate_quadrature(in_i, in_q, test_gain_corrector)
+        out_t = np.arange(0, out_i.shape[0])
+
+        assert in_t.shape == out_t.shape
+
+        for i in range(out_t.shape[0]):
+            i_evm = abs(float(out_i[i])/out_sign.max - (float(in_i[i])/in_sign.max * Ai))
+            q_evm = abs(float(out_q[i])/out_sign.max - (float(in_q[i])/in_sign.max * Aq))
+
+            # Error magnitude should be less than 1%
+            assert i_evm < 0.01 and q_evm < 0.01
+
+        f = plt.figure("test_gain_corrector")
+        plt.title("test_gain_corrector")
+
+        f_in = figure_discrete_quadrature("in", (2, 1, 1), f, in_sign, in_t, in_i, in_q)
+        f_out = figure_discrete_quadrature("out", (2, 1, 2), f, out_sign, out_t, out_i, out_q)
+        plt.savefig("test_gain_corrector.png")
 
 class TestBinaryOffseter(unittest.TestCase):
     def test_binary_offseter(self):

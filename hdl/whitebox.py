@@ -142,6 +142,8 @@ def whitebox(
     interp = Signal(intbv(interp_default)[11:])
     tx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
     tx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
+    tx_gain_i = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    tx_gain_q = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
     fcw = Signal(intbv(1)[fcw_bitwidth:])
     txen = Signal(bool(0))
     txstop = Signal(bool(0))
@@ -171,7 +173,7 @@ def whitebox(
             loopen, loopback,
             tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
             txen, txstop, ddsen, txfilteren,
-            interp, fcw, tx_correct_i, tx_correct_q,
+            interp, fcw, tx_correct_i, tx_correct_q, tx_gain_i, tx_gain_q,
             duc_underrun, tx_sample,
             dac_en, dac_data, dac_last,)
 
@@ -228,7 +230,7 @@ def whitebox(
         rx_fifo_overflow, rx_fifo_underflow,
         rx_fifo_rdcnt, rx_fifo_wrcnt,
 
-        interp, fcw, tx_correct_i, tx_correct_q,
+        interp, fcw, tx_correct_i, tx_correct_q, tx_gain_i, tx_gain_q,
         txen, txstop, ddsen, txfilteren,
         decim, rx_correct_i, rx_correct_q,
         rxen, rxstop, rxfilteren,

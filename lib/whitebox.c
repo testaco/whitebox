@@ -260,3 +260,35 @@ void whitebox_tx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *cor
     *correct_q = (int16_t)(((w.flags.exciter.correction & WEC_Q_MASK)) >> WEC_Q_OFFSET) << 6;
     *correct_q >>= 6;
 }
+
+int whitebox_tx_set_gain(whitebox_t *wb, float gain_i, float gain_q)
+{
+    whitebox_args_t w;
+    uint32_t gi, gq, newg;
+
+    if (!(gain_i >= 0.0 && gain_i < 2.0))
+        return -EINVAL;
+    if (!(gain_q >= 0.0 && gain_q < 2.0))
+        return -EINVAL;
+
+    gi = (uint32_t)(gain_i * WEG_COEFF + 0.5);
+    gq = (uint32_t)(gain_q * WEG_COEFF + 0.5);
+    newg = (uint32_t)((gi & WEG_I_MASK) |
+            ((gq << WEG_Q_OFFSET) & WEG_Q_MASK));
+
+    ioctl(wb->fd, WE_GET, &w);
+    w.flags.exciter.gain = newg;
+    return ioctl(wb->fd, WE_SET, &w);
+}
+
+int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q)
+{
+    whitebox_args_t w;
+    uint32_t gi, gq;
+    ioctl(wb->fd, WE_GET, &w);
+    gi = ((uint32_t)(w.flags.exciter.gain & WEG_I_MASK));
+    *gain_i = gi / WEG_COEFF;
+    gq = (uint32_t)(((w.flags.exciter.gain & WEC_Q_MASK)) >> WEC_Q_OFFSET);
+    *gain_q = gq / WEG_COEFF;
+    return 0;
+}

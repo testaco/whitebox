@@ -13,6 +13,7 @@ WHITEBOX_REGISTER_FILE = dict(
     WE_CORRECTION_ADDR = 0x18,
     WE_AVAILABLE_ADDR  = 0x1c,
     WE_DEBUG_ADDR      = 0x20,
+    WE_GAIN_ADDR       = 0x24,
 
     WR_SAMPLE_ADDR     = 0x80,
     WR_STATUS_ADDR     = 0x84,
@@ -158,7 +159,7 @@ def rfe(resetn,
         rx_fifo_wack, rx_fifo_dvld,
         rx_fifo_overflow, rx_fifo_underflow,
         rx_fifo_rdcnt, rx_fifo_wrcnt,
-        interp, fcw, tx_correct_i, tx_correct_q,
+        interp, fcw, tx_correct_i, tx_correct_q, tx_gain_i, tx_gain_q,
         txen, txstop, ddsen, txfilteren,
         decim, rx_correct_i, rx_correct_q,
         rxen, rxstop, rxfilteren,
@@ -291,6 +292,9 @@ def rfe(resetn,
                 elif addr == WE_CORRECTION_ADDR:
                     tx_correct_q.next = pwdata[26:16].signed()
                     tx_correct_i.next = pwdata[10:].signed()
+                elif addr == WE_GAIN_ADDR:
+                    tx_gain_q.next = pwdata[26:16]
+                    tx_gain_i.next = pwdata[10:]
                 elif addr == WR_STATUS_ADDR:
                     if pwdata[WS_CLEAR]:
                         clear_enable.next = True
@@ -337,6 +341,9 @@ def rfe(resetn,
                 elif addr == WE_CORRECTION_ADDR:
                     prdata.next = concat(intbv(0)[6:], tx_correct_q,
                             intbv(0)[6:], tx_correct_i)
+                elif addr == WE_GAIN_ADDR:
+                    prdata.next = concat(intbv(0)[6:], tx_gain_q,
+                            intbv(0)[6:], tx_gain_i)
                 elif addr == WE_AVAILABLE_ADDR:
                     prdata.next = concat(intbv(0)[32-len(tx_fifo_wrcnt):], tx_fifo_wrcnt)
                 elif addr == WE_DEBUG_ADDR:

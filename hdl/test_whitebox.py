@@ -317,6 +317,16 @@ class TestApb3Transaction(unittest.TestCase):
             assert bus.rdata == 20
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == 100
+            yield bus.receive(WE_GAIN_ADDR)
+            gain_i, gain_q = bus.rdata & 0x3ff, (bus.rdata & 0x03ff0000) >> 16
+            assert (gain_i / 2.**9) == 1.  # Default is 1
+            assert (gain_q / 2.**9) == 1.  # Default is 1
+            gain_word = lambda i: intbv(((intbv(int(i[1]*2.**9))[32:] << 16) & 0x03ff0000) | (intbv(int(i[0]*2.**9))[32:] & 0x3ff))[32:]
+            yield bus.transmit(WE_GAIN_ADDR, gain_word((0.75, 1.25)))
+            yield bus.receive(WE_GAIN_ADDR)
+            gain_i, gain_q = bus.rdata & 0x3ff, (bus.rdata & 0x03ff0000) >> 16
+            assert (gain_i / 2.**9) == 0.75
+            assert (gain_q / 2.**9) == 1.25
             raise StopSimulation
 
         s.simulate(stimulus, test_whitebox_apb3_transaction)

@@ -48,5 +48,7 @@ void whitebox_tx_dds_enable(whitebox_t* wb, float fdes);
 void whitebox_tx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t correct_q);
 void whitebox_tx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q);
 
+int whitebox_tx_set_gain(whitebox_t *wb, float gain_i, float gain_q);
+int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q);
 
 #endif /* __WHITEBOX_H__ */

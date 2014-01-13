@@ -69,6 +69,16 @@ void _exciter_set_correction(struct whitebox_exciter *exciter, u32 correction)
     WHITEBOX_EXCITER(exciter)->correction = correction;
 }
 
+u32 _exciter_get_gain(struct whitebox_exciter *exciter)
+{
+    return WHITEBOX_EXCITER(exciter)->gain;
+}
+
+void _exciter_set_gain(struct whitebox_exciter *exciter, u32 gain)
+{
+    WHITEBOX_EXCITER(exciter)->gain = gain;
+}
+
 void _exciter_get_runs(struct whitebox_exciter *exciter,
         u16 *overruns, u16 *underruns)
 {
@@ -114,6 +124,8 @@ struct whitebox_exciter_operations _exciter_ops = {
     .set_threshold = _exciter_set_threshold,
     .get_correction = _exciter_get_correction,
     .set_correction = _exciter_set_correction,
+    .get_gain = _exciter_get_gain,
+    .set_gain = _exciter_set_gain,
     .get_runs = _exciter_get_runs,
     .space_available = _exciter_space_available,
     .produce = _exciter_produce,
@@ -252,6 +264,8 @@ struct whitebox_exciter_operations _mock_exciter_ops = {
     .set_threshold = _exciter_set_threshold,
     .get_correction = _exciter_get_correction,
     .set_correction = _exciter_set_correction,
+    .get_gain = _exciter_get_gain,
+    .set_gain = _exciter_set_gain,
     .get_runs = _exciter_get_runs,
     .space_available = _mock_exciter_space_available,
     .produce = _mock_exciter_produce,

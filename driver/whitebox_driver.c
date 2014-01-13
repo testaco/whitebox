@@ -89,10 +89,15 @@ module_param(whitebox_receiver_quantum, int, S_IRUSR | S_IWUSR);
 static int whitebox_auto_tx = 1;
 module_param(whitebox_auto_tx, int, S_IRUSR | S_IWUSR);
 
-static int whitebox_tx_i_correction = 17;
+static int whitebox_tx_i_correction = 16;
 module_param(whitebox_tx_i_correction, int, S_IRUSR | S_IWUSR);
 static int whitebox_tx_q_correction = -51;
 module_param(whitebox_tx_q_correction, int, S_IRUSR | S_IWUSR);
+
+static int whitebox_tx_i_gain = (int)(1.023906 * WEG_COEFF + 0.5);
+module_param(whitebox_tx_i_gain, int, S_IRUSR | S_IWUSR);
+static int whitebox_tx_q_gain = (int)(1. * WEG_COEFF + 0.5);
+module_param(whitebox_tx_q_gain, int, S_IRUSR | S_IWUSR);
 
 /*
  * Register mappings for the CMX991 register file.
@@ -163,6 +168,10 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
     exciter->ops->set_correction(exciter,
             (u32)(((s32)whitebox_tx_i_correction & WEC_I_MASK) |
                 (((s32)whitebox_tx_q_correction << WEC_Q_OFFSET) & WEC_Q_MASK)));
+
+    exciter->ops->set_gain(exciter,
+            (u32)(((u32)whitebox_tx_i_gain & WEG_I_MASK) |
+                (((u32)whitebox_tx_q_gain << WEG_Q_OFFSET) & WEG_Q_MASK)));
 
     ret = whitebox_rf_sink_alloc(rf_sink);
     if (ret < 0) {
@@ -464,6 +473,7 @@ long whitebox_ioctl_exciter_get(unsigned long arg) {
     w.flags.exciter.runs = ((u32)o << WER_OVERRUNS_OFFSET) | (u32)u;
     w.flags.exciter.threshold = exciter->ops->get_threshold(exciter);
     w.flags.exciter.correction = exciter->ops->get_correction(exciter);
+    w.flags.exciter.gain = exciter->ops->get_gain(exciter);
     w.flags.exciter.available = exciter->ops->space_available(exciter, &src);
     w.flags.exciter.debug = exciter->ops->get_debug(exciter);
     if (copy_to_user((whitebox_args_t*)arg, &w,
@@ -483,6 +493,7 @@ long whitebox_ioctl_exciter_set(unsigned long arg) {
     exciter->ops->set_fcw(exciter, w.flags.exciter.fcw);
     exciter->ops->set_threshold(exciter, w.flags.exciter.threshold);
     exciter->ops->set_correction(exciter, w.flags.exciter.correction);
+    exciter->ops->set_gain(exciter, w.flags.exciter.gain);
     return 0;
 }
 

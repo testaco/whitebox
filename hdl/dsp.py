@@ -173,6 +173,57 @@ def offset_corrector_with_saturate(clearn, clock,
 
     return offset_correct
 
+def gain_corrector(clearn, clock,
+        gain_i, gain_q,
+        in_sign,
+        out_sign):
+
+    in_valid = in_sign.valid
+    in_last = in_sign.last
+    in_i = in_sign.i
+    in_q = in_sign.q
+
+    out_valid = out_sign.valid
+    out_last = out_sign.last
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    s = len(in_i) + len(gain_i)
+    mul_i = Signal(intbv(0, min=-2**s, max=2**s))
+    mul_q = Signal(intbv(0, min=-2**s, max=2**s))
+    mul_valid = Signal(bool(False))
+    mul_last = Signal(bool(False))
+
+    @always_seq(clock.posedge, reset=clearn)
+    def gain_correct():
+        if in_valid:
+            mul_valid.next = in_valid
+            mul_last.next = in_last
+
+            #print 'i', ia.signed()/2.**9, '*', ix.signed() / float(ix.max), '=', ia.signed()/2**9 * (ix.signed() / float(ix.max))
+
+            mul_i.next = in_i.signed() * concat(bool(0), gain_i).signed()
+            mul_q.next = in_q.signed() * concat(bool(0), gain_q).signed()
+        else:
+            mul_valid.next = False
+            mul_last.next = False
+            mul_i.next = 0
+            mul_q.next = 0
+
+        if mul_valid:
+            out_valid.next = mul_valid
+            out_last.next = mul_last
+            #print 'm', mul_q[len(mul_q)-2] ^ mul_q[len(mul_q)-3]
+            out_i.next = mul_i[len(mul_i)-2:len(mul_i)-len(out_i)-2].signed()
+            out_q.next = mul_q[len(mul_q)-2:len(mul_q)-len(out_q)-2].signed()
+        else:
+            out_valid.next = False
+            out_last.next = False
+            out_i.next = 0
+            out_q.next = 0
+
+    return gain_correct
+
 def binary_offseter(clearn, clock,
                     in_sign,
                     out_sign):

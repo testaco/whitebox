@@ -17,6 +17,7 @@ struct whitebox_exciter_regs {
     u32 correction;
     u32 available;
     u32 debug;
+    u32 gain;
 };
 
 #define WHITEBOX_EXCITER(e) ((volatile struct whitebox_exciter_regs *)((e)->regs))
@@ -58,6 +59,9 @@ struct whitebox_exciter_operations {
 
     u32 (*get_correction)(struct whitebox_exciter *exciter);
     void (*set_correction)(struct whitebox_exciter *exciter, u32 correction);
+
+    u32 (*get_gain)(struct whitebox_exciter *exciter);
+    void (*set_gain)(struct whitebox_exciter *exciter, u32 gain);
 
     void (*get_runs)(struct whitebox_exciter *exciter,
             u16 *overruns, u16 *underruns);
