@@ -1,15 +1,13 @@
 Datasheet
 =========
 
-.. include:: features.rst
-
 .. toctree::
-    pins
-    ratings
     specifications
+    ratings
+    pins
     timing
-    dimensions
     test
+    applications
+    dimensions
     ordering
     liability
-    applications

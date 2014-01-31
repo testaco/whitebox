@@ -1,6 +1,4 @@
 """
-Direct Digital Synthesizer
-==========================
 """
 from math import cos, pi, ceil, log, sin
 from myhdl import Signal, always, always_seq, intbv, modbv
@@ -35,6 +33,14 @@ def freq_to_fcw(freq, **kwargs):
         raise AttributeError, "Frequency is outside of range %d to %d" % (fmin, fmax)
     return int(freq / (sample_rate / pa_cnt))
 
+def dds_lut(sample_resolution, num_samples, scale_factor):
+    half = scale_factor*pow(2, sample_resolution - 1)
+    i_samples = tuple([int(ceil(cos(i)*(half-1))) \
+                for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
+    q_samples = tuple([int(ceil(sin(i)*(half-1))) \
+                for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
+    return i_samples, q_samples
+
 def dds(resetn,
         clock,
         enable,
@@ -59,11 +65,7 @@ def dds(resetn,
     lgsamples = int(ceil(log(num_samples, 2)))
     sample_resolution = len(output_i)
     scale_factor = 0.8  # To compensate for the DC Offset Correction
-    half = scale_factor*pow(2, sample_resolution - 1)
-    i_samples = tuple([int(ceil(cos(i)*(half-1))) \
-                for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
-    q_samples = tuple([int(ceil(sin(i)*(half-1))) \
-                for i in frange(0, 2*pi, step=(2*pi)/num_samples)])
+    i_samples, q_samples = dds_lut(sample_resolution, num_samples, scale_factor)
 
     phase_accumulator = Signal(modbv(0)[pa_bitwidth:])
 

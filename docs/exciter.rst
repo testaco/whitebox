@@ -1,2 +1,0 @@
-.. automodule:: whitebox
-    :members: whitebox

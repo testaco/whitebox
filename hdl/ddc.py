@@ -5,6 +5,15 @@ from dsp import Signature, offset_corrector, binary_offseter
 from dsp import iqmux
 
 def downsampler(clearn, clock, in_sign, out_sign, decim):
+    """Takes every ``decim`` samples.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :param decim: The decimation factor.
+    :returns: A synthesizable MyHDL instance.
+    """
     cnt = Signal(intbv(0)[len(decim):])
     in_valid = in_sign.valid
     in_i = in_sign.i
@@ -62,6 +71,27 @@ def ddc(clearn, dac_clock,
         system_decim, system_correct_i, system_correct_q,
         overrun,
         adc_idata, adc_qdata, adc_last, **kwargs):
+    """Direct Down Converter.
+
+    :param clearn: The reset signal.
+    :param dac_clock: The sampling clock.
+    :param loopen: Loopback enable.
+    :param loopback: Loopback signature.
+    :param fifo_full: Is the receive FIFO full.
+    :param fifo_we: Output to signal to FIFO to write.
+    :param fifo_wdata: The sample to write to the FIFO.
+    :param system_rxen: Enable the receiver.
+    :param system_rxstop: Stop the receiver.
+    :param system_filteren: Enable the receiver decimation filter.
+    :param system_decim: Decimation factor.
+    :param system_correct_i: i channel DC offset correction for the AQM.
+    :param system_correct_q: q channel DC offset correction for the AQM.
+    :param overrun: How many overruns have happened, signal to RFE.
+    :param adc_idata: The input I data from the ADC.
+    :param adc_qdata: The input Q data from the ADC.
+    :param adc_last: Signifies that this is the last sample from the ADC.
+    :returns: A synthesizable MyHDL instance.
+    """
     dspsim = kwargs.get('dspsim', None)
     decim_default = kwargs.get('decim', 1)
 

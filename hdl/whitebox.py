@@ -1,4 +1,6 @@
 """
+Whitebox SoC Peripheral
+=======================
 """
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
@@ -15,9 +17,11 @@ from rfe import rfe_fake
 from rfe import print_rfe_ioctl
 
 class OverrunError(Exception):
+    """Thrown when the system experiences an overflow on a FIFO buffer."""
     pass
 
 class UnderrunError(Exception):
+    """Thrown when the system experiences an underflow on a FIFO buffer."""
     pass
 
 def whitebox_reset(resetn,

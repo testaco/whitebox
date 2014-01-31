@@ -1,2 +1,0 @@
-.. automodule:: receiver
-    :members: receiver

@@ -35,7 +35,7 @@ set(SPHINX_CACHE_DIR "${CMAKE_CURRENT_BINARY_DIR}/_doctrees")
 # HTML output directory
 set(SPHINX_HTML_DIR "${CMAKE_CURRENT_BINARY_DIR}/html")
 
-# HTML output directory
+# PDF output directory
 set(SPHINX_PDF_DIR "${CMAKE_CURRENT_BINARY_DIR}/pdf")
 
 configure_file(
@@ -46,7 +46,7 @@ configure_file(
 
 add_custom_target(whitebox_html_docs
     ${SPHINX_EXECUTABLE}
-    -vvv -q -b html
+    -vvv -b singlehtml -E
     -c "${BINARY_BUILD_DIR}"
     -d "${SPHINX_CACHE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"

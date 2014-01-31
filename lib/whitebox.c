@@ -174,7 +174,7 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     wb->adf4351.aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
     wb->adf4351.aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
 
-    adf4351_pll_enable(&wb->adf4351, 26.0e6, 10e3, vco_frequency);
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 10e3, vco_frequency);
     wb->adf4351.ld_pin_mode = LD_PIN_MODE_DLD;
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);

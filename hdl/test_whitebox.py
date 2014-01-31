@@ -1,3 +1,7 @@
+"""
+Simulating the Whitebox SoC Peripheral
+--------------------------------------
+"""
 from math import sin, pi
 import os
 import struct
@@ -29,6 +33,10 @@ for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
 APB3_DURATION = int(1e9 / 40e6)
 
 class WhiteboxSim(object):
+    """Simulate Whitebox Peripheral and control it with a ``bus``.
+    
+    :param bus: The APB3Bus to connect the peripheral to.
+    """
     def __init__(self, bus):
         self.bus = bus
         self.clear_enable = Signal(bool(0))
@@ -47,6 +55,14 @@ class WhiteboxSim(object):
         self.tx_n = []
 
     def simulate(self, stimulus, whitebox, **kwargs):
+        """Acturally run the cosimulation with iverilog.
+        
+        :param stimulus: A callable that returns the cosim object.
+        :param whitebox: A whitebox peripheral object.
+        :param record_tx: Record the passed in number of valid samples.
+        :param auto_stop: Raise ``StopSimulation`` when the correct number of samples have been recorded.
+        :param sample_rate: Samples per second.
+        """
         record_tx = kwargs.get('record_tx', None)
         auto_stop = kwargs.get('auto_stop', False)
         self.sample_rate = kwargs.get('sample_rate', 10e6)
@@ -93,6 +109,7 @@ class WhiteboxSim(object):
         s.run()
 
     def fft_tx(self, decim=1):
+        """Compute the FFT of the transmitted signal."""
         y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
         #y = signal.decimate(y, decim)
         n = len(y)
@@ -103,6 +120,7 @@ class WhiteboxSim(object):
         return frq, Y
 
     def plot_tx(self, name):
+        """Plot the transmitter's output."""
         f_parent = plt.figure(name + "_tx")
         f_parent.subplots_adjust(hspace=.5)
         #plt.title(name + "_tx")
@@ -125,6 +143,13 @@ class WhiteboxSim(object):
                 frq, Y)
      
     def cosim_dut(self, cosim_name, fifo_args, whitebox_args):
+        """Get the ``Cosimulation`` object.
+
+        :param cosim_name: The name of the cosimulation.
+        :param fifo_args: A dictionary of args to pass to the FIFOs.
+        :param whitebox_args: A dictionary of args to pass to the Whitebox Peripheral.
+        :returns: A `myhdl.Cosimulation` object.
+        """
         bus_pclk = self.bus.pclk
         bus_paddr = self.bus.paddr
         bus_psel = self.bus.psel

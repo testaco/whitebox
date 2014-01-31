@@ -1,3 +1,8 @@
+"""
+Radio Front End
+***************
+
+"""
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
         instance, always, always_comb, always_seq, \
@@ -25,6 +30,7 @@ WHITEBOX_REGISTER_FILE = dict(
     WR_AVAILABLE_ADDR  = 0x9c,
     WR_DEBUG_ADDR      = 0xa0,
 )
+"""Peripheral register file addresses."""
 for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
     globals()[name] = addr
 
@@ -61,7 +67,7 @@ WHITEBOX_STATUS_REGISTER = dict(
     # BYTE 3 - RESERVED
     # 24 - 31 reserved
 )
-
+"""Peripheral status register bit flags."""
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
     globals()[name] = bit
 
@@ -165,6 +171,17 @@ def rfe(resetn,
         rxen, rxstop, rxfilteren,
         duc_underrun, dac_last,
         ddc_overrun, adc_last):
+    """The Radio Front End glues together the APB3 interface and the
+    DSP chains.  It consists of a synchronizer and a controller.
+
+    The synchronizer safely transfers register data between the system and
+    sample clock domains.
+
+    The controller responds to read and write requests to the register file
+    on the APB3 bus.
+
+    :returns: A MyHDL synthesizable module
+    """
 
     state_t = enum('IDLE', 'ACCESS', 'DONE',)
     state = Signal(state_t.IDLE)

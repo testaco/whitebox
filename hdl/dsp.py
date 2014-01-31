@@ -7,6 +7,17 @@ SIGNATURE_SIGNED = True
 SIGNATURE_UNSIGNED = False
 
 class Signature(object):
+    """Represents a small register file of a handshake for the DSP signal flow.
+
+    :param name: Human readable
+    :param bits: Bit precision of each channel
+    :param min: The minimum value allowed
+    :param max: The maximum value allowed
+    :param valid: An already existing boolean ``Signal``
+    :param last: An already existing boolean ``Signal``
+    :param i: An already existing intbv ``Signal``
+    :param q: An already existing intbv ``Signal``
+    """
     def __init__(self, name, signed, **kwargs):
         self.name = name
         self.signed = signed
@@ -40,12 +51,15 @@ class Signature(object):
                 self.bits, self.min, self.max)
 
     def myhdl(self, default):
+        """Get the signature as an ``intbv``."""
         return intbv(int(default), min=self.min, max=self.max)
 
     def myhdl_overflow_acceptable(self, default):
+        """Get the signature as a ``modbv``."""
         return modbv(int(default), min=self.min, max=self.max)
 
     def numpy_dtype(self):
+        """Get the signature as a numpy dtype."""
         if self.signed:
             if self.bits <= 16:
                 return np.int16
@@ -77,6 +91,13 @@ class Signature(object):
         return self.copy_with_bit_gain(name, bit_gain)
 
     def record(self, clearn, clock):
+        """A myhdl stimulus what will record the valid dsp stream and save
+        it to ``self.samples_i`` and ``self.samples_q``.
+
+        :param clearn: A myhdl ``Signal``.
+        :param clock: A myhdl ``Signal``.
+        :returns: A simulation capable MyHDL object.
+        """
         @always(clock.posedge)
         def recorder():
             if clearn == clearn.active:
@@ -95,7 +116,18 @@ def offset_corrector(clearn, clock,
         correct_i, correct_q,
         in_sign,
         out_sign):
+    """Analog quadrature offset corrector.
 
+    Lets you add a DC offset to the incoming signal.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param correct_i: An intbv to add to each sample's i channel.
+    :param correct_q: An intbv to add to each sample's q channel.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
     in_valid = in_sign.valid
     in_last = in_sign.last
     in_i = in_sign.i
@@ -177,6 +209,18 @@ def gain_corrector(clearn, clock,
         gain_i, gain_q,
         in_sign,
         out_sign):
+    """Analog quadrature gain corrector.
+
+    Lets you correct for gain imbalance with an AQM.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param correct_i: An intbv to add to multiply each sample's i channel by.
+    :param correct_q: An intbv to add to multiply each sample's q channel by.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
 
     in_valid = in_sign.valid
     in_last = in_sign.last
@@ -227,6 +271,14 @@ def gain_corrector(clearn, clock,
 def binary_offseter(clearn, clock,
                     in_sign,
                     out_sign):
+    """Converts from two's complement to binary offset.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
 
     in_valid = in_sign.valid
     in_last = in_sign.last
@@ -258,6 +310,16 @@ def iqmux(clearn, clock,
         in0_sign,
         in1_sign,
         out_sign):
+    """Multiplex between two incoming signals.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param channel: The selected channel.
+    :param in1_sign: The first incomming signature.
+    :param in2_sign: The second incomming signature.
+    :param out_sign: The outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
 
     in0_valid = in0_sign.valid
     in0_i = in0_sign.i
@@ -294,6 +356,16 @@ def iqdemux(clearn, clock,
         in_sign,
         out0_sign,
         out1_sign):
+    """Decoder two outgoing ports.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param channel: The selected channel.
+    :param in_sign: The incomming signature.
+    :param out1_sign: The first outgoing signature.
+    :param out2_sign: The second outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
 
     in_valid = in_sign.valid
     in_i = in_sign.i

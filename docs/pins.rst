@@ -6,6 +6,7 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 .. csv-table:: BP7
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1, VCC3BSB
 	"2, 8, 10, 12, 14, 16, 18, 20, 21, 22, 23, 24", DGND
@@ -14,6 +15,7 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 .. csv-table:: BP8
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	"2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 21, 22, 23, 24" , DGND
@@ -22,6 +24,7 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 .. csv-table:: BP9
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	"4, 12, 21, 22, 23, 24" , DGND
@@ -30,6 +33,7 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 .. csv-table:: BP10
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	2 , 5VIN
@@ -39,6 +43,7 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 .. csv-table:: BP11
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	"2, 21, 22, 23, 24" , DGND
@@ -56,6 +61,7 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 .. csv-table:: BP12
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	"2, 21, 22, 23, 24" , DGND
@@ -67,17 +73,17 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 	8 , RADIO_SCLK
 	9 , DAC_CLK
 	10 , RADIO_RDATA
-	11 , DAC[9]
 	12 , RADIO_CSN
 	14 , VCO_CLK
 	16 , VCO_DATA
 	18 , VCO_LE
 	20 , VCO_CE
-	"13, 15, 17, 19" , No Connection
+	"11, 13, 15, 17, 19" , No Connection
 
 .. csv-table:: BP13
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	"2, 21, 22, 23, 24" , DGND
@@ -85,15 +91,17 @@ The main expansion pins are availble on the BP7 - BP14 headers.  These headers a
 	4 , ADC_CLK
 	5 , VCO_LD
 	6 , ADC_S2
+    7 , DAC[9]
 	8 , ADC_S1
 	10 , ADC_DFS
 	12 , ADC_AD[9]
 	14 , ADC_BD[0]
-	"7, 9, 11, 13, 15, 16, 17, 18, 19, 20" , No Connection
+	"9, 11, 13, 15, 16, 17, 18, 19, 20" , No Connection
 
 .. csv-table:: BP14
    :header: "Pins", "Connection"
    :widths: 50, 50
+   :class: table table-bordered table-condensed table-striped
 
 	1 , VCC3BSB
 	"2, 21, 22, 23, 24" , DGND

@@ -1,9 +1,9 @@
 ADF4351 VCO with Integrated PLL
 ===============================
 
-The ADF4351 is an IC that provides the local oscillator for the CMX991's RF mixers.
+The ADF4351 is an IC that provides the variable frequency local oscillator. It is a Phase Lock Loop, with an integrated Voltage Controlled Oscillator.  These are for the RF transceiver's transmit image-reject-up-converter and receiver mixer.
 
-The IC is controlled via a 4-wire SPI-like serial interface.  It has a write only register file which controls features of the IC.
+The IC is controlled via a 4-wire SPI-like serial interface.  It has a write only register file which controls features of the IC.  For reading, there is a digital lock detect pin, and a multiplexed analog pin connected to test points in the Phase Lock Loop.
 
 .. c:type:: typedef struct adf4351_t
     
@@ -15,10 +15,16 @@ The IC is controlled via a 4-wire SPI-like serial interface.  It has a write onl
 
 .. c:function:: void adf4351_destroy(adf4351_t* rf)
 
-.. c:function:: void adf4351_copy(adf4351_t* rf)
+.. c:function:: void adf4351_copy(adf4351_t* src, adf4351_t* dst)
 
 .. c:function:: void adf4351_print_to_file(adf4351_t* rf, FILE* f)
 
 .. c:function:: float adf4351_tune(adf4351_t* rf, float target_freq)
 
 .. c:function:: float adf4351_actual_frequency(adf4351_t* rf)
+    
+    Compute the actual fequency tuned to by the supplied register file.
+
+.. c:function:: float adf4351_pll_enable(adf4351_t* rf, float ref_freq, float res_freq, float target_freq);
+    
+    Update register file to enable the PLL and the VCO.

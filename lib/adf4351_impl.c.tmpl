@@ -53,7 +53,7 @@ rf_divider_select_t get_divider_select(int div) {
 
 double _actual_frequency(double FRAC, double N, double MOD, int DIV, int R, int T, int D) {
     //printf("INT=%f, FRAC=%f, MOD=%f, DIV=%d, D=%d, R=%d, T=%d\n", N, FRAC, MOD, DIV, D, R, T);
-    double pfd_freq = 26.0e6 * (((double)( 1 + D )) / (double)( R * ( 1 + T ) ));
+    double pfd_freq = WA_CLOCK_RATE * (((double)( 1 + D )) / (double)( R * ( 1 + T ) ));
     //printf("pdf_freq=%f\n", pfd_freq);
     double rf_out = (N + (FRAC / MOD)) * (pfd_freq / DIV);
     //printf("rf_out=%f\n", rf_out);

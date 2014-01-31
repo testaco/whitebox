@@ -1,13 +1,15 @@
 CMX991 Quadrature Radio Transceiver
 ===================================
 
-The CMX991 is the core radio IC on the Whitebox Bravo board.
+The CMX991 is the core radio transceiver IC on the Whitebox Bravo board.  It is a combination of an Analog Quadrature Modulator, Transmit Image-Reject Up Converter, Analog Quadrature Demodulator, Receiver Mixer, and a Phase Lock Loop.
 
-The IC is conrolled via a 4-wire serial interface called the C-BUS which is actually a SPI bus.  It has a read/write register file which controls the various features of the IC.
+The Phase Lock Loop, and thus the Intermediate Frequency of the radio system is fixed at 45MHz.  A hardware change in parts is required to set a different IF.  Refer to the CMX991's datasheet for possible values for different IFs.
+
+The IC is conrolled via a 4-wire serial interface called the C-BUS which is actually a SPI bus.  It has a read/write register file which controls the various features of the transmit and receive chains including variable filters, variable gain amplifiers.  There's also a Signal Level Indicator analog pin.
 
 .. c:type:: typedef struct cmx991_t
     
-    Represents the CMX991 chip
+    Register file of the CMX991 chip.
 
 .. c:function:: void cmx991_init(cmx991_t* rf)
     
@@ -43,7 +45,7 @@ Example
 
 This example sets up the CMX991 to transmit by the frequency set for the ADF4351, by the following formula:
 
-:math:`F_{vco} = 2 F_{des} - 90`
+:math:`F_{vco} = 2 ( F_{des} - 45 )`
 
 Where :math:`F_{des}` and :math:`F_{vco}` are both in MHz.
 

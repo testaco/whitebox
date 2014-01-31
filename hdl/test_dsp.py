@@ -1,3 +1,7 @@
+"""
+Simulating DSP Flow Graphs
+==========================
+"""
 import unittest
 
 import numpy as np
@@ -108,6 +112,14 @@ def figure_fft_phase(title, axes, f_parent, frq, Y):
     return f
 
 class DSPSim(object):
+    """Run a simulation with input going into ``in_sign`` and output going to ``out_sign``.
+
+    Records the input, output, and stages of the internal flow during the
+    simulation.  They can then be plotted later with the ``figure_*`` methods.
+
+    :param in_sign: The input.
+    :param out_sign: The output.
+    """
     def __init__(self, in_sign, out_sign):
         self.clock = Signal(bool(0))
         self.clearn = ResetSignal(1, 0, async=False)
@@ -153,6 +165,14 @@ class DSPSim(object):
             yield delay(SYSCLK_DURATION // 2)
 
     def simulate_quadrature(self, in_i, in_q, dspflow, **kwargs):
+        """Actually run the simulation, with separate i and q inputs.
+
+        :param in_i: The input i sequence.
+        :param in_q: The input q sequence.
+        :param dspflow: The MyHDL module representing the dsp flow.
+        :param interp: How many samples to zero-stuff.
+        :returns: The valid i and q sequences as a tuple.
+        """
         interp = kwargs.get('interp', 1)
         @instance
         def stimulus():
@@ -192,6 +212,13 @@ class DSPSim(object):
         return final_i, final_q
 
     def simulate(self, in_c, dspflow, **kwargs):
+        """Actually run the simulation with complex numbers.
+
+        :param in_c: The complex input sequence.
+        :param dspflow: The MyHDL module representing the dsp flow.
+        :param interp: How many samples to zero-stuff.
+        :returns: The valid-output complex sequence.
+        """
         # n, for the DSP is an a-range over the sample size
         in_n = np.arange(in_c.shape[0])
         # Convert the input to two signed shorts

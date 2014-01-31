@@ -3,7 +3,12 @@
 APB3 Bus Functional Model
 =========================
 
-This is the APB3 bus functional model.
+A bus functional model is a way of using prodecural code to stimulate a HDL module, as though there were a real processor connected to it over the system bus.  You can execute read and write operations over the interface in a sequence, and assert the proper function.
+
+This module implements the APB3 bus functional model, which is the common
+peripheral model for the ARM Cortex series of processors.
+It's not the fastest one, but it's more than capable of saturating the bandwidth
+of the CMX991 (1MHz).
 """
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
@@ -14,11 +19,17 @@ from myhdl import \
 apb3_bus_states = enum('IDLE', 'SETUP', 'ACCESS')
 
 class Apb3TimeoutError(Exception):
+    """Raised when a bus transaction times out."""
     pass
 
 class Apb3Bus(object):
     def __init__(self, *args, **kwargs):
-        """Initialize the bus."""
+        """Initialize the bus.
+
+        :param verbose: Add verbose logging
+        :param duration: Clock period in ns
+        :param timeout: Period to wait before timeout in ns
+        """
         self.presetn = ResetSignal(0, 0, async=True)
         self.pclk = Signal(bool(0))
         self.paddr = Signal(intbv(0, 0, 2**32))
@@ -37,7 +48,7 @@ class Apb3Bus(object):
             print msg
         
     def reset(self):
-        """Reset."""
+        """Reset the bus."""
         duration = self.kwargs['duration']
 
         self.debug('-- Resetting --')
@@ -50,7 +61,12 @@ class Apb3Bus(object):
         self.debug('-- Reset --')
 
     def transmit(self, addr, data):
-        """Transmit from master to slave."""
+        """Transmit from master to slave.
+        
+        :param addr: The address to write to
+        :param data: The data to write
+        :raises Apb3TimeoutError: If slave doesn't set ``pready`` in time
+        """
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 
@@ -96,7 +112,12 @@ class Apb3Bus(object):
         yield delay(duration // 2)
 
     def receive(self, addr, assert_equals=None):
-        """Receive from slave to master."""
+        """Receive from slave to master.
+        
+        :param addr: The address to read from
+        :returns: Nothing, but sets ``self.rdata`` to the received data.
+        :raises Apb3TimeoutError: If slave doesn't set ``pready`` in time
+        """
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 

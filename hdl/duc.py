@@ -11,6 +11,14 @@ from dds import dds as DDS
 DDS_NUM_SAMPLES=256
 
 def truncator(clearn, in_clock, in_sign, out_sign):
+    """Truncates ``in_sign`` to ``out_sign``.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -45,6 +53,15 @@ def truncator(clearn, in_clock, in_sign, out_sign):
     return truncate
 
 def upsampler(clearn, clock, in_sign, out_sign, interp):
+    """Upsamples the signal by repeating each one ``interp - 1`` times.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :param interp: How many times to inerpolate.
+    :returns: A synthesizable MyHDL instance.
+    """
     cnt = Signal(intbv(0)[len(interp):])
     in_valid = in_sign.valid
     in_i = in_sign.i
@@ -75,6 +92,15 @@ def upsampler(clearn, clock, in_sign, out_sign, interp):
     return upsample
         
 def interpolator(clearn, clock, in_sign, out_sign, interp):
+    """Interpolates the signal by stuffing ``interp - 1`` zeroes between samples.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :param interp: How many times to inerpolate.
+    :returns: A synthesizable MyHDL instance.
+    """
     cnt = Signal(intbv(0)[len(interp):])
     in_valid = in_sign.valid
     in_i = in_sign.i
@@ -187,7 +213,16 @@ def delay_2(clearn, clock, sign, x, y):
     return delay
 
 def delay_n(n, clearn, clock, sign, x, y):
+    """Delay a signal ``n`` cycles.
 
+    :param n: A constant, how many cycles to delay.
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param sign: The signature.
+    :param x: Input.
+    :param y: Delayed outpt.
+    :returns: A synthesizable MyHDL instance.
+    """
     if n == 1:
         return delay_1(clearn, clock, sign, x, y)
     elif n == 2:
@@ -206,6 +241,15 @@ def delay_n(n, clearn, clock, sign, x, y):
     return delay
 
 def comb(clearn, clock, delay, in_sign, out_sign):
+    """A comber with ``delay``.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param delay: A constant, how many cycles to delay.
+    :param in_sign: The input signature.
+    :param out_sign: The output signature.
+    :returns: A synthesizable MyHDL instance.
+    """
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -237,6 +281,14 @@ def comb(clearn, clock, delay, in_sign, out_sign):
     return comber, delay_i, delay_q
 
 def accumulator(clearn, clock, in_sign, out_sign):
+    """A simple accumulator.
+
+    :param clearn: The reset the accumulator.
+    :param clock: The clock.
+    :param in_sign: The input signature.
+    :param out_sign: The output signature.
+    :returns: A synthesizable MyHDL instance.
+    """
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -266,6 +318,17 @@ def cic(clearn, clock,
         out_sign,
         interp,
         cic_order=4, cic_delay=2, **kwargs):
+    """A cic filter with given order, delay, and interpolation.
+
+    :param clearn: The reset the accumulator.
+    :param clock: The clock.
+    :param in_sign: The input signature.
+    :param out_sign: The output signature.
+    :param interp: The interpolation of the cic filter.
+    :param cic_order: The order of the CIC filter.
+    :param cic_delay: The delay of the CIC comb elements.
+    :returns: A synthesizable MyHDL instance.
+    """
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -356,6 +419,17 @@ def cic(clearn, clock,
 def interleaver(clearn, clock, clock2x,
         in_sign,
         out_valid, out_data, out_last):
+    """Interleaves the input signature to a interleaved single channel signal.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param clock2x: The double clock rate.
+    :param in_sign: The incomming signature.
+    :param out_valid: The outgoing valid flag.
+    :param out_data: The output data.
+    :param out_last: The outgoing last flag.
+    :returns: A synthesizable MyHDL instance.
+    """
 
     in_valid = in_sign.valid
     in_last = in_sign.last
@@ -434,6 +508,35 @@ def duc(clearn, dac_clock, dac2x_clock,
         system_gain_i, system_gain_q,
         underrun, sample,
         dac_en, dac_data, dac_last, **kwargs):
+    """The Digital Up Converter.    
+
+    :param clearn: Reset signal, completely resets the dsp chain.
+    :param dac_clock: The sampling clock.
+    :param dac2x_clock: Twice the sampling clock.
+    :param loopen: Enable the loopback device.
+    :param loopback: The loopback signature to the digital down converter.
+    :param fifo_empty: Input signal that the fifo is empty.
+    :param fifo_re: Output signal to enable a sample read.
+    :param fifo_dvld: Input signal that FIFO data is valid.
+    :param fifo_rdata: Input sample data.
+    :param fifo_underflow: Input signal that fifo underflowed.
+    :param system_txen: Enable transmit.
+    :param system_txstop: Stop the transmitter.
+    :param system_ddsen: Enable the DDS.
+    :param system_filteren: Enable the CIC filter.
+    :param system_interp: Interpolation rate.
+    :param system_fcw: Set the frequency control word of the DDS.
+    :param system_correct_i: Set the i-Channel AQM DC Offset Correction.
+    :param system_correct_q: Set the q-Channel AQM DC Offset Correction.
+    :param system_gain_i: Set the i-channel AQM gain correction.
+    :param system_gain_q: Set the q-channel AQM gain correction.
+    :param underrun: Output of number of underruns to RFE.
+    :param sample: The sample.
+    :param dac_en: Enable DAC on valid data signal.
+    :param dac_data: The interleaved DAC data.
+    :param dac_last: The last sample going out on the DAC, stops the transmit.
+    :returns: A MyHDL synthesizable module.
+    """
 
     dspsim = kwargs.get('dspsim', None)
     interp_default = kwargs.get('interp', 1)

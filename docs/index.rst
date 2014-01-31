@@ -1,14 +1,8 @@
-Home
-====
-
-.. include:: features.rst
-
-**Table of Contents**
-
 .. toctree::
-   :maxdepth: 10
+   :maxdepth: 2
    
-   faq
+   features
    datasheet
    sdk
+   faq
    eratta
