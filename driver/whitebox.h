@@ -14,7 +14,7 @@
 
 #define WHITEBOX_DRIVER_NAME "whitebox"
 
-#define WHITEBOX_VERBOSE_DEBUG 5
+#define WHITEBOX_VERBOSE_DEBUG 0
 
 #define WHITEBOX_EXCITER_IRQ A2F_FPGA_DEMUX_IRQ_MAP(0)
 #define WHITEBOX_EXCITER_SAMPLE_OFFSET 0x00
@@ -66,6 +66,8 @@ enum whitebox_device_state {
 #define W_ERROR_PLL_LOCK_LOST 1
 #define W_ERROR_TX_OVERRUN    2
 #define W_ERROR_TX_UNDERRUN   3
+#define W_ERROR_RX_OVERRUN    2
+#define W_ERROR_RX_UNDERRUN   3
 
 /* Must be a power of two. */
 #define W_EXEC_DETAIL_COUNT    (1 << 6)

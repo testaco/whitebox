@@ -227,15 +227,15 @@ long _mock_exciter_space_available(struct whitebox_exciter *exciter,
     d_printk(1, "\n");
     head = mock_exciter->buf->head;
     tail = ACCESS_ONCE(mock_exciter->buf->tail);
-    space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
+    space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size) & ~3;
     // Wrap around
-    if (space < 4) {
+    /*if (space < 4) {
         mock_exciter->buf->head = head = mock_exciter->buf->tail = tail = 0;
         space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
-    }
+    }*/
 
     *dest = (unsigned long)mock_exciter->buf->buf + head;
-    return space;
+    return min(space, 1024L);
 }
 
 int _mock_exciter_produce(struct whitebox_exciter *exciter,

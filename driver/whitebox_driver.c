@@ -119,6 +119,25 @@ static u8 whitebox_cmx991_regs_read_lut[] = {
 	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
+void d_printk_loop(int level) {
+    unsigned long src;
+    struct circ_buf *mock_buf = &whitebox_device->mock_buf;
+    struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
+    struct whitebox_user_source *user_source = &whitebox_device->user_source;
+    struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
+    struct whitebox_rf_source *rf_source = &whitebox_device->rf_source;
+
+    d_printk(level, "statistics user_source_data/space=%d/%d rf_sink_space=%d mock_data/space=%d/%d rf_source_data=%d user_sink_data/space=%d/%d\n",
+        whitebox_user_source_data_available(user_source, &src),
+        whitebox_user_source_space_available(user_source, &src),
+        whitebox_rf_sink_space_available(rf_sink, &src),
+        CIRC_CNT_TO_END(mock_buf->head, mock_buf->tail, PAGE_SIZE << whitebox_mock_order),
+        CIRC_SPACE_TO_END(mock_buf->head, mock_buf->tail, PAGE_SIZE << whitebox_mock_order),
+        whitebox_rf_source_data_available(rf_source, &src),
+        whitebox_user_sink_data_available(user_sink, &src),
+        whitebox_user_sink_space_available(user_sink, &src));
+}
+
 /* Prototpyes */
 long whitebox_ioctl_reset(void);
 
@@ -266,6 +285,7 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
     struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
     
     d_printk(1, "whitebox read\n");
+    d_printk_loop(4);
 
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
@@ -291,27 +311,32 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
     if (rx_error(whitebox_device)) {
         d_printk(1, "rx_error\n");
         up(&whitebox_device->sem);
-        return -EFAULT;
+        return -EIO;
     }
 
-    if (whitebox_loopen)
-        tx_exec(whitebox_device);
+    /*if (whitebox_loopen)
+        tx_exec(whitebox_device);*/
 
     rx_exec(whitebox_device);
 
+    d_printk_loop(4);
+
     while (((src_count = whitebox_user_sink_data_available(user_sink, &src)) < count) && !(err = rx_error(whitebox_device))) {
-        if (whitebox_loopen)
-            tx_exec(whitebox_device);
+        /*if (whitebox_loopen)
+            tx_exec(whitebox_device);*/
         up(&whitebox_device->sem);
         if (filp->f_flags & O_NONBLOCK)
             return -EAGAIN;
 
+        d_printk(5, "waiting\n");
+
         if (wait_event_interruptible(whitebox_device->read_wait_queue,
-                (src_count = whitebox_user_sink_data_available(user_sink, &src)) > 0))
+                (((src_count = whitebox_user_sink_data_available(user_sink, &src)) >= count) || (err = rx_error(whitebox_device)))))
             return -ERESTARTSYS;
-        if (down_interruptible(&whitebox_device->sem)) {
+        if (down_interruptible(&whitebox_device->sem))
             return -ERESTARTSYS;
-        }
+
+        d_printk(5, "waiting done\n");
     }
 
     if (err) {
@@ -331,10 +356,8 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
 
     up(&whitebox_device->sem);
 
-    if (whitebox_loopen)
-        tx_exec(whitebox_device);
-
-    rx_exec(whitebox_device);
+    /*if (whitebox_loopen)
+        tx_exec(whitebox_device);*/
 
     return ret;
 }
@@ -404,7 +427,11 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
     up(&whitebox_device->sem);
 
+    d_printk_loop(4);
+
     tx_exec(whitebox_device);
+
+    d_printk_loop(4);
 
     return ret;
 }

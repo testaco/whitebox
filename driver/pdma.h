@@ -53,8 +53,8 @@
 #define PDMA_CONTROL_PERIPH     (1 << 0)
 
 #define PDMA_STATUS_BUF_SEL_B   (1 << 2)
-#define PDMA_STATUS_CH_COMP_A   (1 << 1)
-#define PDMA_STATUS_CH_COMP_B   (1 << 0)
+#define PDMA_STATUS_CH_COMP_B   (1 << 1)
+#define PDMA_STATUS_CH_COMP_A   (1 << 0)
 
 typedef void (*pdma_irq_handler_t)(void* data);
 

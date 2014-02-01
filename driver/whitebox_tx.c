@@ -3,6 +3,8 @@
 #include "whitebox_gpio.h"
 #include "pdma.h"
 
+int rx_exec(struct whitebox_device* wb);
+
 // ARM Cortex-M3 SysTick interface
 int *STCSR = (int *)0xE000E010;
 int *STRVR = (int *)0xE000E014;
@@ -75,6 +77,10 @@ int tx_exec(struct whitebox_device* wb)
         whitebox_rf_sink_produce(rf_sink, result);
         spin_unlock(&rf_sink->lock);
         wake_up_interruptible(&wb->write_wait_queue);
+        if (whitebox_loopen) {
+            wake_up_interruptible(&wb->read_wait_queue);
+            rx_exec(wb);
+        }
         tx_exec(wb);
     } else {
         stats->exec_dma_start++;
@@ -85,6 +91,7 @@ int tx_exec(struct whitebox_device* wb)
     return result;
 }
 
+void d_printk_loop(int level);
 void tx_dma_cb(void *data)
 {
     struct whitebox_device *wb = (struct whitebox_device *)data;
@@ -97,12 +104,19 @@ void tx_dma_cb(void *data)
     whitebox_rf_sink_produce(rf_sink, count);
     whitebox_user_source_consume(user_source, count);
 
+    d_printk_loop(4);
+
     stats->exec_dma_finished++;
     stats->bytes += count;
 
     spin_unlock(&rf_sink->lock);
 
     wake_up_interruptible(&wb->write_wait_queue);
+    if (whitebox_loopen) {
+        wake_up_interruptible(&wb->read_wait_queue);
+        rx_exec(wb);
+        d_printk_loop(4);
+    }
 
     tx_exec(wb);
 }

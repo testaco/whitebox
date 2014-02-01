@@ -161,7 +161,7 @@ int test_blocking_write(void *data) {
     return 0;
 }
 
-#define HUGE 400
+#define HUGE 512
 int test_blocking_write_huge(void *data) {
     int fd;
     int ret;
@@ -169,7 +169,6 @@ int test_blocking_write_huge(void *data) {
     int i;
     whitebox_args_t w;
     assert(whitebox_parameter_set("check_plls", 0) == 0);
-    assert(whitebox_parameter_set("loopen", 1) == 0);
     fd = open(WHITEBOX_DEV, O_RDWR);
     assert(fd > 0);
     ioctl(fd, WE_GET, &w);
@@ -181,22 +180,22 @@ int test_blocking_write_huge(void *data) {
         }
         ret = write(fd, buf, sizeof(uint32_t) * HUGE);
         assert(ret == sizeof(uint32_t) * HUGE);
-        ret = write(fd, buf, sizeof(uint32_t) * HUGE);
-        assert(ret == sizeof(uint32_t) * HUGE);
+        /*ret = write(fd, buf, sizeof(uint32_t) * HUGE);
+        assert(ret == sizeof(uint32_t) * HUGE);*/
 
         assert(fsync(fd) == 0);
 
-        ret = read(fd, buf2, sizeof(uint32_t) * HUGE);
-        assert(ret == sizeof(uint32_t) * HUGE);
-        assert(memcmp(buf, buf2, sizeof(uint32_t) * HUGE) == 0);
+        ret = read(fd, buf2, sizeof(uint32_t) * (HUGE));
+        assert(ret == sizeof(uint32_t) * (HUGE));
+        assert(memcmp(buf, buf2, sizeof(uint32_t) * (HUGE)) == 0);
 
-        ret = read(fd, buf2, sizeof(uint32_t) * HUGE);
+        /*ret = read(fd, buf2, sizeof(uint32_t) * HUGE);
         assert(ret == sizeof(uint32_t) * HUGE);
-        assert(memcmp(buf, buf2, sizeof(uint32_t) * HUGE) == 0);
+        assert(memcmp(buf, buf2, sizeof(uint32_t) * HUGE) == 0);*/
 
     }
+    assert(fsync(fd) == 0);
     close(fd);
-    assert(whitebox_parameter_set("loopen", 0) == 0);
     assert(whitebox_parameter_set("check_plls", 1) == 0);
     return 0;
 }
@@ -350,7 +349,6 @@ int test_blocking_xfer4(void *data) {
         buf_in1[i] = rand();
         buf_in2[i] = rand();
     }
-    printf("\n");
 
     ret = write(fd, buf_in1, sizeof(uint32_t) * 200);
     assert(ret == sizeof(uint32_t) * 200);
@@ -378,6 +376,7 @@ int test_tx_fifo(void *data) {
     int quantum = whitebox_parameter_get("exciter_quantum");
     whitebox_args_t w;
     assert(whitebox_parameter_set("check_plls", 0) == 0);
+    assert(whitebox_parameter_set("loopen", 0) == 0);
     fd = open(WHITEBOX_DEV, O_RDWR);
     assert(fd > 0);
 
@@ -439,6 +438,7 @@ int test_tx_fifo(void *data) {
 
     close(fd);
 
+    assert(whitebox_parameter_set("loopen", 1) == 0);
     assert(whitebox_parameter_set("check_plls", 1) == 0);
     return 0;
 }
@@ -555,6 +555,7 @@ int main(int argc, char **argv) {
     int result;
 
     whitebox_parameter_set("mock_en", 1);
+    whitebox_parameter_set("loopen", 1);
 
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_blocking_open_close),
@@ -566,7 +567,6 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_ioctl_adf4351),
         WHITEBOX_TEST(test_blocking_write),
         WHITEBOX_TEST(test_blocking_write_huge),
-#if 0
         WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
         WHITEBOX_TEST(test_blocking_xfer),
@@ -574,6 +574,7 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_xfer3),
         WHITEBOX_TEST(test_blocking_xfer4),
         WHITEBOX_TEST(test_tx_fifo),
+#if 0
         WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_mmap_success),
         WHITEBOX_TEST(test_mmap_write_fail),
@@ -584,5 +585,6 @@ int main(int argc, char **argv) {
     };
     result = whitebox_test_main(tests, NULL, argc, argv);
     whitebox_parameter_set("mock_en", 0);
+    whitebox_parameter_set("loopen", 0);
     return result;
 }

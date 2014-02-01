@@ -79,7 +79,7 @@ size_t whitebox_user_sink_data_available(struct whitebox_user_sink *user_sink,
         data = CIRC_CNT_TO_END(head, tail, user_sink->buf_size);
     }
     *src = (long)user_sink->buf.buf + tail;
-    d_printk(0, "%ld\n", data);
+    d_printk(3, "%ld\n", data);
     return data;
 }
 

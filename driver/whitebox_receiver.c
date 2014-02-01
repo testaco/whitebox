@@ -216,13 +216,13 @@ long _mock_receiver_data_available(struct whitebox_receiver *receiver,
     d_printk(1, "\n");
     head = ACCESS_ONCE(mock_receiver->buf->head);
     tail = mock_receiver->buf->tail;
-    data = CIRC_CNT_TO_END(head, tail, mock_receiver->buf_size);
-    if (data < 4) {
+    data = CIRC_CNT_TO_END(head, tail, mock_receiver->buf_size) & ~3;
+    /*if (data < 4) {
         mock_receiver->buf->head = head = mock_receiver->buf->tail = tail = 0;
         data = CIRC_CNT_TO_END(head, tail, mock_receiver->buf_size);
-    }
+    }*/
     *src = (unsigned long)mock_receiver->buf->buf + tail;
-    return data;
+    return min(data, 1024L);
 }
 
 int _mock_receiver_consume(struct whitebox_receiver *receiver,
