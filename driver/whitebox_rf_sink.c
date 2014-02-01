@@ -5,7 +5,7 @@
 
 #include "pdma.h"
 
-static int whitebox_rf_sink_debug = 0;
+static int whitebox_rf_sink_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
 	if (whitebox_rf_sink_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
@@ -20,6 +20,7 @@ void whitebox_rf_sink_init(struct whitebox_rf_sink *rf_sink,
     rf_sink->dma_cb = dma_cb;
     rf_sink->dma_cb_data = dma_cb_data;
     rf_sink->exciter = exciter;
+    d_printk(3, "\n");
 }
 
 int whitebox_rf_sink_alloc(struct whitebox_rf_sink *rf_sink)
@@ -39,7 +40,13 @@ void whitebox_rf_sink_free(struct whitebox_rf_sink *rf_sink)
 size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,
         unsigned long *dest)
 {
-    return rf_sink->exciter->ops->space_available(rf_sink->exciter, dest);
+    size_t count;
+    if (pdma_buffers_available(rf_sink->dma_ch) > 0)
+        count = rf_sink->exciter->ops->space_available(rf_sink->exciter, dest);
+    else
+        count = 0;
+    d_printk(3, "%d\n", count);
+    return count;
 }
 
 int whitebox_rf_sink_produce(struct whitebox_rf_sink *rf_sink, size_t count)
@@ -57,6 +64,8 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
     // If empty, just return
     if (rf_sink->dma_count >> 2 == 0)
         return -1;
+
+    d_printk(3, "work start\n");
 
     // If there's less than a quantum at the source, do it in a tight loop.
     /*if (rf_sink->dma_count < rf_sink->exciter->quantum) {
@@ -87,6 +96,7 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
             rf_sink->dma_mapping,
             dest,
             rf_sink->dma_count >> 2);
+    d_printk(3, "work finish\n");
     return 0;
 }
 

@@ -161,6 +161,46 @@ int test_blocking_write(void *data) {
     return 0;
 }
 
+#define HUGE 400
+int test_blocking_write_huge(void *data) {
+    int fd;
+    int ret;
+    uint32_t buf[HUGE], buf2[HUGE];
+    int i;
+    whitebox_args_t w;
+    assert(whitebox_parameter_set("check_plls", 0) == 0);
+    assert(whitebox_parameter_set("loopen", 1) == 0);
+    fd = open(WHITEBOX_DEV, O_RDWR);
+    assert(fd > 0);
+    ioctl(fd, WE_GET, &w);
+    w.flags.exciter.interp = 200;
+    ioctl(fd, WE_SET, &w);
+    for (i = 0; i < 1; ++i) {
+        for (i = 0; i < HUGE; ++i) {
+            buf[i] = rand();
+        }
+        ret = write(fd, buf, sizeof(uint32_t) * HUGE);
+        assert(ret == sizeof(uint32_t) * HUGE);
+        ret = write(fd, buf, sizeof(uint32_t) * HUGE);
+        assert(ret == sizeof(uint32_t) * HUGE);
+
+        assert(fsync(fd) == 0);
+
+        ret = read(fd, buf2, sizeof(uint32_t) * HUGE);
+        assert(ret == sizeof(uint32_t) * HUGE);
+        assert(memcmp(buf, buf2, sizeof(uint32_t) * HUGE) == 0);
+
+        ret = read(fd, buf2, sizeof(uint32_t) * HUGE);
+        assert(ret == sizeof(uint32_t) * HUGE);
+        assert(memcmp(buf, buf2, sizeof(uint32_t) * HUGE) == 0);
+
+    }
+    close(fd);
+    assert(whitebox_parameter_set("loopen", 0) == 0);
+    assert(whitebox_parameter_set("check_plls", 1) == 0);
+    return 0;
+}
+
 int test_blocking_write_not_locked(void *data) {
     int fd;
     int ret;
@@ -310,6 +350,7 @@ int test_blocking_xfer4(void *data) {
         buf_in1[i] = rand();
         buf_in2[i] = rand();
     }
+    printf("\n");
 
     ret = write(fd, buf_in1, sizeof(uint32_t) * 200);
     assert(ret == sizeof(uint32_t) * 200);
@@ -524,6 +565,8 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_ioctl_cmx991),
         WHITEBOX_TEST(test_ioctl_adf4351),
         WHITEBOX_TEST(test_blocking_write),
+        WHITEBOX_TEST(test_blocking_write_huge),
+#if 0
         WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
         WHITEBOX_TEST(test_blocking_xfer),
@@ -531,7 +574,6 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_xfer3),
         WHITEBOX_TEST(test_blocking_xfer4),
         WHITEBOX_TEST(test_tx_fifo),
-#if 0
         WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_mmap_success),
         WHITEBOX_TEST(test_mmap_write_fail),

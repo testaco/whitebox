@@ -14,6 +14,8 @@
 
 #define WHITEBOX_DRIVER_NAME "whitebox"
 
+#define WHITEBOX_VERBOSE_DEBUG 5
+
 #define WHITEBOX_EXCITER_IRQ A2F_FPGA_DEMUX_IRQ_MAP(0)
 #define WHITEBOX_EXCITER_SAMPLE_OFFSET 0x00
 #define WHITEBOX_EXCITER_STATUS_OFFSET 0x04
@@ -158,5 +160,6 @@ struct whitebox_platform_data_t {
 
 extern int whitebox_check_plls;
 extern int whitebox_check_runs;
+extern int whitebox_loopen;
 
 #endif /* __WHITEBOX_H */

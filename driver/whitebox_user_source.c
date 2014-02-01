@@ -3,7 +3,7 @@
 #include "whitebox.h"
 #include "whitebox_block.h"
 
-static int whitebox_user_source_debug = 0;
+static int whitebox_user_source_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
 	if (whitebox_user_source_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
@@ -40,11 +40,17 @@ void whitebox_user_source_free(struct whitebox_user_source *user_source)
 size_t whitebox_user_source_space_available(struct whitebox_user_source *user_source,
         unsigned long *dest)
 {
-    long tail, head;
+    long tail, head, space;
     head = user_source->buf.head;
     tail = ACCESS_ONCE(user_source->buf.tail);
+    space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size);
+    if (space < 4) {
+        user_source->buf.head = head = user_source->buf.tail = tail = 0;
+        space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size);
+    }
     *dest = (unsigned long)user_source->buf.buf + head;
-    return CIRC_SPACE_TO_END(head, tail, user_source->buf_size);
+    d_printk(3, "%ld\n", space);
+    return space;
 }
 
 int whitebox_user_source_produce(struct whitebox_user_source *user_source,
@@ -63,11 +69,17 @@ int whitebox_user_source_produce(struct whitebox_user_source *user_source,
 size_t whitebox_user_source_data_available(struct whitebox_user_source *user_source,
         unsigned long *src)
 {
-    long head, tail;
+    long head, tail, data;
     head = ACCESS_ONCE(user_source->buf.head);
     tail = user_source->buf.tail;
+    data = CIRC_CNT_TO_END(head, tail, user_source->buf_size);
+    if (data < 4) {
+        user_source->buf.head = head = user_source->buf.tail = tail = 0;
+        data = CIRC_CNT_TO_END(head, tail, user_source->buf_size);
+    }
+    d_printk(3, "%ld\n", data);
     *src = (long)user_source->buf.buf + tail;
-    return CIRC_CNT_TO_END(head, tail, user_source->buf_size);
+    return data;
 }
 
 int whitebox_user_source_consume(struct whitebox_user_source *user_source,

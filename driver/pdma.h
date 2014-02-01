@@ -52,9 +52,9 @@
 #define PDMA_CONTROL_MEM        (0 << 0)
 #define PDMA_CONTROL_PERIPH     (1 << 0)
 
-#define PDMA_STATUS_BUF_SEL     (1 << 2)
-#define PDMA_STATUS_CH_COMP_B   (1 << 1)
-#define PDMA_STATUS_CH_COMP_A   (1 << 0)
+#define PDMA_STATUS_BUF_SEL_B   (1 << 2)
+#define PDMA_STATUS_CH_COMP_A   (1 << 1)
+#define PDMA_STATUS_CH_COMP_B   (1 << 0)
 
 typedef void (*pdma_irq_handler_t)(void* data);
 
@@ -66,6 +66,6 @@ void pdma_release(u8 ch);
 
 int pdma_start(u8 ch, u32 src, u32 dst, u16 cnt);
 
-int pdma_busy(u8 ch);
+int pdma_buffers_available(u8 ch);
 
 #endif /* __PDMA_H__ */

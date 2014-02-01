@@ -5,7 +5,7 @@
 
 #include "pdma.h"
 
-static int whitebox_rf_source_debug = 0;
+static int whitebox_rf_source_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
 	if (whitebox_rf_source_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
@@ -39,7 +39,13 @@ void whitebox_rf_source_free(struct whitebox_rf_source *rf_source)
 size_t whitebox_rf_source_data_available(struct whitebox_rf_source *rf_source,
         unsigned long *dest)
 {
-    return rf_source->receiver->ops->data_available(rf_source->receiver, dest);
+    size_t count;
+    if (pdma_buffers_available(rf_source->dma_ch) > 0)
+        count = rf_source->receiver->ops->data_available(rf_source->receiver, dest);
+    else
+        count = 0;
+    d_printk(3, "%d\n", count);
+    return count;
 }
 
 int whitebox_rf_source_consume(struct whitebox_rf_source *rf_source, size_t count)

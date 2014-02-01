@@ -6,10 +6,14 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 
 #include <mach/a2f.h>
 
 #include "pdma.h"
+
+static int *STCVR = (int *)0xE000E018;
 
 #define PDMA_REGS 0x40004000 
 #define PDMA_IRQ  9
@@ -22,7 +26,9 @@ static spinlock_t pdma_lock;
 /*
  * Driver verbosity level: 0->silent; >0->verbose
  */
-static int pdma_debug = 0;
+static int pdma_debug = 5;
+
+static struct dentry *pdma_debugfs_root;
 
 /*
  * User can change verbosity of the driver
@@ -62,21 +68,69 @@ static struct platform_device pdma_dev0 = {
 	.resource       = pdma_dev0_resources,
 };
 
+#define PDMA_CHANNEL_BUFFER_A  0
+#define PDMA_CHANNEL_BUFFER_B  1
+
+#define PDMA_CHANNEL_BUFFER_STOPPED   0
+#define PDMA_CHANNEL_BUFFER_STARTED   1
+
+#define PDMA_CHANNEL_NEXT_A 0
+#define PDMA_CHANNEL_NEXT_B 1
+
 /*
  * Bookkeeping structure for each DMA channel.
  */
+
+struct pdma_channel_snapshot {
+    int time;
+
+    u8 channel_buf_a_status;
+    u32 channel_buf_a_src;
+    u32 channel_buf_a_dst;
+    u16 channel_buf_a_cnt;
+
+    u8 channel_buf_b_status;
+    u32 channel_buf_b_src;
+    u32 channel_buf_b_dst;
+    u16 channel_buf_b_cnt;
+
+    u32 device_control;
+    u32 device_status;
+
+    u32 device_buf_a_src;
+    u32 device_buf_a_dst;
+    u16 device_buf_a_cnt;
+
+    u32 device_buf_b_src;
+    u32 device_buf_b_dst;
+    u16 device_buf_b_cnt;
+};
+
+#define PDMA_SNAPS_COUNT    64
+
+struct pdma_channel_stats {
+    long bytes;
+    long xfers_started;
+    long xfers_completed;
+    struct pdma_channel_snapshot snaps[PDMA_SNAPS_COUNT];
+    int snaps_index;
+};
+
 struct pdma_channel_t {
     u8 channel;
     u8 in_use;
     u32 flags;
     u8 write_adj;
+    u8 next;
     pdma_irq_handler_t handler;
     void* user_data;
     struct pdma_channel_buffer_status_t {
         u32 src;
         u32 dst;
         u16 cnt;
+        u8  status;
     } buf[2]; // Buffer A & B
+    struct pdma_channel_stats stats;
 };
 
 /*
@@ -128,13 +182,46 @@ int pdma_set_priority_ratio(int ratio) {
 }
 EXPORT_SYMBOL(pdma_set_priority_ratio);
 
+
+
+/* NOTE: must be called with lock held! */
+void pdma_snap_channel(struct pdma_channel_t *channel)
+{
+    struct pdma_channel_snapshot* snap;
+    u8 ch = channel->channel;
+    snap = &channel->stats.snaps[channel->stats.snaps_index];
+    snap->time = *STCVR;
+
+    snap->channel_buf_a_status = channel->buf[0].status;
+    snap->channel_buf_a_src    = channel->buf[0].src;
+    snap->channel_buf_a_dst    = channel->buf[0].dst;
+    snap->channel_buf_a_cnt    = channel->buf[0].cnt;
+
+    snap->channel_buf_b_status = channel->buf[1].status;
+    snap->channel_buf_b_src    = channel->buf[1].src;
+    snap->channel_buf_b_dst    = channel->buf[1].dst;
+    snap->channel_buf_b_cnt    = channel->buf[1].cnt;
+
+    snap->device_control = PDMA(pdma_device)->chan[ch].control;
+    snap->device_status  = PDMA(pdma_device)->chan[ch].status;
+
+    snap->device_buf_a_src = PDMA(pdma_device)->chan[ch].buf[0].src;
+    snap->device_buf_a_dst = PDMA(pdma_device)->chan[ch].buf[0].dst;
+    snap->device_buf_a_cnt = PDMA(pdma_device)->chan[ch].buf[0].cnt;
+
+    snap->device_buf_b_src = PDMA(pdma_device)->chan[ch].buf[1].src;
+    snap->device_buf_b_dst = PDMA(pdma_device)->chan[ch].buf[1].dst;
+    snap->device_buf_b_cnt = PDMA(pdma_device)->chan[ch].buf[1].cnt;
+
+    channel->stats.snaps_index = (channel->stats.snaps_index + 1) & (PDMA_SNAPS_COUNT - 1);
+}
+
 int pdma_start(u8 ch,
                u32 src,
                u32 dst,
                u16 cnt) {
     unsigned long flags = 0;
     int ret = 0;
-    int buf = -EINVAL;
     struct pdma_channel_t* channel;
 
     if (ch >= 8) {
@@ -152,32 +239,109 @@ int pdma_start(u8 ch,
         goto done_pdma_start;
     }
 
-    buf = !!(PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_BUF_SEL);
+    // Pause transfer
+    PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_PAUSE;
 
-    d_printk(2, "pdma_start ch=%d buf=%c src=%08x dst=%08x cnt=%d\n",
-        ch, buf ? 'B' : 'A', src, dst, cnt);
+    pdma_snap_channel(channel);
 
-    channel->buf[buf].src = src;
-    channel->buf[buf].dst = dst;
-    channel->buf[buf].cnt = cnt;
+    // Clear completed transfers
+    if (PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_CH_COMP_A) {
+        PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_CLR_A;
 
-    d_printk_pdma_ch(4, ch);
+        channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    }
+    if (PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_CH_COMP_B) {
+        PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_CLR_B;
+        channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    }
 
-    PDMA(pdma_device)->chan[ch].buf[buf].src = src;
-    PDMA(pdma_device)->chan[ch].buf[buf].dst = dst;
-    PDMA(pdma_device)->chan[ch].buf[buf].cnt = cnt;
+    if ((channel->buf[PDMA_CHANNEL_BUFFER_A].status != PDMA_CHANNEL_BUFFER_STOPPED) && (channel->buf[PDMA_CHANNEL_BUFFER_B].status != PDMA_CHANNEL_BUFFER_STOPPED)) {
+        ret = -EBUSY;
+        d_printk(0, "busy\n");
+        goto pdma_busy;
+    }
 
-    d_printk_pdma_ch(4, ch);
+    // Load source, destination and count
+    if (PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_BUF_SEL_B) {
+        channel->next = PDMA_CHANNEL_NEXT_A;
+        channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STARTED;
+        channel->buf[PDMA_CHANNEL_BUFFER_B].src = src;
+        channel->buf[PDMA_CHANNEL_BUFFER_B].dst = dst;
+        channel->buf[PDMA_CHANNEL_BUFFER_B].cnt = cnt;
 
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].src = src;
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].dst = dst;
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].cnt = cnt;
+    } else {
+        channel->next = PDMA_CHANNEL_NEXT_B;
+        channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STARTED;
+
+        channel->buf[PDMA_CHANNEL_BUFFER_A].src = src;
+        channel->buf[PDMA_CHANNEL_BUFFER_A].dst = dst;
+        channel->buf[PDMA_CHANNEL_BUFFER_A].cnt = cnt;
+
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].src = src;
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].dst = dst;
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].cnt = cnt;
+    }
+    
+    pdma_snap_channel(channel);
+
+pdma_busy:
+    // Resume the transfer
+    PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
 done_pdma_start:
     spin_unlock_irqrestore(&pdma_lock, flags);
     return ret;
 } EXPORT_SYMBOL(pdma_start);
 
-int pdma_busy(u8 ch) {
-    // TODO: There must be a cleaner way to check this.
-    return PDMA(pdma_device)->chan[ch].buf[0].cnt || PDMA(pdma_device)->chan[ch].buf[1].cnt;
-} EXPORT_SYMBOL(pdma_busy);
+// Returns less than zero on error, or how many buffers are available.
+int pdma_buffers_available(u8 ch) {
+    unsigned long flags = 0;
+    struct pdma_channel_t* channel;
+    int result = 0;
+
+    if (ch >= 8) {
+        d_printk(0, "Invalid channel number %d\n", ch);
+        return -EINVAL;
+    }
+
+    spin_lock_irqsave(&pdma_lock, flags);
+
+    channel = &pdma_device->channel[ch];
+    if (!channel->in_use) {
+        spin_unlock_irqrestore(&pdma_lock, flags);
+        return result;
+    }
+
+    // Pause transfer
+    PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_PAUSE;
+
+    // Clear completed transfers
+    if (PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_CH_COMP_A) {
+        PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_CLR_A;
+
+        channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    }
+    if (PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_CH_COMP_B) {
+        PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_CLR_B;
+        channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    }
+
+    // See if there's an open channel buffer
+    // TODO: figure out this logic!
+    if (channel->buf[PDMA_CHANNEL_BUFFER_A].status == PDMA_CHANNEL_BUFFER_STOPPED)
+        result += 1;
+    if (channel->buf[PDMA_CHANNEL_BUFFER_B].status == PDMA_CHANNEL_BUFFER_STOPPED)
+        result += 1;
+
+    // Resume the transfer
+    PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
+
+    spin_unlock_irqrestore(&pdma_lock, flags);
+
+    return result;
+} EXPORT_SYMBOL(pdma_buffers_available);
 
 int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_adj, u32 flags) {
     unsigned long irqflags = 0;
@@ -205,6 +369,11 @@ int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_ad
     channel->write_adj = write_adj;
     channel->handler = handler;
     channel->user_data = user_data;
+    channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    channel->next = PDMA_CHANNEL_NEXT_A;
+    memset(&channel->stats, 0, sizeof(struct pdma_channel_stats));
+    channel->stats.snaps_index = 0;
 
     PDMA(pdma_device)->chan[ch].control = PDMA_CONTROL_RESET |
             PDMA_CONTROL_CLR_A |
@@ -212,6 +381,8 @@ int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_ad
 
     PDMA(pdma_device)->chan[ch].control =
             ((u32)channel->write_adj << 14) | channel->flags;
+
+    pdma_snap_channel(channel);
 fail_args:
     spin_unlock_irqrestore(&pdma_lock, irqflags);
     return ret;
@@ -310,6 +481,70 @@ static irqreturn_t pdma_irq_cb(int irq, void* ptr) {
 	return IRQ_HANDLED;
 }
 
+static int pdma_channel_show(struct seq_file *m, void *private)
+{
+    unsigned long flags;
+    int ch = 0;
+    struct pdma_channel_t *channel;
+    int i;
+
+    // Lock & pause the channel
+    spin_lock_irqsave(&pdma_lock, flags);
+    channel = &pdma_device->channel[ch];
+    PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_PAUSE;
+
+    for (i = 0; i < PDMA_SNAPS_COUNT; ++i) {
+        int offset = (channel->stats.snaps_index - i) & (PDMA_SNAPS_COUNT - 1);
+        struct pdma_channel_stats *stats = &channel->stats;
+        struct pdma_channel_snapshot *snap = &(stats->snaps[offset]);
+        if (snap->time == 0)
+            continue;
+        seq_printf(m, "%08x A %s %s src=%08x/%08x dst=%08x/%08x cnt=%08x/%08x\n",
+            snap->time,
+            (snap->channel_buf_a_status == PDMA_CHANNEL_BUFFER_STOPPED)
+                ? "stopped" : "started",
+            (snap->device_control & PDMA_STATUS_CH_COMP_A) ? "C" : " ",
+            snap->device_buf_a_src,
+            snap->channel_buf_a_src,
+            snap->device_buf_a_dst,
+            snap->channel_buf_a_dst,
+            snap->device_buf_a_cnt,
+            snap->channel_buf_a_cnt);
+
+        seq_printf(m, "%08x B %s %s src=%08x/%08x dst=%08x/%08x cnt=%08x/%08x\n",
+            snap->time,
+            (channel->buf[1].status == PDMA_CHANNEL_BUFFER_STOPPED)
+                ? "stopped" : "started",
+            (PDMA(pdma_device)->chan[ch].control & PDMA_STATUS_CH_COMP_B) ? "C" : " ",
+            PDMA(pdma_device)->chan[ch].buf[1].src,
+            channel->buf[1].dst,
+            PDMA(pdma_device)->chan[ch].buf[1].dst,
+            channel->buf[1].dst,
+            PDMA(pdma_device)->chan[ch].buf[1].cnt,
+            channel->buf[1].dst);
+    }
+
+    // Unlock & resume the channel
+    PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
+    spin_unlock_irqrestore(&pdma_lock, flags);
+
+    return 0;
+}
+
+static int pdma_channel_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, pdma_channel_show, inode->i_private);
+}
+
+
+static const struct file_operations pdma_channel_fops = {
+    .owner = THIS_MODULE,
+    .open = pdma_channel_open,
+    .read = seq_read,
+    .llseek = seq_lseek,
+    .release = single_release,
+};
+
 static int pdma_probe(struct platform_device *pdev) {
     struct resource* pdma_regs;
     int irq;
@@ -336,7 +571,7 @@ static int pdma_probe(struct platform_device *pdev) {
 		d_printk(0, "unable to map registers for "
 			"PDMA controller base=%08x\n", pdma_regs->start);
 		ret = -EINVAL;
-		goto error_release_nothing;
+		goto free_pdma_device;
 	}
 
     pdma_device->irq = irq;
@@ -354,12 +589,26 @@ static int pdma_probe(struct platform_device *pdev) {
         goto error_release_irq;
     }
 
+
+    pdma_debugfs_root = debugfs_create_dir("pdma", NULL);
+    if (!pdma_debugfs_root) {
+        d_printk(0, "cannot create debugfs dir\n");
+        ret = -ENXIO;
+        goto fail_debugfs_create_dir;
+    }
+    
+    debugfs_create_file("channel0", S_IRUGO, pdma_debugfs_root,
+                        (void*)0, &pdma_channel_fops);
+
     goto done;
 
+fail_debugfs_create_dir:
 error_release_irq:
     free_irq(pdma_device->irq, pdma_device);
 error_release_pdma_regs:
 	iounmap(pdma_device->regs);
+free_pdma_device:
+    kfree(pdma_device);
 error_release_nothing:
 done:
     return ret;

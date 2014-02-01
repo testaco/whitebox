@@ -32,7 +32,7 @@ static atomic_t use_count = ATOMIC_INIT(0);
  * Driver verbosity level: 0->silent; >0->verbose
  * User can change verbosity of the driver.
  */
-static int whitebox_debug = 0;
+static int whitebox_debug = WHITEBOX_VERBOSE_DEBUG;
 module_param(whitebox_debug, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -98,6 +98,9 @@ static int whitebox_tx_i_gain = (int)(1.023906 * WEG_COEFF + 0.5);
 module_param(whitebox_tx_i_gain, int, S_IRUSR | S_IWUSR);
 static int whitebox_tx_q_gain = (int)(1. * WEG_COEFF + 0.5);
 module_param(whitebox_tx_q_gain, int, S_IRUSR | S_IWUSR);
+
+int whitebox_loopen = 0;
+module_param(whitebox_loopen, int, S_IRUSR | S_IWUSR);
 
 /*
  * Register mappings for the CMX991 register file.
@@ -259,7 +262,7 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
 static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff_t* pos) {
     unsigned long src;
     size_t src_count;
-    int ret = 0;
+    int ret = 0, err = 0;
     struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
     
     d_printk(1, "whitebox read\n");
@@ -291,9 +294,14 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
         return -EFAULT;
     }
 
+    if (whitebox_loopen)
+        tx_exec(whitebox_device);
+
     rx_exec(whitebox_device);
 
-    while ((src_count = whitebox_user_sink_data_available(user_sink, &src)) == 0) {
+    while (((src_count = whitebox_user_sink_data_available(user_sink, &src)) < count) && !(err = rx_error(whitebox_device))) {
+        if (whitebox_loopen)
+            tx_exec(whitebox_device);
         up(&whitebox_device->sem);
         if (filp->f_flags & O_NONBLOCK)
             return -EAGAIN;
@@ -306,6 +314,12 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
         }
     }
 
+    if (err) {
+        d_printk(1, "rx_error=%d user_sink_data=%zd\n", err, src_count);
+        up(&whitebox_device->sem);
+        return -EIO;
+    }
+
     ret = whitebox_user_sink_work(user_sink, src, src_count, (unsigned long)buf, count);
 
     if (ret < 0) {
@@ -316,6 +330,11 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
     whitebox_user_sink_consume(user_sink, ret);
 
     up(&whitebox_device->sem);
+
+    if (whitebox_loopen)
+        tx_exec(whitebox_device);
+
+    rx_exec(whitebox_device);
 
     return ret;
 }

@@ -4,7 +4,7 @@
 #include "pdma.h"
 #include "whitebox.h"
 
-static int whitebox_rf_exciter_debug = 0;
+static int whitebox_rf_exciter_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
 	if (whitebox_rf_exciter_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
@@ -223,12 +223,19 @@ long _mock_exciter_space_available(struct whitebox_exciter *exciter,
 {
     struct whitebox_mock_exciter *mock_exciter = 
         container_of(exciter, struct whitebox_mock_exciter, exciter);
-    long tail, head;
+    long tail, head, space;
     d_printk(1, "\n");
     head = mock_exciter->buf->head;
-    *dest = (unsigned long)mock_exciter->buf->buf + head;
     tail = ACCESS_ONCE(mock_exciter->buf->tail);
-    return CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
+    space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
+    // Wrap around
+    if (space < 4) {
+        mock_exciter->buf->head = head = mock_exciter->buf->tail = tail = 0;
+        space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
+    }
+
+    *dest = (unsigned long)mock_exciter->buf->buf + head;
+    return space;
 }
 
 int _mock_exciter_produce(struct whitebox_exciter *exciter,
