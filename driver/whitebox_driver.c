@@ -377,6 +377,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     if (whitebox_device->state == WDS_RX) {
         up(&whitebox_device->sem);
         d_printk(1, "in receive\n");
+        d_printk_loop(4);
         return -EBUSY;
     }
 
@@ -697,10 +698,7 @@ static struct file_operations whitebox_fops = {
     .unlocked_ioctl = whitebox_ioctl,
 };
 
-static int tx_stats_show(struct seq_file *m, void *private)
-{
-    struct whitebox_device *wb = (struct whitebox_device*)m->private;
-    struct whitebox_stats *stats = &wb->tx_stats;
+void stats_show(struct seq_file *m, struct whitebox_stats *stats) {
     int i;
     seq_printf(m, "bytes=%ld\n", stats->bytes);
     seq_printf(m, "bytes_per_call=[");
@@ -724,6 +722,14 @@ static int tx_stats_show(struct seq_file *m, void *private)
     seq_printf(m, "stop=%ld\n", stats->stop);
     seq_printf(m, "error=%ld\n", stats->error);
     seq_printf(m, "last_error=%d\n", stats->last_error);
+}
+
+static int tx_stats_show(struct seq_file *m, void *private)
+{
+    struct whitebox_device *wb = (struct whitebox_device*)m->private;
+    struct whitebox_stats *stats = &wb->tx_stats;
+
+    stats_show(m, stats);
 
     return 0;
 }
@@ -736,6 +742,29 @@ static int tx_stats_open(struct inode *inode, struct file *file)
 static const struct file_operations tx_stats_fops = {
     .owner = THIS_MODULE,
     .open = tx_stats_open,
+    .read = seq_read,
+    .llseek = seq_lseek,
+    .release = single_release,
+};
+
+static int rx_stats_show(struct seq_file *m, void *private)
+{
+    struct whitebox_device *wb = (struct whitebox_device*)m->private;
+    struct whitebox_stats *stats = &wb->rx_stats;
+
+    stats_show(m, stats);
+
+    return 0;
+}
+
+static int rx_stats_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, rx_stats_show, inode->i_private);
+}
+
+static const struct file_operations rx_stats_fops = {
+    .owner = THIS_MODULE,
+    .open = rx_stats_open,
     .read = seq_read,
     .llseek = seq_lseek,
     .release = single_release,
@@ -784,6 +813,8 @@ static int whitebox_probe(struct platform_device* pdev) {
 
     debugfs_create_file("tx_stats", S_IRUGO, whitebox_device->debugfs_root,
                         whitebox_device, &tx_stats_fops);
+    debugfs_create_file("rx_stats", S_IRUGO, whitebox_device->debugfs_root,
+                        whitebox_device, &rx_stats_fops);
 
     init_waitqueue_head(&whitebox_device->write_wait_queue);
     init_waitqueue_head(&whitebox_device->read_wait_queue);

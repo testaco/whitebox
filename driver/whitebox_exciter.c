@@ -93,13 +93,15 @@ long _exciter_space_available(struct whitebox_exciter *exciter,
         unsigned long *dest)
 {
     *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
-    return (WE_FIFO_SIZE << 2) - (long)((WHITEBOX_EXCITER(exciter)->available) << 2);
+    //return (WE_FIFO_SIZE << 2) - (long)((WHITEBOX_EXCITER(exciter)->available) << 2);
+    return 4*4096L;
 }
 
 int _exciter_produce(struct whitebox_exciter *exciter,
         size_t count)
 {
     u32 state = exciter->ops->get_state(exciter);
+    d_printk(2, "%08x\n", state);
     if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN))
         exciter->ops->set_state(exciter, WES_TXEN);
 

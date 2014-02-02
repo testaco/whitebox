@@ -34,10 +34,11 @@ int tx_exec(struct whitebox_device* wb)
     unsigned long src, dest;
     size_t count;
     int result;
+    unsigned long flags;
 
     stats->exec_calls++;
 
-    if (!spin_trylock(&rf_sink->lock)) {
+    if (!spin_trylock_irqsave(&rf_sink->lock, flags)) {
         stats->exec_busy++;
         return -EBUSY;
     }
@@ -49,11 +50,11 @@ int tx_exec(struct whitebox_device* wb)
     dest_count = whitebox_rf_sink_space_available(rf_sink, &dest);
     if (src_count >> 2 == 0) {
         stats->exec_nop_src++;
-        spin_unlock(&rf_sink->lock);
+        spin_unlock_irqrestore(&rf_sink->lock, flags);
         return 0;
     } else if (dest_count >> 2 == 0) {
         stats->exec_nop_dest++;
-        spin_unlock(&rf_sink->lock);
+        spin_unlock_irqrestore(&rf_sink->lock, flags);
         return 0;
     }
     count = min(src_count, dest_count);
@@ -67,15 +68,20 @@ int tx_exec(struct whitebox_device* wb)
 
     if (result < 0) {
         stats->exec_failed++;
-        spin_unlock(&rf_sink->lock);
+        spin_unlock_irqrestore(&rf_sink->lock, flags);
         return result;
     }
-    else if (result > 0) {
+
+    whitebox_rf_sink_produce(rf_sink, count);
+    whitebox_user_source_consume(user_source, count);
+
+    if (result > 0) {
         stats->exec_success_slow++;
         stats->bytes += result;
-        whitebox_user_source_consume(user_source, result);
-        whitebox_rf_sink_produce(rf_sink, result);
-        spin_unlock(&rf_sink->lock);
+        /*whitebox_user_source_consume(user_source, result);
+        whitebox_rf_sink_produce(rf_sink, result);*/
+        //spin_unlock(&rf_sink->lock);
+        spin_unlock_irqrestore(&rf_sink->lock, flags);
         wake_up_interruptible(&wb->write_wait_queue);
         if (whitebox_loopen) {
             wake_up_interruptible(&wb->read_wait_queue);
@@ -84,9 +90,11 @@ int tx_exec(struct whitebox_device* wb)
         tx_exec(wb);
     } else {
         stats->exec_dma_start++;
+        spin_unlock_irqrestore(&rf_sink->lock, flags);
         // NOTE: Do not unlock the rf_sink's lock if result is 0 as a DMA was
         // started.
     }
+
 
     return result;
 }
@@ -96,20 +104,21 @@ void tx_dma_cb(void *data)
 {
     struct whitebox_device *wb = (struct whitebox_device *)data;
     struct whitebox_stats *stats = &wb->tx_stats;
-    struct whitebox_user_source *user_source = &wb->user_source;
+    //struct whitebox_user_source *user_source = &wb->user_source;
     struct whitebox_rf_sink *rf_sink = &wb->rf_sink;
     size_t count;
+    unsigned long flags;
+
+    spin_lock_irqsave(&rf_sink->lock, flags);
 
     count = whitebox_rf_sink_work_done(rf_sink);
-    whitebox_rf_sink_produce(rf_sink, count);
-    whitebox_user_source_consume(user_source, count);
 
     d_printk_loop(4);
 
     stats->exec_dma_finished++;
     stats->bytes += count;
 
-    spin_unlock(&rf_sink->lock);
+    spin_unlock_irqrestore(&rf_sink->lock, flags);
 
     wake_up_interruptible(&wb->write_wait_queue);
     if (whitebox_loopen) {

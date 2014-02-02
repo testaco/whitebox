@@ -277,7 +277,7 @@ int pdma_start(u8 ch,
     }
 
     // Load source, destination and count
-    if (PDMA(pdma_device)->chan[ch].status & PDMA_STATUS_BUF_SEL_B) {
+    if (channel->next == PDMA_CHANNEL_NEXT_B && channel->buf[PDMA_CHANNEL_BUFFER_B].status == PDMA_CHANNEL_BUFFER_STOPPED) {
         channel->next = PDMA_CHANNEL_NEXT_A;
         channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STARTED;
         channel->buf[PDMA_CHANNEL_BUFFER_B].src = src;
@@ -287,7 +287,8 @@ int pdma_start(u8 ch,
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].src = src;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].dst = dst;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].cnt = cnt;
-    } else {
+    }
+    else if (channel->next == PDMA_CHANNEL_NEXT_A && channel->buf[PDMA_CHANNEL_BUFFER_A].status == PDMA_CHANNEL_BUFFER_STOPPED) {
         channel->next = PDMA_CHANNEL_NEXT_B;
         channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STARTED;
 
@@ -298,6 +299,11 @@ int pdma_start(u8 ch,
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].src = src;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].dst = dst;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].cnt = cnt;
+    }
+    else {
+        ret = -EBUSY;
+        d_printk(0, "busy\n");
+        goto pdma_busy;
     }
     
     //pdma_snap_channel(channel);
