@@ -301,7 +301,7 @@ int test_tx_halt(void* data) {
     runs = w.flags.exciter.runs;
 
     whitebox_debug_to_file(&wb, stdout);
-    for (j = 0; j < 5000; ++j) {
+    for (j = 0; j < 500; ++j) {
         //accum32(i, fcw, buf[COUNT-2], buf);
         //sincos16c(i, buf, c);
         ret = write(whitebox_fd(&wb), c, sizeof(uint32_t) * i);

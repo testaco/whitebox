@@ -26,6 +26,7 @@ int whitebox_user_source_alloc(struct whitebox_user_source *user_source)
         d_printk(0, "failed to create port buffer\n");
         return -ENOMEM;
     }
+    d_printk(4, "%08lx\n", (unsigned long)user_source->buf.buf);
     user_source->buf.head = 0;
     user_source->buf.tail = 0;
     return 0;
@@ -56,12 +57,9 @@ size_t whitebox_user_source_space_available(struct whitebox_user_source *user_so
 int whitebox_user_source_produce(struct whitebox_user_source *user_source,
         size_t count)
 {
-    d_printk(1, "values... %08x %08x %08x %08x\n",
-            (u32)*(user_source->buf.buf + user_source->buf.head + 0),
-            (u32)*(user_source->buf.buf + user_source->buf.head + 4),
-            (u32)*(user_source->buf.buf + user_source->buf.head + 8),
-            (u32)*(user_source->buf.buf + user_source->buf.head + 12));
+    d_printk(1, "user_source_buf_head was %08x, buf_size is %08lx\n", user_source->buf.head, user_source->buf_size);
     user_source->buf.head = (user_source->buf.head + count) & (user_source->buf_size - 1);
+    d_printk(1, "head moved up %zu to %08x\n", count, user_source->buf.head);
     user_source->off += count;
     return 0;
 }
@@ -73,10 +71,6 @@ size_t whitebox_user_source_data_available(struct whitebox_user_source *user_sou
     head = ACCESS_ONCE(user_source->buf.head);
     tail = user_source->buf.tail;
     data = CIRC_CNT_TO_END(head, tail, user_source->buf_size);
-    if (data < 4) {
-        user_source->buf.head = head = user_source->buf.tail = tail = 0;
-        data = CIRC_CNT_TO_END(head, tail, user_source->buf_size);
-    }
     d_printk(3, "%ld\n", data);
     *src = (long)user_source->buf.buf + tail;
     return data;
@@ -102,9 +96,11 @@ int whitebox_user_source_work(struct whitebox_user_source *user_source,
             (u32)*(src + 8),
             (u32)*(src + 12));*/
 
-    if (copy_from_user((void*)dest, (void*)src, count) != 0) {
-        d_printk(0, "failed to copy data from user\n");
-        return -EFAULT;
+    if (!atomic_read(user_source->mapped)) {
+        if (copy_from_user((void*)dest, (void*)src, count) != 0) {
+            d_printk(0, "failed to copy data from user\n");
+            return -EFAULT;
+        }
     }
     return (int)count;
 }

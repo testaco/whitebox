@@ -167,12 +167,15 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
             &whitebox_device->receiver;
 
     d_printk(2, "whitebox open\n");
+    filp->private_data = whitebox_device;
 
     if (atomic_add_return(1, &use_count) != 1) {
         d_printk(1, "Device in use\n");
         ret = -EBUSY;
         goto fail_in_use;
     }
+
+    atomic_set(&whitebox_device->mapped, 0);
 
     whitebox_user_source_init(&whitebox_device->user_source,
             whitebox_user_source_order, &whitebox_device->mapped);
@@ -230,6 +233,10 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
         goto fail_free_rf_source;
     }
 
+    // Reset the stats
+    memset(&whitebox_device->tx_stats, 0, sizeof(struct whitebox_stats));
+    memset(&whitebox_device->rx_stats, 0, sizeof(struct whitebox_stats));
+
     // enable dac
     whitebox_gpio_dac_enable(whitebox_device->platform_data);
 
@@ -277,6 +284,61 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
     atomic_dec(&use_count);
     return 0;
 }
+
+static void whitebox_mmap_open(struct vm_area_struct *vma) {
+    struct whitebox_device *wb = (struct whitebox_device*)vma->vm_private_data;
+    d_printk(4, "\n");
+    atomic_inc(&wb->mapped);
+}
+
+static void whitebox_mmap_close(struct vm_area_struct *vma) {
+    struct whitebox_device *wb = (struct whitebox_device*)vma->vm_private_data;
+    d_printk(4, "\n");
+    atomic_dec(&wb->mapped);
+}
+
+static const struct vm_operations_struct whitebox_mmap_ops = {
+    .open = whitebox_mmap_open,
+    .close = whitebox_mmap_close,
+};
+
+static int whitebox_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+    vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
+    d_printk(4, "%08lx %08lx %08lx %08lx\n", vma->vm_start, vma->vm_end, vma->vm_pgoff, vma->vm_page_prot);
+    if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+            vma->vm_end - vma->vm_start, vma->vm_page_prot))
+        return -EAGAIN;
+
+    //struct inode *inode = filp->f_dentry->d_inode;
+    vma->vm_ops = &whitebox_mmap_ops;
+    vma->vm_flags |= VM_RESERVED;
+    vma->vm_private_data = filp->private_data;
+    whitebox_mmap_open(vma);
+
+    return 0;
+}
+
+static unsigned long whitebox_get_unmapped_area(struct file* filp,
+        unsigned long addr, unsigned long len,
+        unsigned long pgoff, unsigned long flags) {
+    struct whitebox_device *wb = (struct whitebox_device*)filp->private_data;
+    struct whitebox_user_source *user_source = &wb->user_source;
+    unsigned long dest;
+
+    d_printk(4, "addr=%08lx len=%08lx pgoff=%08lx flags=%08lx\n", addr, len, pgoff, flags);
+    //if (flags & PROT_WRITE) {
+        if (len != user_source->buf_size)
+            dest = 0;
+        if (addr || pgoff)
+            dest = 0;
+        else
+            dest = (unsigned long)user_source->buf.buf;
+    //}
+    d_printk(4, "dest=%08lx\n", dest);
+    return dest;
+}
+
 
 static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff_t* pos) {
     unsigned long src;
@@ -417,6 +479,8 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
         return -EIO;
     }
 
+    d_printk_loop(4);
+
     ret = whitebox_user_source_work(user_source, (unsigned long)buf, count, dest, dest_count);
 
     if (ret < 0) {
@@ -425,6 +489,8 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     }
 
     whitebox_user_source_produce(user_source, ret);
+
+    d_printk_loop(4);
 
     up(&whitebox_device->sem);
 
@@ -654,6 +720,32 @@ long whitebox_ioctl_mock_command(unsigned long arg) {
     return 0;
 }
 
+long whitebox_ioctl_mmap_write(unsigned long arg)
+{
+    long count;
+    unsigned long dest;
+    count = whitebox_user_source_space_available(&whitebox_device->user_source, &dest);
+
+    if (copy_to_user((unsigned long*)arg, &dest,
+            sizeof(unsigned long)))
+        return -EACCES;
+
+    return count;
+}
+
+long whitebox_ioctl_mmap_read(unsigned long arg)
+{
+    long count;
+    unsigned long src;
+    count = whitebox_user_sink_data_available(&whitebox_device->user_sink, &src);
+
+    if (copy_to_user((unsigned long*)arg, &src,
+            sizeof(unsigned long)))
+        return -EACCES;
+
+    return count;
+}
+
 static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long arg) {
     switch(cmd) {
         case W_RESET:
@@ -682,6 +774,10 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_adf4351_set(arg);
         case WM_CMD:
             return whitebox_ioctl_mock_command(arg);
+        case W_MMAP_WRITE:
+            return whitebox_ioctl_mmap_write(arg);
+        case W_MMAP_READ:
+            return whitebox_ioctl_mmap_read(arg);
         default:
             return -EINVAL;
     }
@@ -696,6 +792,8 @@ static struct file_operations whitebox_fops = {
     .write = whitebox_write,
     .fsync = whitebox_fsync,
     .unlocked_ioctl = whitebox_ioctl,
+    .mmap = whitebox_mmap,
+    .get_unmapped_area = whitebox_get_unmapped_area,
 };
 
 void stats_show(struct seq_file *m, struct whitebox_stats *stats) {

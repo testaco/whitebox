@@ -12,9 +12,8 @@ int *STCVR = (int *)0xE000E018;
 
 int tx_start(struct whitebox_device *wb)
 {
-    struct whitebox_stats *stats = &wb->tx_stats;
+    //struct whitebox_stats *stats = &wb->tx_stats;
     struct whitebox_exciter *exciter = wb->rf_sink.exciter;
-    memset(stats, 0, sizeof(struct whitebox_stats));
     exciter->ops->get_runs(exciter, &wb->cur_overruns, &wb->cur_underruns);
 
     // Reset the SysTick interface

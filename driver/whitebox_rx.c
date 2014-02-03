@@ -9,9 +9,7 @@ extern int *STCVR;
 
 int rx_start(struct whitebox_device *wb)
 {
-    struct whitebox_stats *stats = &wb->rx_stats;
     struct whitebox_receiver *receiver = wb->rf_source.receiver;
-    memset(stats, 0, sizeof(struct whitebox_stats));
     receiver->ops->get_runs(receiver, &wb->cur_overruns, &wb->cur_underruns);
 
     // Reset the SysTick interface

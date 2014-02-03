@@ -143,3 +143,8 @@ typedef struct whitebox_args {
 
 #define WMC_CAUSE_UNDERRUN      (1 << 0)
 #define WMC_CAUSE_OVERRUN       (1 << 1)
+
+/* Zero-memory copy from user space */
+
+#define W_MMAP_WRITE _IOR('w', 14, unsigned long*)
+#define W_MMAP_READ  _IOR('w', 15, unsigned long*)
