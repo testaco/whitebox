@@ -123,6 +123,7 @@ struct whitebox_device {
     struct whitebox_exciter exciter;
     struct whitebox_receiver receiver;
 
+    unsigned long user_buffer;
     struct whitebox_user_source user_source;
     struct whitebox_user_sink user_sink;
 

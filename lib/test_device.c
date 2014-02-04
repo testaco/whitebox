@@ -1,4 +1,6 @@
 #include <string.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 #include "whitebox.h"
 #include "whitebox_test.h"
@@ -106,43 +108,6 @@ int test_ioctl_exciter(void *data) {
 
     assert(whitebox_close(&wb) == 0);
     return 0;
-}
-
-#define WHITEBOX_DEV "/dev/whitebox"
-
-int whitebox_parameter_set(const char *param, int value)
-{
-    char name[512];
-    char final_value[128];
-    int fd;
-    snprintf(name, 512, "/sys/module/whitebox/parameters/whitebox_%s", param);
-    snprintf(final_value, 128, "%d\n", value);
-    fd = open(name, O_WRONLY);
-    if (fd < 0)
-        return fd;
-    if (write(fd, final_value, strlen(final_value)+1) < 0) {
-        close(fd);
-        return 1;
-    }
-    close(fd);
-    return 0;
-}
-
-int whitebox_parameter_get(const char *param)
-{
-    char name[512];
-    char final_value[128];
-    int fd;
-    snprintf(name, 512, "/sys/module/whitebox/parameters/whitebox_%s", param);
-    fd = open(name, O_RDONLY);
-    if (fd < 0)
-        return fd;
-    if (read(fd, &final_value, 127) < 0) {
-        close(fd);
-        return 1;
-    }
-    close(fd);
-    return atoi(final_value);
 }
 
 int test_tx_fifo(void *data) {
@@ -284,16 +249,18 @@ int test_tx_overrun_underrun(void *data) {
 int test_tx_halt(void* data) {
     whitebox_t wb;
     whitebox_args_t w;
-    uint32_t buf[COUNT-1];
-    uint32_t c[COUNT-1];
-    int i = COUNT, j;
+    int j;
     int ret;
     int fd;
     int runs;
     float sample_rate = SAMP_RATE;
     uint32_t fcw = freq_to_fcw(1.7e3, sample_rate);
+    void *wbptr;
+    int buffer_size = sysconf(_SC_PAGE_SIZE) << whitebox_parameter_get("user_order");
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
+    wbptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    assert(wbptr != MAP_FAILED && wbptr);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
     assert(ioctl(fd, WE_GET, &w) == 0);
@@ -301,15 +268,22 @@ int test_tx_halt(void* data) {
     runs = w.flags.exciter.runs;
 
     whitebox_debug_to_file(&wb, stdout);
-    for (j = 0; j < 500; ++j) {
-        //accum32(i, fcw, buf[COUNT-2], buf);
-        //sincos16c(i, buf, c);
-        ret = write(whitebox_fd(&wb), c, sizeof(uint32_t) * i);
-        if (ret != sizeof(uint32_t) * i) {
-            whitebox_debug_to_file(&wb, stdout);
-            perror("write: ");
+    for (j = 0; j < 5000; ++j) {
+        unsigned long dest, count;
+        count = ioctl(fd, W_MMAP_WRITE, &dest);
+        if (count <= 0) {
+            printf("busy\n");
+        } else {
+            count = count < COUNT ? count : COUNT;
+            //accum32(count >> 2, fcw, 0, (uint32_t*)dest);
+            //sincos16c(count >> 2, (uint32_t*)dest, (uint32_t*)dest);
+            ret = write(whitebox_fd(&wb), 0, count);
+            if (ret != count) {
+                whitebox_debug_to_file(&wb, stdout);
+                perror("write: ");
+            }
+            assert(ret == count);
         }
-        assert(ret == sizeof(uint32_t) * i);
         if (j % 1000 == 0)
             whitebox_debug_to_file(&wb, stdout);
     }
@@ -320,12 +294,15 @@ int test_tx_halt(void* data) {
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WES_TXEN));
     assert(w.flags.exciter.runs == runs);
+    assert(munmap(wbptr, buffer_size) == 0);
     assert(whitebox_close(&wb) == 0);
 }
 
 int main(int argc, char **argv) {
     whitebox_parameter_set("mock_en", 0);
     whitebox_test_t tests[] = {
+        WHITEBOX_TEST(test_tx_fifo_dma),
+        WHITEBOX_TEST(test_tx_fifo),
         WHITEBOX_TEST(test_open_close),
         WHITEBOX_TEST(test_tx_clear),
         WHITEBOX_TEST(test_tx_50_pll_fails),
@@ -335,9 +312,9 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_tx_902_pll),
         WHITEBOX_TEST(test_ioctl_exciter),
         WHITEBOX_TEST(test_tx_overrun_underrun),
-        WHITEBOX_TEST(test_tx_fifo),
-        WHITEBOX_TEST(test_tx_fifo_dma),
         WHITEBOX_TEST(test_tx_halt),
+#if 0
+#endif
         WHITEBOX_TEST(0),
     };
     return whitebox_test_main(tests, NULL, argc, argv);

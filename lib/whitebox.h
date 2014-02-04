@@ -19,12 +19,20 @@ typedef struct whitebox {
     int rate;
     int interp;
     float frequency;
+
+    void *user_buffer;
+    unsigned long user_buffer_size;
 } whitebox_t;
+
+int whitebox_parameter_set(const char *param, int value);
+int whitebox_parameter_get(const char *param);
 
 void whitebox_init(whitebox_t* wb);
 whitebox_t* whitebox_alloc(void);
 void whitebox_free(whitebox_t* wb);
 int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate);
+int whitebox_mmap(whitebox_t* wb);
+int whitebox_munmap(whitebox_t* wb);
 int whitebox_fd(whitebox_t* wb);
 int whitebox_close(whitebox_t* wb);
 void whitebox_debug_to_file(whitebox_t* wb, FILE* f);

@@ -49,7 +49,7 @@ struct whitebox_user_source {
 
 void whitebox_user_source_init(struct whitebox_user_source *user_source,
         int order, atomic_t *mapped);
-int whitebox_user_source_alloc(struct whitebox_user_source *user_source);
+int whitebox_user_source_alloc(struct whitebox_user_source *user_source, unsigned long buf_addr);
 void whitebox_user_source_free(struct whitebox_user_source *user_source);
 size_t whitebox_user_source_space_available(struct whitebox_user_source *user_source,
         unsigned long *dest);
@@ -119,7 +119,7 @@ struct whitebox_user_sink {
 
 void whitebox_user_sink_init(struct whitebox_user_sink *user_sink,
         int order, atomic_t *mapped);
-int whitebox_user_sink_alloc(struct whitebox_user_sink *user_sink);
+int whitebox_user_sink_alloc(struct whitebox_user_sink *user_sink, unsigned long buf_addr);
 void whitebox_user_sink_free(struct whitebox_user_sink *user_sink);
 size_t whitebox_user_sink_space_available(struct whitebox_user_sink *user_sink,
         unsigned long *dest);

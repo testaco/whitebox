@@ -52,8 +52,8 @@ target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 #add_executable(cw cw.c)
 #target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
 
-#add_executable(rfcat rfcat.c)
-#target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_executable(rfcat rfcat.c)
+target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_executable(gnuradio_peripheral gnuradio_peripheral.c)
 target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)

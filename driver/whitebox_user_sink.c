@@ -16,17 +16,16 @@ void whitebox_user_sink_init(struct whitebox_user_sink *user_sink,
     d_printk(3, "\n");
 }
 
-int whitebox_user_sink_alloc(struct whitebox_user_sink *user_sink)
+int whitebox_user_sink_alloc(struct whitebox_user_sink *user_sink, unsigned long buf_addr)
 {
     // alloc circ buffer
     user_sink->buf_size = PAGE_SIZE << user_sink->order;
-    user_sink->buf.buf = (char*)
-            __get_free_pages(GFP_KERNEL | __GFP_DMA | __GFP_COMP |
-            __GFP_NOWARN, user_sink->order);
+    user_sink->buf.buf = (char*)buf_addr;
     if (!user_sink->buf.buf) {
         d_printk(0, "failed to create port buffer\n");
         return -ENOMEM;
     }
+    d_printk(4, "%08lx\n", (unsigned long)user_sink->buf.buf);
     user_sink->buf.head = 0;
     user_sink->buf.tail = 0;
     return 0;
@@ -35,7 +34,7 @@ int whitebox_user_sink_alloc(struct whitebox_user_sink *user_sink)
 void whitebox_user_sink_free(struct whitebox_user_sink *user_sink)
 {
     // release the circ buffer
-    free_pages((unsigned long)user_sink->buf.buf, user_sink->order);
+    //free_pages((unsigned long)user_sink->buf.buf, user_sink->order);
 }
 
 size_t whitebox_user_sink_space_available(struct whitebox_user_sink *user_sink,
@@ -103,9 +102,11 @@ int whitebox_user_sink_work(struct whitebox_user_sink *user_sink,
     d_printk(1, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu\n",
             src, src_count, dest, dest_count);
 
-    if (copy_to_user((void*)dest, (void*)src, count) != 0) {
-        d_printk(0, "failed to copy data to user\n");
-        return -EFAULT;
+    if (!atomic_read(user_sink->mapped)) {
+        if (copy_to_user((void*)dest, (void*)src, count) != 0) {
+            d_printk(0, "failed to copy data to user\n");
+            return -EFAULT;
+        }
     }
     return (int)count;
 }

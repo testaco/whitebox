@@ -48,16 +48,10 @@ int whitebox_check_runs = 1;
 module_param(whitebox_check_runs, int, S_IRUSR | S_IWUSR);
 
 /*
- * Order of the user_source circular buffer.
+ * Order of the user read and write circular buffers.
  */
-static int whitebox_user_source_order = 3;
-module_param(whitebox_user_source_order, int, S_IRUSR | S_IWUSR);
-
-/*
- * Order of the user_sink circular buffer.
- */
-static int whitebox_user_sink_order = 3;
-module_param(whitebox_user_sink_order, int, S_IRUSR | S_IWUSR);
+static int whitebox_user_order = 4;
+module_param(whitebox_user_order, int, S_IRUSR | S_IWUSR);
 
 /*
  * Whether or not to use the mock.
@@ -178,7 +172,7 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
     atomic_set(&whitebox_device->mapped, 0);
 
     whitebox_user_source_init(&whitebox_device->user_source,
-            whitebox_user_source_order, &whitebox_device->mapped);
+            whitebox_user_order - 1, &whitebox_device->mapped);
 
     whitebox_rf_sink_init(&whitebox_device->rf_sink,
             whitebox_device->platform_data->tx_dma_ch,
@@ -204,14 +198,14 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
         goto fail_in_use;
     }
 
-    ret = whitebox_user_source_alloc(user_source);
+    ret = whitebox_user_source_alloc(user_source, whitebox_device->user_buffer);
     if (ret < 0) {
         d_printk(0, "Buffer allocation failed\n");
         goto fail_free_rf_sink;
     }
 
     whitebox_user_sink_init(&whitebox_device->user_sink,
-            whitebox_user_sink_order, &whitebox_device->mapped);
+            whitebox_user_order - 1, &whitebox_device->mapped);
 
     whitebox_rf_source_init(&whitebox_device->rf_source,
             whitebox_device->platform_data->rx_dma_ch,
@@ -227,7 +221,7 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
         goto fail_free_tx;
     }
 
-    ret = whitebox_user_sink_alloc(user_sink);
+    ret = whitebox_user_sink_alloc(user_sink,  whitebox_device->user_buffer + (PAGE_SIZE << (whitebox_user_order - 1)));
     if (ret < 0) {
         d_printk(0, "Buffer allocation failed\n");
         goto fail_free_rf_source;
@@ -1004,7 +998,17 @@ static int whitebox_probe(struct platform_device* pdev) {
 
     whitebox_gpio_cmx991_reset(whitebox_device->platform_data);
 
-	printk(KERN_INFO "Whitebox: bravo found\n");
+    whitebox_device->user_buffer =
+            __get_free_pages(GFP_KERNEL | __GFP_DMA | __GFP_COMP |
+                __GFP_NOWARN, whitebox_user_order);
+
+    if (!whitebox_device->user_buffer) {
+        goto fail_gpio_request;
+    }
+
+	printk(KERN_INFO "Whitebox: bravo found tx=0x%08lx rx=0x%08lx\n",
+            (unsigned long)whitebox_exciter_regs->start,
+            (unsigned long)whitebox_receiver_regs->start);
 
     goto done;
 

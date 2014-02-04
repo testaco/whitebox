@@ -2,8 +2,46 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 #include "whitebox.h"
+
+int whitebox_parameter_set(const char *param, int value)
+{
+    char name[512];
+    char final_value[128];
+    int fd;
+    snprintf(name, 512, "/sys/module/whitebox/parameters/whitebox_%s", param);
+    snprintf(final_value, 128, "%d\n", value);
+    fd = open(name, O_WRONLY);
+    if (fd < 0)
+        return fd;
+    if (write(fd, final_value, strlen(final_value)+1) < 0) {
+        close(fd);
+        return 1;
+    }
+    close(fd);
+    return 0;
+}
+
+int whitebox_parameter_get(const char *param)
+{
+    char name[512];
+    char final_value[128];
+    int fd;
+    snprintf(name, 512, "/sys/module/whitebox/parameters/whitebox_%s", param);
+    fd = open(name, O_RDONLY);
+    if (fd < 0)
+        return fd;
+    if (read(fd, &final_value, 127) < 0) {
+        close(fd);
+        return 1;
+    }
+    close(fd);
+    return atoi(final_value);
+}
+
 
 void whitebox_init(whitebox_t* wb) {
     wb->fd = -EINVAL;
@@ -61,6 +99,18 @@ int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
     free(filename);
 
     return wb->fd;
+}
+
+int whitebox_mmap(whitebox_t* wb) {
+    wb->user_buffer_size = sysconf(_SC_PAGE_SIZE) << whitebox_parameter_get("user_order");
+    wb->user_buffer = mmap(0, wb->user_buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, wb->fd, 0);
+    if (wb->user_buffer == MAP_FAILED || !wb->user_buffer)
+        return -1;
+    return 0;
+}
+
+int whitebox_munmap(whitebox_t *wb) {
+    return munmap(wb->user_buffer, wb->user_buffer_size);
 }
 
 int whitebox_fd(whitebox_t* wb) {

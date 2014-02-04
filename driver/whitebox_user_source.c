@@ -15,13 +15,11 @@ void whitebox_user_source_init(struct whitebox_user_source *user_source,
     user_source->mapped = mapped;
 }
 
-int whitebox_user_source_alloc(struct whitebox_user_source *user_source)
+int whitebox_user_source_alloc(struct whitebox_user_source *user_source, unsigned long buf_addr)
 {
     // alloc circ buffer
     user_source->buf_size = PAGE_SIZE << user_source->order;
-    user_source->buf.buf = (char*)
-            __get_free_pages(GFP_KERNEL | __GFP_DMA | __GFP_COMP |
-            __GFP_NOWARN, user_source->order);
+    user_source->buf.buf = (char*)buf_addr;
     if (!user_source->buf.buf) {
         d_printk(0, "failed to create port buffer\n");
         return -ENOMEM;
@@ -35,7 +33,7 @@ int whitebox_user_source_alloc(struct whitebox_user_source *user_source)
 void whitebox_user_source_free(struct whitebox_user_source *user_source)
 {
     // release the circ buffer
-    free_pages((unsigned long)user_source->buf.buf, user_source->order);
+    //free_pages((unsigned long)user_source->buf.buf, user_source->order);
 }
 
 size_t whitebox_user_source_space_available(struct whitebox_user_source *user_source,
