@@ -164,5 +164,6 @@ struct whitebox_platform_data_t {
 extern int whitebox_check_plls;
 extern int whitebox_check_runs;
 extern int whitebox_loopen;
+extern int whitebox_debug;
 
 #endif /* __WHITEBOX_H */

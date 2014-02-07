@@ -32,7 +32,7 @@ static atomic_t use_count = ATOMIC_INIT(0);
  * Driver verbosity level: 0->silent; >0->verbose
  * User can change verbosity of the driver.
  */
-static int whitebox_debug = WHITEBOX_VERBOSE_DEBUG;
+int whitebox_debug = WHITEBOX_VERBOSE_DEBUG;
 module_param(whitebox_debug, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -120,8 +120,12 @@ void d_printk_loop(int level) {
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
     struct whitebox_rf_sink *rf_sink = &whitebox_device->rf_sink;
     struct whitebox_rf_source *rf_source = &whitebox_device->rf_source;
+    u32 exciter_state = rf_sink->exciter->ops->get_state(rf_sink->exciter);
+    u32 receiver_state = rf_source->receiver->ops->get_state(rf_source->receiver);
 
-    d_printk(level, "statistics user_source_data/space=%d/%d rf_sink_space=%d mock_data/space=%d/%d rf_source_data=%d user_sink_data/space=%d/%d\n",
+    d_printk(level, "stats %c%c user_source_data/space=%d/%d rf_sink_space=%d mock_data/space=%d/%d rf_source_data=%d user_sink_data/space=%d/%d\n",
+        exciter_state & WES_TXEN ? 'T' : ' ',
+        receiver_state & WRS_RXEN ? 'R' : ' ',
         whitebox_user_source_data_available(user_source, &src),
         whitebox_user_source_space_available(user_source, &src),
         whitebox_rf_sink_space_available(rf_sink, &src),
@@ -429,25 +433,21 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
-
     if (whitebox_device->state == WDS_RX) {
         up(&whitebox_device->sem);
         d_printk(1, "in receive\n");
         d_printk_loop(4);
         return -EBUSY;
     }
-
     if (whitebox_device->state == WDS_IDLE) {
         whitebox_device->state = WDS_TX;
         tx_start(whitebox_device);
     }
-
     if (count == 0) {
         tx_stop(whitebox_device);
         up(&whitebox_device->sem);
         return 0;
     }
-
     if ((ret = tx_error(whitebox_device))) {
         dest_count = whitebox_user_source_data_available(user_source, &dest);
         d_printk(2, "tx_error=%d user_source_data=%zd\n", ret, dest_count);
@@ -499,27 +499,58 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
 static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
+    struct whitebox_user_source *user_source = &whitebox_device->user_source;
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
     struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    unsigned long src;
+    size_t src_count;
+    int err = 0;
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
     d_printk(1, "state=%d\n", whitebox_device->state);
     if (whitebox_device->state == WDS_TX) {
-        if (tx_error(whitebox_device)) {
+        while (((src_count = whitebox_user_source_data_available(user_source, &src)) > 0) && !(err = tx_error(whitebox_device))) {
             up(&whitebox_device->sem);
-            return -EFAULT;
+
+            d_printk(1, "waiting for user source to drain\n");
+
+            tx_exec(whitebox_device);
+
+            d_printk_loop(1);
+
+            if (down_interruptible(&whitebox_device->sem))
+                return -ERESTARTSYS;
+            else
+                d_printk(1, "no interrupt\n");
         }
+
+        if (err) {
+            d_printk(1, "wait for user_source to drain error tx_error=%d user_source_data=%zd\n", err, src_count);
+            up(&whitebox_device->sem);
+            return -EIO;
+        }
+
         tx_stop(whitebox_device);
-        while (exciter->ops->get_state(exciter) & WES_TXEN) {
-            if (tx_error(whitebox_device)) {
-                up(&whitebox_device->sem);
-                return -EFAULT;
-            }
-            cpu_relax();
+
+        while ((exciter->ops->get_state(exciter) & WES_TXEN) && !(err = tx_error(whitebox_device))) {
+            up(&whitebox_device->sem);
+
+            d_printk(1, "waiting for dma & hardware dsp flow to finish\n");
+
+            if (down_interruptible(&whitebox_device->sem))
+                return -ERESTARTSYS;
         }
+
+        if (err) {
+            d_printk(1, "wait for tx_en to shut off error tx_error=%d user_source_data=%zd\n", err, src_count);
+            up(&whitebox_device->sem);
+            return -EIO;
+        }
+
         whitebox_device->state = WDS_IDLE;
     }
+
     if (whitebox_device->state == WDS_RX) {
         if (rx_error(whitebox_device)) {
             up(&whitebox_device->sem);
@@ -533,8 +564,10 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             }
             cpu_relax();
         }
+
         whitebox_device->state = WDS_IDLE;
     }
+
     up(&whitebox_device->sem);
     return 0;
 }
@@ -1006,9 +1039,7 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_gpio_request;
     }
 
-	printk(KERN_INFO "Whitebox: bravo found tx=0x%08lx rx=0x%08lx\n",
-            (unsigned long)whitebox_exciter_regs->start,
-            (unsigned long)whitebox_receiver_regs->start);
+	printk(KERN_INFO "Whitebox bravo mapped to address 0x%08lx\n", (unsigned long)whitebox_exciter_regs->start);
 
     goto done;
 

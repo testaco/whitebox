@@ -244,8 +244,8 @@ int test_tx_overrun_underrun(void *data) {
     whitebox_parameter_set("auto_tx", 1);
 }
 
-#define COUNT 2048
-#define SAMP_RATE 500e3
+#define COUNT 1024 
+#define SAMP_RATE 200e3
 int test_tx_halt(void* data) {
     whitebox_t wb;
     whitebox_args_t w;
@@ -253,8 +253,10 @@ int test_tx_halt(void* data) {
     int ret;
     int fd;
     int runs;
+    int last_count = 0;
     float sample_rate = SAMP_RATE;
     uint32_t fcw = freq_to_fcw(1.7e3, sample_rate);
+    uint32_t phase = 0;
     void *wbptr;
     int buffer_size = sysconf(_SC_PAGE_SIZE) << whitebox_parameter_get("user_order");
     whitebox_init(&wb);
@@ -267,29 +269,31 @@ int test_tx_halt(void* data) {
     assert(!(w.flags.exciter.state & WES_TXEN));
     runs = w.flags.exciter.runs;
 
-    whitebox_debug_to_file(&wb, stdout);
-    for (j = 0; j < 5000; ++j) {
+    for (j = 0; j < 200;) {
         unsigned long dest, count;
-        count = ioctl(fd, W_MMAP_WRITE, &dest);
+        count = ioctl(fd, W_MMAP_WRITE, &dest) >> 2;
         if (count <= 0) {
-            printf("busy\n");
+            continue;
         } else {
             count = count < COUNT ? count : COUNT;
-            //accum32(count >> 2, fcw, 0, (uint32_t*)dest);
-            //sincos16c(count >> 2, (uint32_t*)dest, (uint32_t*)dest);
-            ret = write(whitebox_fd(&wb), 0, count);
-            if (ret != count) {
+            phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
+            ret = write(whitebox_fd(&wb), 0, count << 2);
+            if (ret != count << 2) {
                 whitebox_debug_to_file(&wb, stdout);
                 perror("write: ");
             }
-            assert(ret == count);
+            assert(ret == count << 2);
+            last_count += count;
+            //whitebox_debug_to_file(&wb, stdout);
+            j++;
         }
-        if (j % 1000 == 0)
-            whitebox_debug_to_file(&wb, stdout);
     }
 
     assert(fsync(fd) == 0);
-    whitebox_debug_to_file(&wb, stdout);
+    //whitebox_debug_to_file(&wb, stdout);
+
+    ioctl(wb.fd, WE_GET, &w);
+    assert(last_count == w.flags.exciter.debug);
 
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WES_TXEN));

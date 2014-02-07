@@ -136,7 +136,7 @@ typedef struct whitebox_args {
 #define WA_GET _IOR('w', 11, whitebox_args_t*)
 #define WA_SET _IOW('w', 12, whitebox_args_t*)
 
-#define WA_CLOCK_RATE 10.0e6
+#define WA_CLOCK_RATE 26.0e6
 
 /* Mock Commands */
 #define WM_CMD _IOW('w', 13, whitebox_args_t*)

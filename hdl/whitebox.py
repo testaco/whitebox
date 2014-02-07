@@ -253,7 +253,7 @@ if __name__ == '__main__':
     from fifo import fifo as FIFO
     fifo_depth = 1024
     fifo_width = 32
-    interp = 20
+    interp = 200
     duc_enable = True
     rfe_enable = True
 

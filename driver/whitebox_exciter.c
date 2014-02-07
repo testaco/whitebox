@@ -4,9 +4,9 @@
 #include "pdma.h"
 #include "whitebox.h"
 
-static int whitebox_rf_exciter_debug = WHITEBOX_VERBOSE_DEBUG;
+//static int whitebox_rf_exciter_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
-	if (whitebox_rf_exciter_debug >= level) printk(KERN_INFO "%s: " fmt,	\
+	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
 void _exciter_free(struct whitebox_exciter *exciter)
@@ -92,6 +92,9 @@ void _exciter_get_runs(struct whitebox_exciter *exciter,
 long _exciter_space_available(struct whitebox_exciter *exciter,
         unsigned long *dest)
 {
+    u32 state = exciter->ops->get_state(exciter);
+    if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN))
+        exciter->ops->set_state(exciter, WES_TXEN);
     *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
     //return (WE_FIFO_SIZE << 2) - (long)((WHITEBOX_EXCITER(exciter)->available) << 2);
     return 4*4096L;
@@ -205,6 +208,7 @@ void _mock_exciter_set_state(struct whitebox_exciter *exciter, u32 state_mask)
         return;
     }
     if (state_mask & WES_TXSTOP) {
+        d_printk(1, "stopping\n");
         exciter->ops->clear_state(exciter, WES_TXEN);
         return;
     }

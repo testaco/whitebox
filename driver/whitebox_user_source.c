@@ -43,10 +43,6 @@ size_t whitebox_user_source_space_available(struct whitebox_user_source *user_so
     head = user_source->buf.head;
     tail = ACCESS_ONCE(user_source->buf.tail);
     space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size);
-    if (space < 4) {
-        user_source->buf.head = head = user_source->buf.tail = tail = 0;
-        space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size);
-    }
     *dest = (unsigned long)user_source->buf.buf + head;
     d_printk(3, "%ld\n", space);
     return space;
@@ -56,7 +52,7 @@ int whitebox_user_source_produce(struct whitebox_user_source *user_source,
         size_t count)
 {
     d_printk(1, "user_source_buf_head was %08x, buf_size is %08lx\n", user_source->buf.head, user_source->buf_size);
-    user_source->buf.head = (user_source->buf.head + count) & (user_source->buf_size - 1);
+    user_source->buf.head = (user_source->buf.head + count) & (user_source->buf_size - 4);
     d_printk(1, "head moved up %zu to %08x\n", count, user_source->buf.head);
     user_source->off += count;
     return 0;
@@ -77,7 +73,7 @@ size_t whitebox_user_source_data_available(struct whitebox_user_source *user_sou
 int whitebox_user_source_consume(struct whitebox_user_source *user_source,
         size_t count)
 {
-    user_source->buf.tail = (user_source->buf.tail + count) & (user_source->buf_size - 1);
+    user_source->buf.tail = (user_source->buf.tail + count) & (user_source->buf_size - 4);
     return 0;
 }
 

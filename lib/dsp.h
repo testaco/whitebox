@@ -33,6 +33,6 @@ void sincos16(uint32_t phase, int16_t *i, int16_t *q);
  *
  * c[i] = cos(phase) + 1j * sin(phase)
  */
-void sincos16c(int n, uint32_t *phases, uint32_t *c);
+uint32_t sincos16c(int n, uint32_t fcw, uint32_t p0, uint32_t *c);
 
 #endif /* __WHITEBOX_DSP_H__ */

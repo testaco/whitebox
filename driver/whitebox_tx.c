@@ -132,10 +132,15 @@ void tx_dma_cb(void *data)
 void tx_stop(struct whitebox_device *wb)
 {
     struct whitebox_stats *stats = &wb->tx_stats;
-    /*while (pdma_busy(wb->platform_data->tx_dma_ch)) {
-        cpu_relax();
-    }*/
+
     stats->stop++;
+
+    while (pdma_buffers_available(wb->platform_data->tx_dma_ch) < 2) {
+        //d_printk(0, "waiting on dma\n");
+        //d_printk_loop(0);
+        cpu_relax();
+    }
+
     wb->rf_sink.exciter->ops->set_state(wb->rf_sink.exciter, WES_TXSTOP);
 }
 

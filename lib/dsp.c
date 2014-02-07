@@ -10,31 +10,35 @@ int16_t sin_lut[] = {
 };
 
 void accum32(int n, uint32_t fcw, uint32_t p0, uint32_t *phases) {
-    int i;
-    phases[0] = p0;
-    //printf("%08lx\n", phases);
-    for (i = 1; i < n; ++i) {
-        //*(phases+i) = (*(phases + i - 1) + fcw) & (DDS_PA_MAX - 1);
-        *(phases+i) = (*(phases+i-1) + fcw) & (DDS_PA_MAX - 1);
+    int i = 0;
+    uint32_t last = p0;
+
+    while (i < n) {
+        last = (last + fcw) & (DDS_PA_MAX - 1);
+        *(phases + i++) = last;
     }
 }
 
-void sincos16(uint32_t phase, int16_t *i, int16_t *q) {
+inline void sincos16(uint32_t phase, int16_t *i, int16_t *q) {
     uint16_t entry = (phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
     //printf("%08x\n", entry);
-    *i = cos_lut[entry];
-    *q = sin_lut[entry];
+    *i = 0;//cos_lut[entry];
+    //*q = 0;//sin_lut[entry];
 }
 
-void sincos16c(int n, uint32_t *phases, uint32_t *c) {
+uint32_t sincos16c(int n, uint32_t fcw, uint32_t p0, uint32_t *c) {
     int i;
     int16_t re = 0, im = 0;
-    printf("%08lx - %08lx (%08lx)\n", phases, phases + n - 1, (phases + n - 1) - phases);
+    uint16_t entry;
+    uint32_t phase = p0;
     for (i = 0; i < n; ++i) {
-        //printf("%08lx %08lx\n", phases + i, *(phases + i));
-        //sincos16(*(phases+i), &re, &im);
-        //*(c+i) = ((uint32_t)im << 16) | (uint32_t)re;
+        phase = (phase + fcw) & (DDS_PA_MAX - 1);
+        entry = (phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
+        //re = cos_lut[entry];//0;
+        //im = sin_lut[entry];//0;
+        *(c+i) = ((uint32_t)im << 16) | (uint32_t)re;
     }
+    return phase;
 }
 
 uint32_t freq_to_fcw(float freq, float sample_rate) {

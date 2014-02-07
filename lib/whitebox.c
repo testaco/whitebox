@@ -201,16 +201,18 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
         fprintf(stderr, "Error setting the pll\n");
         return 1;
     }
-    cmx991_tx_tune(&wb->cmx991, 198.00e6, IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
-        TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P0DB);
-    cmx991_ioctl_set(&wb->cmx991, &w);
-    ioctl(wb->fd, WC_SET, &w);
 
     vco_frequency = (frequency - 45.00e6) * 2.0;
     if (vco_frequency <= 35.00e6) {
         fprintf(stderr, "VCO frequency too low\n");
         return 2;
     }
+
+    cmx991_tx_tune(&wb->cmx991, vco_frequency,
+        IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
+        TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P0DB);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
 
     adf4351_init(&wb->adf4351);
     wb->adf4351.charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;

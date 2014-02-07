@@ -5,7 +5,7 @@
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_CXX_COMPILER arm-uclinuxeabi-g++)
 set(CMAKE_C_COMPILER  arm-uclinuxeabi-gcc)
-set(CMAKE_CXX_FLAGS "-march=armv7-m -mtune=cortex-m3 -mthumb" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS "-march=armv7-m -mtune=cortex-m3 -mthumb -g" CACHE STRING "" FORCE)
 set(CMAKE_C_FLAGS ${CMAKE_CXX_FLAGS} CACHE STRING "" FORCE)
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 #set(CMAKE_FIND_ROOT_PATH ${CMAKE_CXXlinux-cortexm-1.9.0/projects/radio/local)

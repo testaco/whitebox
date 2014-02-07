@@ -194,20 +194,31 @@ void snipe(int use_dds)
     while (ch != 10) {
         ch = getch();
         if (ch > 0) {
-            if ((char)ch == 'r')
-                carrier_freq = 144.95e6;
-            else if (ch == 65)
-                carrier_freq += 500e3;
-            else if (ch == 66)
-                carrier_freq -= 500e3;
-            /*else if (ch == 67)
-                *q += 1;
-            else if (ch == 68)
-                *q -= 1;*/
-
+            float vco_frequency;
+            whitebox_args_t w;
             printf("%f\n", carrier_freq);
             whitebox_tx_clear(&wb);
-            assert(whitebox_tx(&wb, carrier_freq) == 0);
+            ioctl(wb.fd, WC_GET, &w);
+            cmx991_ioctl_get(&wb.cmx991, &w);
+            cmx991_resume(&wb.cmx991);
+            if (cmx991_pll_enable_m_n(&wb.cmx991, 19.2e6, 192, 1800) < 0) {
+                fprintf(stderr, "Error setting the pll\n");
+                return;
+            }
+
+            vco_frequency = (carrier_freq - 45.00e6) * 2.0;
+            if (vco_frequency <= 35.00e6) {
+                fprintf(stderr, "VCO frequency too low\n");
+                return;
+            }
+
+            cmx991_tx_tune(&wb.cmx991, vco_frequency,
+                IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
+                TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P0DB);
+            cmx991_print_to_file(&wb.cmx991, stdout);
+            cmx991_ioctl_set(&wb.cmx991, &w);
+            ioctl(wb.fd, WC_SET, &w);
+            //assert(whitebox_tx(&wb, carrier_freq) == 0);
             //whitebox_tx_set_correction(&wb, *i, *q);
         }
         ret = write(fd, c, sizeof(uint32_t) * N);
