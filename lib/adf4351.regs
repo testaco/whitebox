@@ -10,7 +10,7 @@ int_16_bit              0[15:30]    0x23
 mod_12_bit              1[3:14]     0xfff
 phase_12_bit            1[15:26]    0
 prescaler               1[27]       0       4_5, 8_9
-phase_adjust            1[28]       0
+phase_adjust            1[28]       0       off, on
 ##reserved              1[29:31]    0
 ########################################################################
 ## address 2

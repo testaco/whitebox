@@ -131,12 +131,15 @@ typedef struct whitebox_args {
 /* CMX991 */
 #define WC_GET _IOR('w', 9, whitebox_args_t*)
 #define WC_SET _IOW('w', 10, whitebox_args_t*)
+#define WC_LOCKED _IO('w', 17)
 
 /* ADF4351 */
 #define WA_GET _IOR('w', 11, whitebox_args_t*)
 #define WA_SET _IOW('w', 12, whitebox_args_t*)
+#define WA_LOCKED _IO('w', 16)
 
-#define WA_CLOCK_RATE 26.0e6
+#define WA_CLOCK_RATE 10.0e6
+#define WA_PD_MASK   0x00000020
 
 /* Mock Commands */
 #define WM_CMD _IOW('w', 13, whitebox_args_t*)

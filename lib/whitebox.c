@@ -180,7 +180,13 @@ int whitebox_reset(whitebox_t* wb) {
 }
 
 int whitebox_plls_locked(whitebox_t* wb) {
-    return ioctl(wb->fd, W_LOCKED);
+    int i;
+    // We wait for a little bit incase tuning just changed
+    for (i = 0; i < 10; ++i) {
+        if (ioctl(wb->fd, W_LOCKED))
+            return 1;
+    }
+    return 0;
 }
 
 int whitebox_tx_clear(whitebox_t* wb) {
@@ -202,35 +208,40 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
         return 1;
     }
 
-    vco_frequency = (frequency - 45.00e6) * 2.0;
+    vco_frequency = (frequency + 45.00e6) * 4.0;
     if (vco_frequency <= 35.00e6) {
         fprintf(stderr, "VCO frequency too low\n");
         return 2;
     }
 
     cmx991_tx_tune(&wb->cmx991, vco_frequency,
-        IF_FILTER_BW_45MHZ, HI_LO_HIGHER,
-        TX_RF_DIV_BY_2, TX_IF_DIV_BY_4, GAIN_P0DB);
+        IF_FILTER_BW_45MHZ, HI_LO_LOWER,
+        TX_RF_DIV_BY_4, TX_IF_DIV_BY_4, GAIN_P0DB);
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
 
     adf4351_init(&wb->adf4351);
-    wb->adf4351.charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
-    wb->adf4351.muxout = MUXOUT_DGND;
-    //adf4351.clock_divider_12_bit = 150;
-    wb->adf4351.clock_div_mode = CLOCK_DIV_MODE_CLOCK_DIVIDER_OFF;
-    wb->adf4351.low_noise_and_spur = LOW_NOISE_AND_SPUR_LOW_NOISE;
 
-    wb->adf4351.rf_output_enable = RF_OUTPUT_ENABLE_ENABLED;
-    wb->adf4351.aux_output_power = AUX_OUTPUT_POWER_5DBM;
-    wb->adf4351.aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
-    wb->adf4351.aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
-
-    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 10e3, vco_frequency);
-    wb->adf4351.ld_pin_mode = LD_PIN_MODE_DLD;
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
     return 0;
+}
+
+int whitebox_tx_fine_tune(whitebox_t *wb, float frequency) {
+    float vco_frequency;
+    whitebox_args_t w;
+
+    vco_frequency = (frequency + 45.00e6) * 4.0;
+    if (vco_frequency <= 35.00e6) {
+        fprintf(stderr, "VCO frequency too low\n");
+        return 2;
+    }
+
+
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    ioctl(wb->fd, WA_SET, &w);
 }
 
 int whitebox_tx_set_interp(whitebox_t* wb, uint32_t interp) {

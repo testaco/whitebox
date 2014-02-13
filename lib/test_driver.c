@@ -130,12 +130,12 @@ int test_ioctl_adf4351(void *data) {
     fd = open(WHITEBOX_DEV, O_WRONLY);
     assert(fd > 0);
     ioctl(fd, W_RESET);
-    ioctl(fd, WC_GET, &w);
+    ioctl(fd, WA_GET, &w);
     adf4351_ioctl_get(&adf4351, &w);
     adf4351.frac_12_bit = 100;
     adf4351_ioctl_set(&adf4351, &w);
-    ioctl(fd, WC_SET, &w);
-    ioctl(fd, WC_GET, &w);
+    ioctl(fd, WA_SET, &w);
+    ioctl(fd, WA_GET, &w);
     adf4351_ioctl_get(&adf4351, &w);
     assert(adf4351.frac_12_bit == 100);
     close(fd);

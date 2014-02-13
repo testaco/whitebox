@@ -5,6 +5,8 @@
 
 #include "whitebox_test.h"
 
+#define WHITEBOX_DEV "/dev/whitebox"
+
 int test_cmx991_unpack_state(void *data) {
     cmx991_t cmx991;
     cmx991_load(&cmx991, 0x11, 0x8f);
@@ -56,14 +58,28 @@ int test_cmx991_pll_enable(void *data) {
 }
 
 int test_cmx991_rf_responds(void *data) {
-    whitebox_t wb;
-    whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 144.00e6) == 0);
-    assert(whitebox_plls_locked(&wb));
-    assert(whitebox_close(&wb) == 0);
+    int fd;
+    whitebox_args_t w;
+    cmx991_t cmx991;
+
+    fd = open(WHITEBOX_DEV, O_WRONLY);
+    assert(fd > 0);
+    cmx991_ioctl_get(&cmx991, &w);
+
+    cmx991.hi_lo = HI_LO_HIGHER;
+    cmx991_ioctl_set(&cmx991, &w);
+    ioctl(fd, WC_SET, &w);
+    ioctl(fd, WC_GET, &w);
+    cmx991_ioctl_get(&cmx991, &w);
+    assert(cmx991.hi_lo == HI_LO_HIGHER);
+
+    cmx991.hi_lo = HI_LO_LOWER;
+    cmx991_ioctl_set(&cmx991, &w);
+    ioctl(fd, WC_SET, &w);
+    ioctl(fd, WC_GET, &w);
+    cmx991_ioctl_get(&cmx991, &w);
+    assert(cmx991.hi_lo == HI_LO_LOWER);
+    return 0;
 }
 
 int main(int argc, char **argv) {

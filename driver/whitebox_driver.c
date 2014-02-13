@@ -271,6 +271,11 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
     if (whitebox_device->state == WDS_TX)
         tx_stop(whitebox_device);
 
+    // Turn off LO
+    whitebox_device->adf4351_regs[2] |= WA_PD_MASK;
+    whitebox_gpio_adf4351_write(whitebox_device->platform_data,
+        whitebox_device->adf4351_regs[2]);
+
     // Disable DAC
     whitebox_gpio_dac_disable(whitebox_device->platform_data);
 
@@ -701,6 +706,12 @@ long whitebox_ioctl_cmx991_set(unsigned long arg) {
     return 0;
 }
 
+long whitebox_ioctl_cmx991_locked(void) {
+
+    return whitebox_gpio_cmx991_read(whitebox_device->platform_data,
+        WHITEBOX_CMX991_LD_REG) & WHITEBOX_CMX991_LD_MASK;
+}
+
 long whitebox_ioctl_adf4351_get(unsigned long arg) {
     whitebox_args_t w;
     int i;
@@ -721,12 +732,18 @@ long whitebox_ioctl_adf4351_set(unsigned long arg) {
         return -EACCES;
 
     for (i = WA_REGS_COUNT - 1; i >= 0; --i) {
-        whitebox_device->adf4351_regs[i] = w.flags.adf4351[i];
-        whitebox_gpio_adf4351_write(whitebox_device->platform_data, 
-                w.flags.adf4351[i]);
+        if (whitebox_device->adf4351_regs[i] != w.flags.adf4351[i]) {
+            whitebox_device->adf4351_regs[i] = w.flags.adf4351[i];
+            whitebox_gpio_adf4351_write(whitebox_device->platform_data, 
+                    w.flags.adf4351[i]);
+        }
     }
 
     return 0;
+}
+
+long whitebox_ioctl_adf4351_locked(void) {
+    return whitebox_gpio_adf4351_locked(whitebox_device->platform_data);
 }
 
 long whitebox_ioctl_mock_command(unsigned long arg) {
@@ -795,10 +812,14 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_cmx991_get(arg);
         case WC_SET:
             return whitebox_ioctl_cmx991_set(arg);
+        case WC_LOCKED:
+            return whitebox_ioctl_cmx991_locked();
         case WA_GET:
             return whitebox_ioctl_adf4351_get(arg);
         case WA_SET:
             return whitebox_ioctl_adf4351_set(arg);
+        case WA_LOCKED:
+            return whitebox_ioctl_adf4351_locked();
         case WM_CMD:
             return whitebox_ioctl_mock_command(arg);
         case W_MMAP_WRITE:

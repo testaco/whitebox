@@ -8,5 +8,5 @@ void adf4351_load(adf4351_t* rf, uint32_t data);
 void adf4351_ioctl_get(adf4351_t* rf, struct whitebox_args* w);
 void adf4351_ioctl_set(adf4351_t* rf, struct whitebox_args* w);
 
-double adf4351_actual_frequency(adf4351_t* rf);
+double adf4351_actual_frequency(adf4351_t* rf, double ref_freq);
 double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, double target_freq);

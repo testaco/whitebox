@@ -61,8 +61,11 @@ target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_tx qa_tx.c)
 target_link_libraries(qa_tx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(qa_lo qa_lo.c)
+target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 add_custom_target(apps
-    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx)
+    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx qa_lo)
 
 add_test(NAME target_netboot
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot
