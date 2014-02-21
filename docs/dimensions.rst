@@ -1,4 +1,4 @@
 Dimensions
 ==========
 
-.. image:: img/dimensions.png
+.. image:: _images/dimensions.png

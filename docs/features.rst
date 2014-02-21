@@ -80,7 +80,7 @@ and make a Smart Software Radio with Android.
 Functional Block Diagram
 ************************
 
-.. image:: img/functional_block_diagram.png
+.. image:: _images/functional_block_diagram.png
 
 **Signals**
 
