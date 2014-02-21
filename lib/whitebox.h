@@ -61,4 +61,8 @@ void whitebox_tx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *cor
 int whitebox_tx_set_gain(whitebox_t *wb, float gain_i, float gain_q);
 int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q);
 
+
+int whitebox_rx(whitebox_t* wb, float frequency);
+int whitebox_rx_fine_tune(whitebox_t* wb, float frequency);
+
 #endif /* __WHITEBOX_H__ */

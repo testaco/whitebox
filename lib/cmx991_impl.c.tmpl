@@ -211,6 +211,8 @@ void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div, mix_out_t mix_out,
     rf->mix_pwr = MIX_PWR_POWER_UP;
     rf->iq_pwr = IQ_PWR_POWER_UP;
     rf->vbias = VBIAS_POWER_UP;
+    rf->sli_pwr = SLI_PWR_POWER_UP;
+    rf->lna = LNA_POWER_UP;
 
     rf->rx_rf_div = div;
     rf->if_in = if_in;

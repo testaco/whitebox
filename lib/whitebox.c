@@ -355,3 +355,50 @@ int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q)
     *gain_q = gq / WEG_COEFF;
     return 0;
 }
+
+int whitebox_rx(whitebox_t* wb, float frequency) {
+    float vco_frequency;
+    whitebox_args_t w;
+
+    ioctl(wb->fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    cmx991_resume(&wb->cmx991);
+    if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
+        fprintf(stderr, "Error setting the pll\n");
+        return 1;
+    }
+
+    vco_frequency = (frequency + 45.00e6) * 4.0;
+    if (vco_frequency <= 35.00e6) {
+        fprintf(stderr, "VCO frequency too low\n");
+        return 2;
+    }
+
+    cmx991_rx_tune(&wb->cmx991, //vco_frequency,
+        RX_RF_DIV_BY_4, MIX_OUT_MIXOUT1, IF_IN_IFIP1,
+        IQ_FILTER_BW_1MHZ, VGA_N0DB);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+
+    adf4351_init(&wb->adf4351);
+
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    ioctl(wb->fd, WA_SET, &w);
+    return 0;
+}
+
+int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
+    float vco_frequency;
+    whitebox_args_t w;
+
+    vco_frequency = (frequency + 45.00e6) * 4.0;
+    if (vco_frequency <= 35.00e6) {
+        fprintf(stderr, "VCO frequency too low\n");
+        return 2;
+    }
+
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    ioctl(wb->fd, WA_SET, &w);
+}

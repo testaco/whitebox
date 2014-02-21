@@ -62,7 +62,7 @@ double _actual_frequency(double FRAC, double N, double MOD, int DIV, int R, int 
 
 double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, double target_freq) {
     double actual_freq, pfd_freq;
-    int R=1, N=0, FRAC=0, MOD=0;
+    int R=1, N=0, FRAC=0, MOD=0, BS=0;
     int RFdiv = 1;
     reference_divide_by_2_t T = REFERENCE_DIVIDE_BY_2_DISABLED;
     reference_doubler_t D = REFERENCE_DOUBLER_DISABLED;
@@ -89,6 +89,7 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
         pfd_freq = ref_freq * ( 1 + D ) / ( R * ( 1 + T ) );
     }
 
+    BS = pfd_freq / 125e3;
 
     // vco_freq = (pfd_freq / RFdiv) * ((INT + (FRAC/MOD)) 
     // INT + (FRAC/MOD) = vco_freq / (pfd_freq / RFdiv)
@@ -118,7 +119,7 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     rf->reference_divide_by_2 = T;
     rf->r_counter_10_bit = R;
     rf->rf_divider_select = get_divider_select(RFdiv);
-    rf->band_select_clock_div = 80;
+    rf->band_select_clock_div = BS;
 
     rf->rf_output_enable = RF_OUTPUT_ENABLE_ENABLED;
     rf->output_power = OUTPUT_POWER_M4DBM;
