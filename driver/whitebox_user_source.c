@@ -42,7 +42,7 @@ size_t whitebox_user_source_space_available(struct whitebox_user_source *user_so
     long tail, head, space;
     head = user_source->buf.head;
     tail = ACCESS_ONCE(user_source->buf.tail);
-    space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size);
+    space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size) & ~3;
     *dest = (unsigned long)user_source->buf.buf + head;
     d_printk(3, "%ld\n", space);
     return space;

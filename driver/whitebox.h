@@ -60,6 +60,8 @@
 enum whitebox_device_state {
     WDS_IDLE,
     WDS_TX,
+    WDS_TX_STREAMING,
+    WDS_TX_STOPPING,
     WDS_RX,
 };
 
@@ -165,5 +167,7 @@ extern int whitebox_check_plls;
 extern int whitebox_check_runs;
 extern int whitebox_loopen;
 extern int whitebox_debug;
+extern int whitebox_flow_control;
+extern int whitebox_frame_size;
 
 #endif /* __WHITEBOX_H */

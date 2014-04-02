@@ -97,7 +97,7 @@ long _exciter_space_available(struct whitebox_exciter *exciter,
         exciter->ops->set_state(exciter, WES_TXEN);
     *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
     //return (WE_FIFO_SIZE << 2) - (long)((WHITEBOX_EXCITER(exciter)->available) << 2);
-    return 4*4096L;
+    return whitebox_frame_size << 2;
 }
 
 int _exciter_produce(struct whitebox_exciter *exciter,

@@ -55,6 +55,10 @@ int tx_exec(struct whitebox_device* wb)
         stats->exec_nop_dest++;
         spin_unlock_irqrestore(&rf_sink->lock, flags);
         return 0;
+    } else if (whitebox_flow_control && !(wb->state == WDS_TX_STOPPING) && src_count < dest_count) {
+        stats->exec_nop_src++;
+        spin_unlock_irqrestore(&rf_sink->lock, flags);
+        return 0;
     }
     count = min(src_count, dest_count);
 
@@ -99,7 +103,7 @@ int tx_exec(struct whitebox_device* wb)
 }
 
 void d_printk_loop(int level);
-void tx_dma_cb(void *data)
+void tx_dma_cb(void *data, int buf)
 {
     struct whitebox_device *wb = (struct whitebox_device *)data;
     struct whitebox_stats *stats = &wb->tx_stats;
@@ -110,7 +114,7 @@ void tx_dma_cb(void *data)
 
     spin_lock_irqsave(&rf_sink->lock, flags);
 
-    count = whitebox_rf_sink_work_done(rf_sink);
+    count = whitebox_rf_sink_work_done(rf_sink, buf);
 
     d_printk_loop(4);
 
@@ -119,14 +123,14 @@ void tx_dma_cb(void *data)
 
     spin_unlock_irqrestore(&rf_sink->lock, flags);
 
+    tx_exec(wb);
+
     wake_up_interruptible(&wb->write_wait_queue);
     if (whitebox_loopen) {
         wake_up_interruptible(&wb->read_wait_queue);
         rx_exec(wb);
         d_printk_loop(4);
     }
-
-    tx_exec(wb);
 }
 
 void tx_stop(struct whitebox_device *wb)

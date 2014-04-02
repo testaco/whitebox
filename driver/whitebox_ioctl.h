@@ -1,7 +1,7 @@
 #include <linux/ioctl.h>
 
 // DAC Rate
-#define W_DAC_RATE_HZ   10000000
+#define W_DAC_RATE_HZ   10080000UL
 
 // DDS Constants
 #define W_DDS_PA_BITWIDTH 25
@@ -138,7 +138,7 @@ typedef struct whitebox_args {
 #define WA_SET _IOW('w', 12, whitebox_args_t*)
 #define WA_LOCKED _IO('w', 16)
 
-#define WA_CLOCK_RATE 10.0e6
+#define WA_CLOCK_RATE 26.0e6
 #define WA_PD_MASK   0x00000020
 
 /* Mock Commands */

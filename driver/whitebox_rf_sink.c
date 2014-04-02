@@ -60,9 +60,12 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
         unsigned long src, size_t src_count,
         unsigned long dest, size_t dest_count)
 {
-    rf_sink->dma_count = min(src_count, dest_count);
+    size_t count = min(src_count, dest_count);
+    dma_addr_t mapping;
+    int buf;
+
     // If empty, just return
-    if (rf_sink->dma_count >> 2 == 0)
+    if (count >> 2 == 0)
         return -1;
 
     d_printk(3, "work start\n");
@@ -85,24 +88,29 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
     d_printk(1, "src=%08lx src_count=%zu dest=%08lx dest_count=%zu\n",
             src, src_count, dest, dest_count);
 
-    rf_sink->dma_mapping = dma_map_single(NULL,
-            (void*)src, rf_sink->dma_count, DMA_TO_DEVICE);
-    if (dma_mapping_error(NULL, rf_sink->dma_mapping)) {
+    mapping = dma_map_single(NULL,
+            (void*)src, count, DMA_TO_DEVICE);
+    if (dma_mapping_error(NULL, mapping)) {
         d_printk(0, "failed to map dma\n");
         return -EFAULT;
     }
 
-    pdma_start(rf_sink->dma_ch,
-            rf_sink->dma_mapping,
+    if ((buf = pdma_start(rf_sink->dma_ch,
+            mapping,
             dest,
-            rf_sink->dma_count >> 2);
+            count >> 2)) < 0) {
+        d_printk(0, "failed to start dma\n");
+        return -EFAULT;
+    }
+    rf_sink->dma[buf].count = count;
+    rf_sink->dma[buf].mapping = mapping;
     d_printk(3, "work finish\n");
     return 0;
 }
 
-int whitebox_rf_sink_work_done(struct whitebox_rf_sink *rf_sink)
+int whitebox_rf_sink_work_done(struct whitebox_rf_sink *rf_sink, int buf)
 {
-    dma_unmap_single(NULL, rf_sink->dma_mapping,
-            rf_sink->dma_count, DMA_TO_DEVICE);
-    return (int)rf_sink->dma_count;
+    dma_unmap_single(NULL, rf_sink->dma[buf].mapping,
+            rf_sink->dma[buf].count, DMA_TO_DEVICE);
+    return (int)rf_sink->dma[buf].count;
 }

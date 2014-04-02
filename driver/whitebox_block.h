@@ -73,10 +73,12 @@ struct whitebox_rf_sink {
     loff_t off;
     /* the dma channel */
     int dma_ch;
-    /* the dma mapping */
-    dma_addr_t dma_mapping;
-    /* the dma mapped size */
-    size_t dma_count;
+    struct {
+        /* the dma mapping */
+        dma_addr_t mapping;
+        /* the dma mapped size */
+        size_t count;
+    } dma[2];
     /* driver callback to keep flow going */
     void (*dma_cb)(void*);
     /* callback data */
@@ -102,7 +104,7 @@ int whitebox_rf_sink_produce(struct whitebox_rf_sink *rf_sink, size_t count);
 int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
         unsigned long src, size_t src_count,
         unsigned long dest, size_t dest_count);
-int whitebox_rf_sink_work_done(struct whitebox_rf_sink *rf_sink);
+int whitebox_rf_sink_work_done(struct whitebox_rf_sink *rf_sink, int buf);
 
 struct whitebox_user_sink {
     /* where the sink is, absolute byte offset */

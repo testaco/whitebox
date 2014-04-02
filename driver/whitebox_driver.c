@@ -50,7 +50,7 @@ module_param(whitebox_check_runs, int, S_IRUSR | S_IWUSR);
 /*
  * Order of the user read and write circular buffers.
  */
-static int whitebox_user_order = 4;
+static int whitebox_user_order = 7;
 module_param(whitebox_user_order, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -83,18 +83,39 @@ module_param(whitebox_receiver_quantum, int, S_IRUSR | S_IWUSR);
 static int whitebox_auto_tx = 1;
 module_param(whitebox_auto_tx, int, S_IRUSR | S_IWUSR);
 
-static int whitebox_tx_i_correction = 16;
+/*
+ * Offset to add to I & Q coming out of the DUC - for AQM calibration
+ */
+static int whitebox_tx_i_correction = 0;
 module_param(whitebox_tx_i_correction, int, S_IRUSR | S_IWUSR);
-static int whitebox_tx_q_correction = -51;
+static int whitebox_tx_q_correction = 0;
 module_param(whitebox_tx_q_correction, int, S_IRUSR | S_IWUSR);
 
-static int whitebox_tx_i_gain = (int)(1.023906 * WEG_COEFF + 0.5);
+/*
+ * Gain to multiply I & Q by coming out of the DUC - for AQM calibration
+ */
+static int whitebox_tx_i_gain = (int)(1. * WEG_COEFF + 0.5);
 module_param(whitebox_tx_i_gain, int, S_IRUSR | S_IWUSR);
 static int whitebox_tx_q_gain = (int)(1. * WEG_COEFF + 0.5);
 module_param(whitebox_tx_q_gain, int, S_IRUSR | S_IWUSR);
 
+/*
+ * Enable the loopback (for testing)
+ */
 int whitebox_loopen = 0;
 module_param(whitebox_loopen, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Buffer delay size.  latency_secs = (threshold / 4) * sample_rate.
+ */
+int whitebox_user_source_buffer_threshold = PAGE_SIZE * 8;
+module_param(whitebox_user_source_buffer_threshold, int, S_IRUSR | S_IWUSR);
+
+int whitebox_flow_control = 1;
+module_param(whitebox_flow_control, int, S_IRUSR | S_IWUSR);
+
+int whitebox_frame_size = 1024;
+module_param(whitebox_frame_size, int, S_IRUSR | S_IWUSR);
 
 /*
  * Register mappings for the CMX991 register file.
@@ -268,7 +289,7 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
         return -ENOENT;
     }
 
-    if (whitebox_device->state == WDS_TX)
+    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING)
         tx_stop(whitebox_device);
 
     // Turn off LO
@@ -356,7 +377,7 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
         return -ERESTARTSYS;
     }
 
-    if (whitebox_device->state == WDS_TX) {
+    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING || whitebox_device->state == WDS_TX_STOPPING) {
         up(&whitebox_device->sem);
         d_printk(1, "in transmit\n");
         return -EBUSY;
@@ -428,7 +449,7 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
 }
 
 static int whitebox_write(struct file* filp, const char __user* buf, size_t count, loff_t* pos) {
-    unsigned long dest;
+    unsigned long dest, src;
     size_t dest_count;
     int ret = 0, err = 0;
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
@@ -495,7 +516,18 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 
     d_printk_loop(4);
 
-    tx_exec(whitebox_device);
+    if (whitebox_device->state == WDS_TX_STREAMING) {
+        tx_exec(whitebox_device);
+    } else {
+        if (whitebox_user_source_data_available(user_source, &src) >=
+                whitebox_user_source_buffer_threshold) {
+            d_printk(1, "streaming %d %d\n",
+                whitebox_user_source_data_available(user_source, &src),
+                whitebox_user_source_buffer_threshold);
+            whitebox_device->state = WDS_TX_STREAMING;
+            tx_exec(whitebox_device);
+        }
+    }
 
     d_printk_loop(4);
 
@@ -514,11 +546,12 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
         return -ERESTARTSYS;
     }
     d_printk(1, "state=%d\n", whitebox_device->state);
-    if (whitebox_device->state == WDS_TX) {
+    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
+        whitebox_device->state = WDS_TX_STOPPING;
         while (((src_count = whitebox_user_source_data_available(user_source, &src)) > 0) && !(err = tx_error(whitebox_device))) {
             up(&whitebox_device->sem);
 
-            d_printk(1, "waiting for user source to drain\n");
+            d_printk(1, "waiting for user source to drain %d\n", src_count);
 
             tx_exec(whitebox_device);
 
@@ -531,7 +564,7 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
         }
 
         if (err) {
-            d_printk(1, "wait for user_source to drain error tx_error=%d user_source_data=%zd\n", err, src_count);
+            d_printk(0, "wait for user_source to drain error tx_error=%d user_source_data=%zd\n", err, src_count);
             up(&whitebox_device->sem);
             return -EIO;
         }
@@ -849,7 +882,7 @@ void stats_show(struct seq_file *m, struct whitebox_stats *stats) {
     seq_printf(m, "bytes=%ld\n", stats->bytes);
     seq_printf(m, "bytes_per_call=[");
     for (i = 0; i < W_EXEC_DETAIL_COUNT; ++i) {
-        int offset = (stats->exec_detail_index - i) & (W_EXEC_DETAIL_COUNT - 1);
+        int offset = (stats->exec_detail_index + i) & (W_EXEC_DETAIL_COUNT - 1);
         struct whitebox_stats_exec_detail *detail = &stats->exec_detail[offset];
         
         if (detail->time > 0)
