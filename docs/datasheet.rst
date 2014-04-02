@@ -2,12 +2,7 @@ Datasheet
 =========
 
 .. toctree::
-    specifications
     ratings
-    pins
-    timing
+    specifications
     test
-    applications
     dimensions
-    ordering
-    liability

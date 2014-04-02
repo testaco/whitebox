@@ -80,7 +80,7 @@ add_dependencies(upload_docs DPENDS whitebox_html_docs)
 
 add_custom_target(whitebox_pdf_docs
     ${SPHINX_EXECUTABLE}
-    -vvv -q -b latex
+    -vvv -q -b pdf
     -c "${BINARY_BUILD_DIR}"
     -d "${SPHINX_CACHE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"

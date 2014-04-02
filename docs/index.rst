@@ -5,4 +5,4 @@
    datasheet
    sdk
    faq
-   eratta
+   references

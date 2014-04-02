@@ -3,8 +3,6 @@ Digital Signal Processing
 
 .. automodule:: dsp
 
-*Digital Signal Processing* is
-
 The *block diagram* representation of the signal uses symbols to represent
 the interconnections of the core parts of a signal processing flow including
 mathematical operations and memory.  In the case of RTL, the memory is

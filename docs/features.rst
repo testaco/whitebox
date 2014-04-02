@@ -7,8 +7,8 @@ Features
 
 **Hardware**
 
-* Quadrature receiver from 100MHz to 1000MHz
-* Quadrature transmitter from 100MHz to 1000MHz
+* Receive from 50MHz to 1000MHz
+* Transmit from 50MHz to 1000MHz
 * Half-duplex
 * 1MHz bandwidth
 * 10 MS/s, 10 bit ADC & DAC
@@ -92,3 +92,6 @@ Functional Block Diagram
 6. Transmitter (TX SMA).  Transmit antenna SMA.
 7. 10MHz Reference (REFIN).  External 10MHz reference input SMA.
 
+.. raw:: pdf
+    
+    PageBreak oneColumn

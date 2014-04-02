@@ -3,20 +3,6 @@ Installing
 
 Downloading a compiled image is not ready yet.  For now, please follow the `Building` instructions before reaching this point.
 
-NFS
----
-
-Windows
-Mac
-Linux
-
-TFTP
-----
-
-Windows
-Mac
-Linux
-
 Custom Kernel Boot
 ------------------
 

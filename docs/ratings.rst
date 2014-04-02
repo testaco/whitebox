@@ -3,7 +3,7 @@ Absolute Maximum Ratings
 
 .. csv-table::
    :header: "Parameter", "Min", "Max", "Units"
-   :widths: 80, 10, 10, 10
+   :widths: 40, 10, 10, 10
    :class: table table-bordered table-condensed table-striped
 
     Supply Voltage, 3.7, 9, V
