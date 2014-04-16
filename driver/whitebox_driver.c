@@ -569,6 +569,8 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             return -EIO;
         }
 
+        d_printk(2, "stopping tx\n");
+
         tx_stop(whitebox_device);
 
         while ((exciter->ops->get_state(exciter) & WES_TXEN) && !(err = tx_error(whitebox_device))) {
@@ -672,6 +674,16 @@ long whitebox_ioctl_exciter_set(unsigned long arg) {
     exciter->ops->set_threshold(exciter, w.flags.exciter.threshold);
     exciter->ops->set_correction(exciter, w.flags.exciter.correction);
     exciter->ops->set_gain(exciter, w.flags.exciter.gain);
+    return 0;
+}
+
+long whitebox_ioctl_exciter_clear_mask(unsigned long arg) {
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    exciter->ops->clear_state(exciter, w.flags.exciter.state);
     return 0;
 }
 
@@ -823,6 +835,41 @@ long whitebox_ioctl_mmap_read(unsigned long arg)
     return count;
 }
 
+long whitebox_ioctl_fir_get(unsigned long arg) {
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    whitebox_args_t w;
+    u32 fir = exciter->ops->get_fir(exciter);
+    u8 i;
+    w.flags.fir.bank = (fir & 0x180) >> 7;
+    w.flags.fir.n = fir & 0x7f;
+    exciter->ops->set_fir(exciter, fir | WF_ACCESS_COEFFS);
+    for (i = 0; i < w.flags.fir.n; ++i)
+        w.flags.fir.coeff[i] = exciter->ops->get_fir_coeff(exciter, i);
+
+    if (copy_to_user((whitebox_args_t*)arg, &w,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    return 0;
+}
+
+long whitebox_ioctl_fir_set(unsigned long arg) {
+    struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    whitebox_args_t w;
+    u32 fir;
+    int i;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    fir = ((w.flags.fir.bank & 0x3) << 7) | (w.flags.fir.n & 0x7f);
+
+    exciter->ops->set_fir(exciter, fir | WF_ACCESS_COEFFS);
+    for (i = 0; i < w.flags.fir.n; ++i)
+        exciter->ops->set_fir_coeff(exciter, i, w.flags.fir.coeff[i]);
+
+    return 0;
+}
+
+
 static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long arg) {
     switch(cmd) {
         case W_RESET:
@@ -835,6 +882,8 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_exciter_get(arg);
         case WE_SET:
             return whitebox_ioctl_exciter_set(arg);
+        case WE_CLEAR_MASK:
+            return whitebox_ioctl_exciter_clear_mask(arg);
         case WR_CLEAR:
             return whitebox_ioctl_receiver_clear();
         case WR_GET:
@@ -859,6 +908,10 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_mmap_write(arg);
         case W_MMAP_READ:
             return whitebox_ioctl_mmap_read(arg);
+        case WF_GET:
+            return whitebox_ioctl_fir_get(arg);
+        case WF_SET:
+            return whitebox_ioctl_fir_set(arg);
         default:
             return -EINVAL;
     }

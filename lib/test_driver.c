@@ -104,6 +104,28 @@ int test_ioctl_exciter(void *data) {
     return 0;
 }
 
+int test_ioctl_fir(void *data) {
+    int fd;
+    int i;
+    whitebox_args_t w;
+    fd = open(WHITEBOX_DEV, O_WRONLY);
+    assert(fd > 0);
+    ioctl(fd, WE_CLEAR);
+    ioctl(fd, WF_GET, &w);
+    w.flags.fir.bank = 0;
+    w.flags.fir.n = WF_COEFF_COUNT - 1;
+    for (i = 0; i < WF_COEFF_COUNT - 1; ++i)
+        w.flags.fir.coeff[i] = i - (WF_COEFF_COUNT >> 1) + 1;
+    ioctl(fd, WF_SET, &w);
+    ioctl(fd, WF_GET, &w);
+    assert(w.flags.fir.bank == 0);
+    assert(w.flags.fir.n == WF_COEFF_COUNT - 1);
+    for (i = 0; i < WF_COEFF_COUNT - 1; ++i)
+        assert(w.flags.fir.coeff[i] == i - (WF_COEFF_COUNT >> 1) + 1);
+    close(fd);
+    return 0;
+}
+
 int test_ioctl_cmx991(void *data) {
     int fd;
     whitebox_args_t w;
@@ -578,6 +600,7 @@ int main(int argc, char **argv) {
 
     whitebox_parameter_set("mock_en", 1);
     whitebox_parameter_set("loopen", 1);
+    whitebox_parameter_set("flow_control", 0);
 
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_blocking_open_close),
@@ -585,8 +608,10 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_ioctl_reset),
         WHITEBOX_TEST(test_ioctl_not_locked),
         WHITEBOX_TEST(test_ioctl_exciter),
+        WHITEBOX_TEST(test_ioctl_fir),
         WHITEBOX_TEST(test_ioctl_cmx991),
         WHITEBOX_TEST(test_ioctl_adf4351),
+#if 0
         WHITEBOX_TEST(test_blocking_write),
         WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
@@ -594,12 +619,11 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_xfer2),
         WHITEBOX_TEST(test_blocking_xfer3),
         WHITEBOX_TEST(test_blocking_xfer4),
-        WHITEBOX_TEST(test_tx_fifo),
         WHITEBOX_TEST(test_mmap_success),
         WHITEBOX_TEST(test_mmap_write_success),
         //WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_blocking_xfer_huge),
-#if 0
+        WHITEBOX_TEST(test_tx_fifo),
         WHITEBOX_TEST(test_mmap_write_fail),
         WHITEBOX_TEST(test_mmap_write_not_locked),
 #endif
@@ -608,5 +632,6 @@ int main(int argc, char **argv) {
     result = whitebox_test_main(tests, NULL, argc, argv);
     whitebox_parameter_set("mock_en", 0);
     whitebox_parameter_set("loopen", 0);
+    whitebox_parameter_set("flow_control", 1);
     return result;
 }

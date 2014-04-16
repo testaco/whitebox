@@ -8,15 +8,16 @@
 #include <unistd.h>
 #include <termios.h>
 #include <sys/mman.h>
+#include <string.h>
 
 #include "whitebox.h"
 #include "whitebox_test.h"
 
-#define CARRIER_FREQ 144.95e6
-#define TONE_FREQ    17e3
+#define CARRIER_FREQ 146.00e6
+#define TONE_FREQ    7e3
 #define N 512
 #define COUNT 1024 
-#define SAMPLE_RATE 10e3 
+#define SAMPLE_RATE 48e3 
 #define DURATION_IN_SECS 1
 #define TOTAL_SAMPLES (DURATION_IN_SECS * SAMPLE_RATE)
 
@@ -63,19 +64,14 @@ void calibrate_dc_offset(int use_dds, int16_t *i, int16_t *q)
     int n;
     int fd, ret;
     whitebox_t wb;
-    uint32_t c[N];
+    unsigned long dest, count;
+    uint32_t phase = 0;
+    uint32_t fcw = freq_to_fcw(TONE_FREQ, sample_rate);
 
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
+    assert(whitebox_mmap(&wb) == 0);
     assert(whitebox_tx(&wb, carrier_freq) == 0);
-    //whitebox_tx_set_correction(&wb, *i, *q);
-
-    if (use_dds)
-        whitebox_tx_dds_enable(&wb, TONE_FREQ);
-
-    for (n = 0; n < N; ++n) {
-        c[n] =  0;
-    }
 
     while (ch != 10) {
         ch = getch();
@@ -98,37 +94,51 @@ void calibrate_dc_offset(int use_dds, int16_t *i, int16_t *q)
             printf("i=%d, q=%d\n", *i, *q);
             whitebox_tx_set_correction(&wb, *i, *q);
         }
-        ret = write(fd, c, sizeof(uint32_t) * N);
-        if (ret != sizeof(uint32_t) * N) {
+
+        count = ioctl(fd, W_MMAP_WRITE, &dest) >> 2;
+        if (count <= 0)
+            continue;
+
+        count = count < COUNT ? count : COUNT;
+        if (use_dds) {
+            int j;
+            for (j = 0; j < count; ++j) {
+                int16_t re, im;
+                QUAD_UNPACK(sincos16c(fcw, &phase), re, im);
+                ((uint32_t*)dest)[j] = QUAD_PACK(re, im);
+            }
+        } else {
+            memset((void*)dest, 0, count << 2);
+        }
+        ret = write(fd, 0, count << 2);
+        if (ret != count << 2) {
             printf("U"); fflush(stdout);
         }
     }
 
     //assert(fsync(fd) == 0);
-
+    assert(whitebox_munmap(&wb) == 0);
     assert(whitebox_close(&wb) == 0);
 }
 
-void calibrate_gain_and_phase(int16_t i, int16_t q, float *i_gain, float *q_gain, float *phase)
+void calibrate_gain_and_phase(int16_t i, int16_t q, float *i_gain, float *q_gain)
 {
     float carrier_freq = CARRIER_FREQ;
     float sample_rate = SAMPLE_RATE;
     int ch = -1;
     int n;
     int fd, ret;
+    int j;
     whitebox_t wb;
-    uint32_t c[N];
+    unsigned long dest, count;
+    uint32_t phase = 0;
+    uint32_t fcw = freq_to_fcw(TONE_FREQ, sample_rate);
 
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
+    assert(whitebox_mmap(&wb) == 0);
     assert(whitebox_tx(&wb, carrier_freq) == 0);
     whitebox_tx_set_correction(&wb, i, q);
-
-    whitebox_tx_dds_enable(&wb, TONE_FREQ);
-
-    for (n = 0; n < N; ++n) {
-        c[n] =  0;
-    }
 
     while (ch != 10) {
         ch = getch();
@@ -136,8 +146,19 @@ void calibrate_gain_and_phase(int16_t i, int16_t q, float *i_gain, float *q_gain
             if ((char)ch == 'r') {
                 *i_gain = 1.0; *q_gain = 1.0;
             }
-            else if ((char)ch == 'e') {
-                *i_gain = 1.9; *q_gain = 1.0;
+            else if ((char)ch == 'z') {
+                *i_gain = *q_gain = 0.0;
+            }
+            else if ((char)ch == 'h') {
+                *i_gain = 0.5; *q_gain = 0.5;
+            }
+            else if ((char)ch == 'j') {
+                *i_gain -= (1 / WEG_COEFF);
+                *q_gain -= (1 / WEG_COEFF);
+            }
+            else if ((char)ch == 'k') {
+                *i_gain += (1 / WEG_COEFF);
+                *q_gain += (1 / WEG_COEFF);
             }
             if (ch == 65)
                 *i_gain += (1 / WEG_COEFF);
@@ -151,14 +172,28 @@ void calibrate_gain_and_phase(int16_t i, int16_t q, float *i_gain, float *q_gain
             printf("i_gain=%f, q_gain=%f\n", *i_gain, *q_gain);
             whitebox_tx_set_gain(&wb, *i_gain, *q_gain);
         }
-        ret = write(fd, c, sizeof(uint32_t) * N);
-        if (ret != sizeof(uint32_t) * N) {
+
+        count = ioctl(fd, W_MMAP_WRITE, &dest) >> 2;
+        if (count <= 0)
+            continue;
+
+        count = count < COUNT ? count : COUNT;
+
+        for (j = 0; j < count; ++j) {
+            int16_t re, im;
+            QUAD_UNPACK(sincos16c(fcw, &phase), re, im);
+            ((uint32_t*)dest)[j] = QUAD_PACK(re, im);
+        }
+
+        ret = write(fd, 0, count << 2);
+        if (ret != count << 2) {
             printf("U"); fflush(stdout);
         }
     }
 
     //assert(fsync(fd) == 0);
 
+    assert(whitebox_munmap(&wb) == 0);
     assert(whitebox_close(&wb) == 0);
 }
 
@@ -230,6 +265,68 @@ void snipe(int use_dds)
     assert(whitebox_close(&wb) == 0);
 }
 
+int whitebox_tx2(whitebox_t* wb, float frequency, int m, int n) {
+    float vco_frequency;
+    whitebox_args_t w;
+
+    ioctl(wb->fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    cmx991_resume(&wb->cmx991);
+    if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, m, n) < 0) {
+        fprintf(stderr, "Error setting the pll\n");
+        return 1;
+    }
+
+    vco_frequency = (frequency + 45.00e6) * 4.0;
+    if (vco_frequency <= 35.00e6) {
+        fprintf(stderr, "VCO frequency too low\n");
+        return 2;
+    }
+
+    cmx991_tx_tune(&wb->cmx991, vco_frequency,
+        IF_FILTER_BW_45MHZ, HI_LO_LOWER,
+        TX_RF_DIV_BY_4, TX_IF_DIV_BY_4, GAIN_P0DB);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+
+    adf4351_init(&wb->adf4351);
+
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    ioctl(wb->fd, WA_SET, &w);
+    return 0;
+}
+
+void test_iflo(void) {
+    whitebox_t wb;
+    whitebox_args_t w;
+    char ch;
+    int m = 192, n = 1800;
+    whitebox_init(&wb);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_RDWR, SAMPLE_RATE) > 0);
+
+    whitebox_tx2(&wb, CARRIER_FREQ, m, n);
+
+    while (ch != 10) {
+        ch = getch();
+        if (ch == 65)
+            m += 10;
+        else if (ch == 66)
+            m -= 10;
+        else if (ch == 67)
+            n += 10;
+        else if (ch == 68)
+            n -= 10;
+
+        if (ch >= 65 && ch <= 68) {
+            whitebox_tx2(&wb, CARRIER_FREQ, m, n);
+            printf("m=%d, n=%d, f=%f\n", m, n,
+                cmx991_pll_actual_frequency(&wb.cmx991, 19.2e6));
+        }
+    }
+    assert(whitebox_close(&wb) == 0);
+}
+
 int main(int argc, char **argv) {
     whitebox_t wb;
     int16_t i, q;
@@ -243,15 +340,14 @@ int main(int argc, char **argv) {
 
     fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
     printf("Step 0. Choose carrier freq\n");
-    snipe(0);
+    //snipe(0);
+    //test_iflo();
     printf("Step 1. Static DC Offset\n");
     calibrate_dc_offset(0, &i, &q);
     printf("Step 2. SSB DC Offset\n");
     calibrate_dc_offset(1, &i, &q);
-#if 0
     printf("Step 3. SSB Gain/Phase Mismatch\n");
-    calibrate_gain_and_phase(i, q, &i_gain, &q_gain, &phase);
-#endif
+    calibrate_gain_and_phase(i, q, &i_gain, &q_gain);
 
     printf("echo %d > /sys/module/whitebox/parameters/whitebox_tx_i_correction\n", i);
     printf("echo %d > /sys/module/whitebox/parameters/whitebox_tx_q_correction\n", q);

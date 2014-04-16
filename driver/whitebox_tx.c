@@ -139,11 +139,8 @@ void tx_stop(struct whitebox_device *wb)
 
     stats->stop++;
 
-    while (pdma_buffers_available(wb->platform_data->tx_dma_ch) < 2) {
-        //d_printk(0, "waiting on dma\n");
-        //d_printk_loop(0);
+    while (pdma_buffers_available(wb->platform_data->tx_dma_ch) < 2)
         cpu_relax();
-    }
 
     wb->rf_sink.exciter->ops->set_state(wb->rf_sink.exciter, WES_TXSTOP);
 }

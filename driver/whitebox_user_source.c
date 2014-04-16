@@ -3,9 +3,8 @@
 #include "whitebox.h"
 #include "whitebox_block.h"
 
-static int whitebox_user_source_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
-	if (whitebox_user_source_debug >= level) printk(KERN_INFO "%s: " fmt,	\
+	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
 void whitebox_user_source_init(struct whitebox_user_source *user_source,

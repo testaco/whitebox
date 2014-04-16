@@ -32,7 +32,7 @@ find_python_module(numpy REQUIRED)
 add_custom_command(
     OUTPUT whitebox.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/whitebox.py
-    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py dds.py rfe.py dsp.py
+    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py dds.py rfe.py dsp.py ram.py fir.py
 ) 
 
 add_custom_target(hdl
@@ -45,6 +45,10 @@ add_test(NAME test_apb3_simple_slave
 
 add_test(NAME test_fifo
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fifo.py
+)
+
+add_test(NAME test_ram
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/ram.py
 )
     
 add_test(NAME test_dsp_offset_corrector
@@ -69,6 +73,18 @@ add_test(NAME test_duc_cic_sin
 
 add_test(NAME test_duc_cic_interpolate_20
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicInterpolate20
+)
+
+add_test(NAME test_fir_impulse
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_fir.py TestFirImpulse
+)
+
+add_test(NAME test_fir_bypass
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_fir.py TestFirBypass
+)
+
+add_test(NAME test_fir_design
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_fir.py TestFirDesign
 )
 
 add_test(NAME test_whitebox_apb3_transaction
@@ -103,6 +119,26 @@ add_test(NAME test_whitebox_cic
 
 add_test(NAME test_whitebox_pipe_samples
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestPipeSamples
+)
+
+add_test(NAME test_whitebox_upsampler_impulse_response
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestUpsamplerImpulseResponse
+)
+
+add_test(NAME test_whitebox_upsampler_3x_impulse_response
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestUpsampler3xImpulseResponse
+)
+
+add_test(NAME test_whitebox_fir_impulse_response
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestFirImpulseResponse
+)
+
+add_test(NAME test_whitebox_cic_impulse_response
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestCicImpulseResponse
+)
+
+add_test(NAME test_whitebox_cic_3x_impulse_response
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestCic3xImpulseResponse
 )
 
 add_subdirectory(constraint)

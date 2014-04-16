@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <math.h>
 
 #include "whitebox.h"
 
@@ -81,12 +82,10 @@ int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
 
     wb->fd = open(filename, flags);
 
-
     if (W_DAC_RATE_HZ % rate != 0) {
         fprintf(stderr, "Error, sample rate is not a multiple of DAC clock rate!");
         exit(1);
     }
-
 
     wb->rate = rate;
     wb->interp = W_DAC_RATE_HZ / rate;
@@ -150,7 +149,9 @@ void whitebox_debug_to_file(whitebox_t* wb, FILE* f) {
     else fprintf(f, "     ");
     if (value & WES_DDSEN) fprintf(f, "ddsen ");
     else fprintf(f, "      ");
-    if (value & WES_FILTEREN) fprintf(f, "filen ");
+    if (value & WES_FILTEREN) fprintf(f, "cicen ");
+    else fprintf(f, "      ");
+    if (value & WS_FIREN) fprintf(f, "firen ");
     else fprintf(f, "      ");
     fprintf(f, "space=%d ", w.flags.exciter.available);
     fprintf(f, "debug=%08x ", w.flags.exciter.debug);
@@ -213,18 +214,21 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
         fprintf(stderr, "VCO frequency too low\n");
         return 2;
     }
+    printf("%f %f\n", frequency, vco_frequency);
 
     cmx991_tx_tune(&wb->cmx991, vco_frequency,
         IF_FILTER_BW_45MHZ, HI_LO_LOWER,
-        TX_RF_DIV_BY_4, TX_IF_DIV_BY_4, GAIN_P0DB);
+        TX_RF_DIV_BY_4, TX_IF_DIV_BY_4, GAIN_P6DB);
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
 
     adf4351_init(&wb->adf4351);
 
-    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+
+    whitebox_tx_flags_enable(wb, WES_FILTEREN);
     return 0;
 }
 
@@ -239,15 +243,27 @@ int whitebox_tx_fine_tune(whitebox_t *wb, float frequency) {
     }
 
 
-    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
 }
 
+uint16_t _cic_shift(uint16_t interp)
+{
+    // Based on the excellent work of Hogenauer, 1981.
+    float cic_order = 4, cic_delay = 1, in_len=9, out_len=10; // From CIC implementation on the FPGA
+    float stage = 2 * cic_order; // Last stage
+    float gain = (pow(2, 2 * cic_order - stage) * pow(interp * cic_delay, stage - cic_order)) / interp;
+    float bit_width = in_len + ceil(log(gain)/log(2));
+    float shift = bit_width - out_len;
+    return (shift < 0) ? 0 : (uint16_t)shift;
+}
+
 int whitebox_tx_set_interp(whitebox_t* wb, uint32_t interp) {
+    uint16_t shift;
     whitebox_args_t w;
     ioctl(wb->fd, WE_GET, &w);
-    w.flags.exciter.interp = interp;
+    w.flags.exciter.interp = (_cic_shift(interp) << 16) & 0xffff0000 | (interp & 0xffff);
     ioctl(wb->fd, WE_SET, &w);
 }
 
@@ -294,9 +310,8 @@ void whitebox_tx_flags_enable(whitebox_t* wb, uint32_t flags) {
 
 void whitebox_tx_flags_disable(whitebox_t* wb, uint32_t flags) {
     whitebox_args_t w;
-    ioctl(wb->fd, WE_GET, &w);
-    w.flags.exciter.state &= ~flags;
-    ioctl(wb->fd, WE_SET, &w);
+    w.flags.exciter.state = flags;
+    ioctl(wb->fd, WE_CLEAR_MASK, &w);
 }
 
 void whitebox_tx_dds_enable(whitebox_t* wb, float fdes) {
@@ -382,7 +397,7 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
 
     adf4351_init(&wb->adf4351);
 
-    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
     return 0;
@@ -398,7 +413,34 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
         return 2;
     }
 
-    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 4e3, vco_frequency);
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+}
+
+int whitebox_fir_load_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int16_t *coeffs)
+{
+    int i;
+    whitebox_args_t w;
+    w.flags.fir.bank = bank;
+    w.flags.fir.n = N;
+    for (i = 0; i < N; ++i)
+        w.flags.fir.coeff[i] = coeffs[i];
+
+    ioctl(wb->fd, WF_SET, &w);
+    return 0;
+}
+
+int whitebox_fir_get_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int16_t *coeffs)
+{
+    int i;
+    int n;
+    whitebox_args_t w;
+    ioctl(wb->fd, WF_GET, &w);
+    n = w.flags.fir.n < N ? w.flags.fir.n : N;
+    
+    for (i = 0; i < n; ++i)
+        coeffs[i] = w.flags.fir.coeff[i];
+
+    return w.flags.fir.n;
 }

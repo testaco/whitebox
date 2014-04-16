@@ -1,7 +1,7 @@
 #include <linux/ioctl.h>
 
 // DAC Rate
-#define W_DAC_RATE_HZ   10080000UL
+#define W_DAC_RATE_HZ   6144000UL
 
 // DDS Constants
 #define W_DDS_PA_BITWIDTH 25
@@ -12,6 +12,9 @@
 
 // Number of registers for the ADF4351
 #define WA_REGS_COUNT   6U
+
+// Maximum number of coefficients that can be in the FIR
+#define WF_COEFF_COUNT 128
 
 typedef struct whitebox_args {
     union {
@@ -38,6 +41,11 @@ typedef struct whitebox_args {
         } receiver;
         uint8_t cmx991[WC_REGS_COUNT];
         uint32_t adf4351[WA_REGS_COUNT];
+        struct {
+            uint8_t bank;
+            uint8_t n;
+            int16_t coeff[WF_COEFF_COUNT];
+        } fir;
     } flags;
     uint8_t locked;
     uint32_t mock_command;
@@ -58,13 +66,15 @@ typedef struct whitebox_args {
 #define WE_AVAILABLE_ADDR       0x1c
 #define WE_DEBUG_ADDR           0x20
 #define WE_GAIN_ADDR            0x24
-#define WR_SAMPLE_ADDR          0x80
-#define WR_STATUS_ADDR          0x84
-#define WR_DECIM_ADDR           0x88
-#define WR_RUNS_ADDR            0x90
-#define WR_THRESHOLD_ADDR       0x94
-#define WR_CORRECTION_ADDR      0x98
-#define WR_AVAILABLE_ADDR       0x9c
+#define W_FIR_ADDR              0x28
+#define WR_SAMPLE_ADDR          0x30
+#define WR_STATUS_ADDR          0x34
+#define WR_DECIM_ADDR           0x38
+#define WR_RUNS_ADDR            0x40
+#define WR_THRESHOLD_ADDR       0x44
+#define WR_CORRECTION_ADDR      0x48
+#define WR_AVAILABLE_ADDR       0x4c
+#define WR_DEBUG_ADDR           0xa0
 
 /* Status Flags */
 #define WS_CLEAR                (1 << 0)
@@ -84,6 +94,8 @@ typedef struct whitebox_args {
 #define WRS_AFULL               (1 << 21)
 #define WRS_SPACE               (1 << 22)
 #define WRS_DATA                (1 << 23)
+#define WS_FIREN                (1 << 24)
+#define WF_ACCESS_COEFFS        (1 << 16)
 
 /* General */
 #define W_RESET _IO('w', 1)
@@ -93,6 +105,7 @@ typedef struct whitebox_args {
 #define WE_CLEAR _IO('w', 3)
 #define WE_GET  _IOR('w', 4, whitebox_args_t*)
 #define WE_SET _IOW('w', 5, whitebox_args_t*)
+#define WE_CLEAR_MASK _IOW('w', 20, whitebox_args_t*)
 
 #define WE_FIFO_SIZE    1024L
 
@@ -148,6 +161,9 @@ typedef struct whitebox_args {
 #define WMC_CAUSE_OVERRUN       (1 << 1)
 
 /* Zero-memory copy from user space */
-
 #define W_MMAP_WRITE _IOR('w', 14, unsigned long*)
 #define W_MMAP_READ  _IOR('w', 15, unsigned long*)
+
+/* FIR Filter */
+#define WF_GET _IOR('w', 18, whitebox_args_t*)
+#define WF_SET _IOR('w', 19, whitebox_args_t*)

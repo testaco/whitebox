@@ -296,7 +296,7 @@ int pdma_start(u8 ch,
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].src = src;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_B].dst = dst;
         if (channel->ping_pong == 1) {
-            d_printk(0, "pong\n");
+            d_printk(1, "pong\n");
             PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].cnt = channel->buf[PDMA_CHANNEL_BUFFER_A].cnt;
             channel->ping_pong = 2;
         }
@@ -314,14 +314,14 @@ int pdma_start(u8 ch,
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].src = src;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].dst = dst;
         if (channel->ping_pong == 1) {
-            d_printk(0, "ping\n");
+            d_printk(4, "ping\n");
         } else {
             PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].cnt = cnt;
         }
     }
     else {
         ret = -EBUSY;
-        d_printk(0, "busy\n");
+        d_printk(4, "busy\n");
         goto pdma_busy;
     }
     
@@ -350,7 +350,8 @@ int pdma_buffers_available(u8 ch) {
     channel = &pdma_device->channel[ch];
     if (!channel->in_use) {
         spin_unlock_irqrestore(&pdma_lock, flags);
-        return result;
+        d_printk(0, "Channel not requested %d\n", ch);
+        return -EINVAL;
     }
 
     // Pause transfer
@@ -367,11 +368,9 @@ int pdma_buffers_available(u8 ch) {
     // Resume the transfer
     PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
 
-    if (result == 0) {
-        d_printk(4, "busy\n");
-    }
-
     spin_unlock_irqrestore(&pdma_lock, flags);
+
+    d_printk(4, "available channels %d\n", result);
 
     return result;
 } EXPORT_SYMBOL(pdma_buffers_available);

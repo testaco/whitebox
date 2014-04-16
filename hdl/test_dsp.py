@@ -86,12 +86,15 @@ def figure_fft_power(title, axes, f_parent, frq, Y):
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,3))
     ax1 = plt.gca()
     ax1.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: ('%.1f')%(x/1e6)))
-    plt.xlabel('Freq (MHz)')
-    plt.ylabel('Power (???)')
+    plt.xlabel('Freq (Radians)')
+    plt.ylabel('Attenuation (dB)')
     #amplitude_Y = 20*np.log10(np.abs(Y))
     power_Y = np.abs(Y)**2
-    phase_Y = np.angle(Y)
-    plt.plot(frq, power_Y, 'b')
+    power_db = -10 * np.log10(power_Y / np.max(power_Y))
+    plt.plot(frq[0:len(frq)/2], power_db[0:len(frq)/2], 'b')
+    plt.plot(frq[len(frq)/2+1:], power_db[len(frq)/2+1:], 'b')
+    f.set_autoscaley_on(False)
+    plt.ylim(120, 0)
     return f
 
 def figure_fft_phase(title, axes, f_parent, frq, Y):
@@ -99,12 +102,15 @@ def figure_fft_phase(title, axes, f_parent, frq, Y):
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,3))
     ax1 = plt.gca()
     ax1.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: ('%.1f')%(x/1e6)))
-    plt.xlabel('Freq (MHz)')
+    plt.xlabel('Freq (radians)')
     plt.ylabel('Phase (radians)')
     phase_Y = np.angle(Y)
-    plt.plot(frq, phase_Y, 'g')
+    plt.plot(frq[0:len(frq)/2], phase_Y[0:len(frq)/2], 'g')
+    plt.plot(frq[len(frq)/2+1:], phase_Y[len(frq)/2+1:], 'g')
+    f.set_autoscaley_on(False)
+    plt.ylim(-np.pi, np.pi)
 
-    y_tick = np.arange(-np.pi, np.pi, np.pi)
+    y_tick = np.array([-1, 0, 1])
     y_label = [r"$-\pi$", r"$0$", r"$+\pi$"]
     ax1.set_yticks(y_tick*np.pi)
     ax1.set_yticklabels(y_label)
@@ -174,9 +180,13 @@ class DSPSim(object):
         :returns: The valid i and q sequences as a tuple.
         """
         interp = kwargs.get('interp', 1)
+        loader = kwargs.get('loader', None)
         @instance
         def stimulus():
             self.t = 0
+
+            if loader:
+                yield loader()
 
             self.clearn.next = self.clearn.active
             yield self.delay(1)
@@ -226,7 +236,6 @@ class DSPSim(object):
         in_q = np.array((self.input.max-1) * in_c.imag, dtype=self.input.numpy_dtype())
 
         final_i, final_q = self.simulate_quadrature(in_i, in_q, dspflow, **kwargs)
-
         out_c = (final_i / (self.output.max-1.0)) + 1.0j * (final_q / (self.output.max-1.0))
 
         return out_c

@@ -111,7 +111,7 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     rf->int_16_bit = N;
     rf->frac_12_bit = FRAC;
     rf->prescaler = prescaler;
-    rf->phase_adjust = PHASE_ADJUST_ON;
+    rf->phase_adjust = PHASE_ADJUST_OFF;
     rf->phase_12_bit = 1; // can be used to adjust spurs! phase_adjust must be on
     rf->mod_12_bit = MOD;
 

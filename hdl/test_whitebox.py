@@ -2,7 +2,7 @@
 Simulating the Whitebox SoC Peripheral
 --------------------------------------
 """
-from math import sin, pi
+from math import sin, pi, ceil, log
 import os
 import struct
 import tempfile
@@ -23,12 +23,16 @@ from whitebox import whitebox
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
 from test_dsp import figure_discrete_quadrature, figure_fft_power, figure_fft_phase
 from dds import freq_to_fcw
+from ram import Ram, RamSimulation
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
     globals()[name] = intbv(1 << bit)[32:]
 
 for name, addr in WHITEBOX_REGISTER_FILE.iteritems():
     globals()[name] = addr
+
+from rfe import WF_ACCESS_COEFFS
+WF_ACCESS_COEFFS = intbv(1 << WF_ACCESS_COEFFS)[32:]
 
 APB3_DURATION = int(1e9 / 40e6)
 
@@ -53,6 +57,10 @@ class WhiteboxSim(object):
         self.tx_q = []
         self.tx_i = []
         self.tx_n = []
+        pclk = self.bus.pclk
+        self.fir_coeff_ram = Ram(self.bus.presetn, self.dac_clock, pclk)
+        self.fir_delay_line_i_ram = Ram(self.bus.presetn, self.dac_clock, self.dac_clock)
+        self.fir_delay_line_q_ram = Ram(self.bus.presetn, self.dac_clock, self.dac_clock)
 
     def simulate(self, stimulus, whitebox, **kwargs):
         """Acturally run the cosimulation with iverilog.
@@ -100,7 +108,6 @@ class WhiteboxSim(object):
                 else:
                     self.tx_i.append(int(self.dac_data[:]))
 
-
         traced = traceSignals(whitebox)
         ss = [dac_clock, dac2x_clock, stimulus, traced]
         if 'record_tx' in kwargs:
@@ -110,7 +117,8 @@ class WhiteboxSim(object):
 
     def fft_tx(self, decim=1):
         """Compute the FFT of the transmitted signal."""
-        y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
+        #y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
+        y = self.tx(decim=decim)
         #y = signal.decimate(y, decim)
         n = len(y)
         frq = np.fft.fftfreq(n, 1/(self.sample_rate/decim))
@@ -119,17 +127,26 @@ class WhiteboxSim(object):
         #       np.concatenate((Y[0:1+64], Y[n-64:]))
         return frq, Y
 
-    def plot_tx(self, name):
+    def tx(self, decim=1):
+        re = [intbv(i)[10:] for i in self.tx_i][::decim]
+        re = [intbv(concat(not i[len(i)-1], i[len(i)-1:])).signed() for i in re]
+        im = [intbv(q)[10:] for q in self.tx_q][::decim]
+        im = [intbv(concat(not q[len(q)-1], q[len(q)-1:])).signed() for q in im]
+        y = np.array([i + 1j * q for i, q in zip(re, im)])
+        return y
+
+    def plot_tx(self, name, decim=1):
         """Plot the transmitter's output."""
         f_parent = plt.figure(name + "_tx")
         f_parent.subplots_adjust(hspace=.5)
         #plt.title(name + "_tx")
 
-        n = len(self.tx_i)
+        y = self.tx(decim=decim)
+        n = len(y)
         k = np.arange(n)
 
         f1 = figure_discrete_quadrature("Signal", (3, 1, 1), f_parent,
-                self.dac_data, k, self.tx_i, self.tx_q)
+                self.dac_data, k, [i.real for i in y], [i.imag for i in y])
                 
         #frq = np.fft.fftfreq(n, 1/sample_rate)
         #y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
@@ -182,6 +199,8 @@ class WhiteboxSim(object):
         tx_fifo_underflow = Signal(bool(False))
         tx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
         tx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
+
+
         tx_fifo_signals = (
             clearn,
             tx_fifo_re,
@@ -252,6 +271,47 @@ class WhiteboxSim(object):
         cmd = 'iverilog -o %s.v -c %s whitebox.v whitebox_reset.v /home/testa/whitebox/hdl/cosim_whitebox.v' % (cosim_name, config_file.name)
         os.system(cmd)
 
+        fir_coeff_ram_addr = self.fir_coeff_ram.port['a'].addr
+        fir_coeff_ram_din = self.fir_coeff_ram.port['a'].din
+        fir_coeff_ram_width0 = self.fir_coeff_ram.port['a'].width0
+        fir_coeff_ram_width1 = self.fir_coeff_ram.port['a'].width1
+        fir_coeff_ram_pipe = self.fir_coeff_ram.port['a'].pipe
+        fir_coeff_ram_wmode = self.fir_coeff_ram.port['a'].wmode
+        fir_coeff_ram_blk = self.fir_coeff_ram.port['a'].blk
+        fir_coeff_ram_wen = self.fir_coeff_ram.port['a'].wen
+        fir_coeff_ram_clk = self.fir_coeff_ram.port['a'].clk
+        fir_coeff_ram_dout = self.fir_coeff_ram.port['a'].dout
+        fir_load_coeff_ram_addr = self.fir_coeff_ram.port['b'].addr
+        fir_load_coeff_ram_din = self.fir_coeff_ram.port['b'].din
+        fir_load_coeff_ram_width0 = self.fir_coeff_ram.port['b'].width0
+        fir_load_coeff_ram_width1 = self.fir_coeff_ram.port['b'].width1
+        fir_load_coeff_ram_pipe = self.fir_coeff_ram.port['b'].pipe
+        fir_load_coeff_ram_wmode = self.fir_coeff_ram.port['b'].wmode
+        fir_load_coeff_ram_blk = self.fir_coeff_ram.port['b'].blk
+        fir_load_coeff_ram_wen = self.fir_coeff_ram.port['b'].wen
+        fir_load_coeff_ram_clk = self.fir_coeff_ram.port['b'].clk
+        fir_load_coeff_ram_dout = self.fir_coeff_ram.port['b'].dout
+        fir_delay_line_i_ram_addr = self.fir_delay_line_i_ram.port['a'].addr
+        fir_delay_line_i_ram_din = self.fir_delay_line_i_ram.port['a'].din
+        fir_delay_line_i_ram_width0 = self.fir_delay_line_i_ram.port['a'].width0
+        fir_delay_line_i_ram_width1 = self.fir_delay_line_i_ram.port['a'].width1
+        fir_delay_line_i_ram_pipe = self.fir_delay_line_i_ram.port['a'].pipe
+        fir_delay_line_i_ram_wmode = self.fir_delay_line_i_ram.port['a'].wmode
+        fir_delay_line_i_ram_blk = self.fir_delay_line_i_ram.port['a'].blk
+        fir_delay_line_i_ram_wen = self.fir_delay_line_i_ram.port['a'].wen
+        fir_delay_line_i_ram_clk = self.fir_delay_line_i_ram.port['a'].clk
+        fir_delay_line_i_ram_dout = self.fir_delay_line_i_ram.port['a'].dout
+        fir_delay_line_q_ram_addr = self.fir_delay_line_q_ram.port['a'].addr
+        fir_delay_line_q_ram_din = self.fir_delay_line_q_ram.port['a'].din
+        fir_delay_line_q_ram_width0 = self.fir_delay_line_q_ram.port['a'].width0
+        fir_delay_line_q_ram_width1 = self.fir_delay_line_q_ram.port['a'].width1
+        fir_delay_line_q_ram_pipe = self.fir_delay_line_q_ram.port['a'].pipe
+        fir_delay_line_q_ram_wmode = self.fir_delay_line_q_ram.port['a'].wmode
+        fir_delay_line_q_ram_blk = self.fir_delay_line_q_ram.port['a'].blk
+        fir_delay_line_q_ram_wen = self.fir_delay_line_q_ram.port['a'].wen
+        fir_delay_line_q_ram_clk = self.fir_delay_line_q_ram.port['a'].clk
+        fir_delay_line_q_ram_dout = self.fir_delay_line_q_ram.port['a'].dout
+
         whitebox_test = Cosimulation(
                     'vvp -m ./myhdl.vpi %s.v' % (cosim_name, ),
                     resetn=self.bus.presetn,
@@ -312,8 +372,48 @@ class WhiteboxSim(object):
                     rx_fifo_underflow=rx_fifo_underflow,
                     rx_fifo_rdcnt=rx_fifo_rdcnt,
                     rx_fifo_wrcnt=rx_fifo_wrcnt,
+                    fir_coeff_ram_addr=fir_coeff_ram_addr,
+                    fir_coeff_ram_din=fir_coeff_ram_din,
+                    fir_coeff_ram_width0=fir_coeff_ram_width0,
+                    fir_coeff_ram_width1=fir_coeff_ram_width1,
+                    fir_coeff_ram_pipe=fir_coeff_ram_pipe,
+                    fir_coeff_ram_wmode=fir_coeff_ram_wmode,
+                    fir_coeff_ram_blk=fir_coeff_ram_blk,
+                    fir_coeff_ram_wen=fir_coeff_ram_wen,
+                    fir_coeff_ram_clk=fir_coeff_ram_clk,
+                    fir_coeff_ram_dout=fir_coeff_ram_dout,
+                    fir_load_coeff_ram_addr=fir_load_coeff_ram_addr,
+                    fir_load_coeff_ram_din=fir_load_coeff_ram_din,
+                    fir_load_coeff_ram_width0=fir_load_coeff_ram_width0,
+                    fir_load_coeff_ram_width1=fir_load_coeff_ram_width1,
+                    fir_load_coeff_ram_pipe=fir_load_coeff_ram_pipe,
+                    fir_load_coeff_ram_wmode=fir_load_coeff_ram_wmode,
+                    fir_load_coeff_ram_blk=fir_load_coeff_ram_blk,
+                    fir_load_coeff_ram_wen=fir_load_coeff_ram_wen,
+                    fir_load_coeff_ram_clk=fir_load_coeff_ram_clk,
+                    fir_load_coeff_ram_dout=fir_load_coeff_ram_dout,
+                    fir_delay_line_i_ram_addr=fir_delay_line_i_ram_addr,
+                    fir_delay_line_i_ram_din=fir_delay_line_i_ram_din,
+                    fir_delay_line_i_ram_width0=fir_delay_line_i_ram_width0,
+                    fir_delay_line_i_ram_width1=fir_delay_line_i_ram_width1,
+                    fir_delay_line_i_ram_pipe=fir_delay_line_i_ram_pipe,
+                    fir_delay_line_i_ram_wmode=fir_delay_line_i_ram_wmode,
+                    fir_delay_line_i_ram_blk=fir_delay_line_i_ram_blk,
+                    fir_delay_line_i_ram_wen=fir_delay_line_i_ram_wen,
+                    fir_delay_line_i_ram_clk=fir_delay_line_i_ram_clk,
+                    fir_delay_line_i_ram_dout=fir_delay_line_i_ram_dout,
+                    fir_delay_line_q_ram_addr=fir_delay_line_q_ram_addr,
+                    fir_delay_line_q_ram_din=fir_delay_line_q_ram_din,
+                    fir_delay_line_q_ram_width0=fir_delay_line_q_ram_width0,
+                    fir_delay_line_q_ram_width1=fir_delay_line_q_ram_width1,
+                    fir_delay_line_q_ram_pipe=fir_delay_line_q_ram_pipe,
+                    fir_delay_line_q_ram_wmode=fir_delay_line_q_ram_wmode,
+                    fir_delay_line_q_ram_blk=fir_delay_line_q_ram_blk,
+                    fir_delay_line_q_ram_wen=fir_delay_line_q_ram_wen,
+                    fir_delay_line_q_ram_clk=fir_delay_line_q_ram_clk,
+                    fir_delay_line_q_ram_dout=fir_delay_line_q_ram_dout,
         )
-        return tx_fifo, rx_fifo, whitebox_test
+        return tx_fifo, rx_fifo, self.fir_coeff_ram.ram, self.fir_delay_line_i_ram.ram, self.fir_delay_line_q_ram.ram, whitebox_test
 
 def whitebox_clear(bus):
     yield bus.transmit(WE_STATUS_ADDR, WS_CLEAR)
@@ -723,31 +823,31 @@ class TestLoop(unittest.TestCase):
             # Send a clear
             yield whitebox_clear(bus)
 
-            yield bus.transmit(WE_STATUS_ADDR, WS_LOOPEN)
+            #yield bus.transmit(WE_STATUS_ADDR, WS_LOOPEN)
 
-            yield bus.receive(WR_STATUS_ADDR)
-            assert bus.rdata & WS_LOOPEN
+            #yield bus.receive(WR_STATUS_ADDR)
+            #assert bus.rdata & WS_LOOPEN
 
-            yield bus.transmit(WE_INTERP_ADDR, 1)
-            sample = concat(intbv(1 << 6)[16:], intbv(1 << 6)[16:])
-            yield bus.transmit(WE_SAMPLE_ADDR, sample)
-            yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
-            yield bus.transmit(WE_STATUS_ADDR, WES_TXEN)
-            
-            yield bus.receive(WE_STATUS_ADDR)
-            assert bus.rdata & WS_LOOPEN
+            #yield bus.transmit(WE_INTERP_ADDR, 1)
+            #sample = concat(intbv(1 << 6)[16:], intbv(1 << 6)[16:])
+            #yield bus.transmit(WE_SAMPLE_ADDR, sample)
+            #yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
+            #yield bus.transmit(WE_STATUS_ADDR, WES_TXEN)
+            #
+            #yield bus.receive(WE_STATUS_ADDR)
+            #assert bus.rdata & WS_LOOPEN
 
-            yield bus.transmit(WR_DECIM_ADDR, 1)
-            yield bus.transmit(WR_STATUS_ADDR, WRS_RXSTOP)
-            yield bus.transmit(WR_STATUS_ADDR, WRS_RXEN)
-            yield bus.receive(WR_STATUS_ADDR)
-            while not bus.rdata & WRS_DATA:
-                yield bus.delay(1)
-                yield bus.receive(WR_STATUS_ADDR)
-            #assert not (bus.rdata & WRS_RXEN)
+            #yield bus.transmit(WR_DECIM_ADDR, 1)
+            #yield bus.transmit(WR_STATUS_ADDR, WRS_RXSTOP)
+            #yield bus.transmit(WR_STATUS_ADDR, WRS_RXEN)
+            #yield bus.receive(WR_STATUS_ADDR)
+            #while not bus.rdata & WRS_DATA:
+            #    yield bus.delay(1)
+            #    yield bus.receive(WR_STATUS_ADDR)
+            ##assert not (bus.rdata & WRS_RXEN)
 
-            yield bus.receive(WR_SAMPLE_ADDR)
-            print bus.rdata
+            #yield bus.receive(WR_SAMPLE_ADDR)
+            #print bus.rdata
 
             #yield bus.receive(WR_SAMPLE_ADDR)
             #assert bus.rdata == 0xdeadbeef
@@ -869,8 +969,6 @@ class TestCic(unittest.TestCase):
         s.simulate(stimulus, test_whitebox_cic, sample_rate=output_sample_rate,
                 record_tx=CNT, auto_stop=True)
 
-        print len(s.tx_i), len(s.tx_q)
-
         s.plot_tx("whitebox_cic")
         plt.savefig("test_whitebox_cic.png")
 
@@ -987,6 +1085,300 @@ class TestPipeSamples(unittest.TestCase):
         s.simulate(stimulus, test_whitebox_pipe_samples, record_tx=SAMPLES_TO_SIMULATE, auto_stop=True)
         s.plot_tx("whitebox_pipe")
         plt.savefig("test_whitebox_pipe.png")
+
+class WhiteboxImpulseResponseTestCase(unittest.TestCase):
+    def setUp(self):
+        self.bus = Apb3Bus(duration=APB3_DURATION)
+        self.s = WhiteboxSim(self.bus)
+
+        self.fifo_args = { 'width': 32, 'depth': self.fifo_depth }
+        self.whitebox_args = { 'interp': self.interp }
+
+    def simulate(self, dut):
+        @instance
+        def stimulus():
+            N = Signal(intbv(0)[32:])
+            s = self.s
+            bus = self.bus
+
+            yield bus.reset()
+            # Send a clear
+            yield whitebox_clear(bus)
+
+            # Turn on and off the fir filter
+            yield bus.receive(WE_STATUS_ADDR)
+            assert not bus.rdata & WS_FIREN
+            yield bus.transmit(WE_STATUS_ADDR, bus.rdata | WS_FIREN)
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WS_FIREN
+            yield bus.transmit(WE_STATUS_ADDR, bus.rdata & ~WS_FIREN)
+            yield bus.receive(WE_STATUS_ADDR)
+            assert not bus.rdata & WS_FIREN
+
+            # Set the threshold
+            afval = intbv(self.fifo_depth - self.bulk_size)[16:]
+            aeval = intbv(self.bulk_size)[16:]
+            yield bus.transmit(WE_THRESHOLD_ADDR, concat(afval, aeval))
+
+            if hasattr(self, 'taps') and self.taps:
+                yield bus.transmit(W_FIR_ADDR, len(self.taps) | WF_ACCESS_COEFFS)
+                for t in self.taps:
+                    yield bus.transmit(0, intbv(t << 3)[32:])
+
+                yield bus.receive(W_FIR_ADDR)
+                assert bus.rdata == len(self.taps)
+
+                yield bus.transmit(W_FIR_ADDR, len(self.taps) | WF_ACCESS_COEFFS)
+
+                for t in self.taps:
+                    yield bus.receive(0)
+                    assert bus.rdata.signed() == t << 3
+
+            # Check the fifo flags
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_SPACE
+            assert not (bus.rdata & WES_DATA)
+
+            if hasattr(self, 'shift'):
+                interp = concat(intbv(self.shift)[16:],
+                        intbv(self.interp)[16:])
+            else:
+                interp = intbv(self.interp)[32:]
+            yield bus.transmit(WE_INTERP_ADDR, interp)
+            yield bus.receive(WE_INTERP_ADDR)
+            assert bus.rdata == interp
+
+            def quadrature_bit_vector(N):
+                return \
+                intbv(int(self.x[int(N)].real), min=-2**15, max=2**15), \
+                intbv(int(self.x[int(N)].imag), min=-2**15, max=2**15)
+
+            ## Insert some samples
+            for j in range(self.bulk_size):
+                i, q = quadrature_bit_vector(N)
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                N.next = N + 1
+                yield delay(1)
+
+            ## Now start transmitting
+            yield bus.transmit(WE_STATUS_ADDR, self.status | WES_TXEN)
+            yield bus.receive(WE_STATUS_ADDR)
+            assert bus.rdata & WES_TXEN
+
+            ## Insert some more samples
+            while len(self.n) - N > self.bulk_size - 1:
+                ## Make sure there were no overruns or underruns
+                yield bus.receive(WE_RUNS_ADDR)
+                assert bus.rdata == 0
+
+                ## Wait for space
+                yield bus.receive(WE_STATUS_ADDR)
+                while bus.rdata & WES_AFULL:
+                    yield bus.delay(2)
+                    yield bus.receive(WE_STATUS_ADDR)
+
+                for j in range(self.bulk_size):
+                    i, q = quadrature_bit_vector(N)
+                    yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                    N.next = N + 1
+
+            ## Insert remaining samples
+            while N < len(self.n)-1:
+                ## Wait for space
+                yield bus.receive(WE_STATUS_ADDR)
+                while not (bus.rdata & WES_SPACE):
+                    yield bus.delay(2)
+                    yield bus.receive(WE_STATUS_ADDR)
+
+                i, q = quadrature_bit_vector(N)
+                yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
+                N.next = N + 1
+
+            ## Stop the transmission
+            yield bus.transmit(WE_STATUS_ADDR, WES_TXSTOP)
+
+            ## Wait for TXEN to go low
+            yield bus.receive(WE_STATUS_ADDR)
+            while bus.rdata & WES_TXEN:
+                yield bus.delay(2)
+                yield bus.receive(WE_STATUS_ADDR)
+
+            ## Make sure there were no overruns or underruns
+            yield bus.receive(WE_RUNS_ADDR)
+            assert bus.rdata == 0
+
+            raise StopSimulation
+
+        if hasattr(self, 'record_tx'):
+            record_tx = self.record_tx
+        else:
+            record_tx = self.interp * self.cnt
+        self.s.simulate(stimulus, dut, sample_rate=self.sample_rate,
+                record_tx=record_tx, auto_stop=False)
+
+class TestUpsamplerImpulseResponse(WhiteboxImpulseResponseTestCase):
+    def setUp(self):
+        self.apb3_duration = APB3_DURATION
+        self.interp = 1
+        self.fifo_depth = 64
+        self.bulk_size = 16
+        self.sample_rate = 6.144e6
+        self.freq = 1.7e3 
+        self.duration = 4e-6 # 2 mS
+        self.status = 0
+
+        self.cnt = ceil(self.sample_rate * self.duration)
+        self.n = np.arange(0, self.cnt)
+        self.x = np.zeros(self.cnt, dtype=np.complex128)
+        self.x[0] = (1 << 14) + 1j * (1 << 14)
+        self.y = np.zeros(self.interp*self.cnt, dtype=np.complex128)
+        for i in range(self.interp):
+            self.y[i] = (1 << 7) + 1j * (1 << 7)
+        WhiteboxImpulseResponseTestCase.setUp(self)
+        
+    def test_whitebox_upsampler_impulse_response(self):
+        def test_whitebox_upsampler_impulse_response():
+            return self.s.cosim_dut("cosim_whitebox_upsampler_impulse_response",
+                    self.fifo_args, self.whitebox_args)
+
+        self.simulate(test_whitebox_upsampler_impulse_response)
+
+        self.s.plot_tx("whitebox_upsampler_impulse_response", decim=self.interp)
+        plt.savefig("test_whitebox_upsampler_impulse_response.png")
+        assert (self.s.tx() == self.y).all()
+
+class TestUpsampler3xImpulseResponse(WhiteboxImpulseResponseTestCase):
+    def setUp(self):
+        self.apb3_duration = APB3_DURATION
+        self.interp = 3
+        self.fifo_depth = 64
+        self.bulk_size = 16
+        self.sample_rate = 6.144e6
+        self.freq = 1.7e3 
+        self.duration = 4e-6 # 2 mS
+        self.status = 0
+
+        self.cnt = ceil(self.sample_rate * self.duration)
+        self.n = np.arange(0, self.cnt)
+        self.x = np.zeros(self.cnt, dtype=np.complex128)
+        self.x[0] = (1 << 14) + 1j * (1 << 14)
+        self.y = np.zeros(self.interp*self.cnt, dtype=np.complex128)
+        for i in range(self.interp):
+            self.y[i] = (1 << 7) + 1j * (1 << 7)
+        WhiteboxImpulseResponseTestCase.setUp(self)
+        
+    def test_whitebox_upsampler_3x_impulse_response(self):
+        def test_whitebox_upsampler_3x_impulse_response():
+            return self.s.cosim_dut("cosim_whitebox_upsampler_3x_impulse_response",
+                    self.fifo_args, self.whitebox_args)
+
+        self.simulate(test_whitebox_upsampler_3x_impulse_response)
+
+        self.s.plot_tx("whitebox_upsampler_3x_impulse_response", decim=self.interp)
+        plt.savefig("test_whitebox_upsampler_3x_impulse_response.png")
+        assert (self.s.tx() == self.y).all()
+
+class TestFirImpulseResponse(WhiteboxImpulseResponseTestCase):
+    def setUp(self):
+        self.apb3_duration = APB3_DURATION
+        self.fifo_depth = 64
+        self.bulk_size = 16
+        self.sample_rate = 6.144e6
+        self.freq = 1.7e3 
+        self.taps = [1, 2, 3, 5, 8, -5, -3, -2, -1]
+        self.interp = 16
+        self.status = WS_FIREN
+
+        self.cnt = 128
+        self.n = np.arange(0, self.cnt)
+        self.x = np.zeros(self.cnt, dtype=np.complex128)
+        self.x[0] = (1 << 14) + 1j * (1 << 14)
+        self.y = np.zeros(self.cnt, dtype=np.complex128)
+        for i in range(len(self.taps)):
+            self.y[i] = self.taps[i] + 1j * self.taps[i]
+        WhiteboxImpulseResponseTestCase.setUp(self)
+        
+    def test_whitebox_fir_impulse_response(self):
+        def test_whitebox_fir_impulse_response():
+            return self.s.cosim_dut("cosim_whitebox_fir_impulse_response",
+                    self.fifo_args, self.whitebox_args)
+
+        self.simulate(test_whitebox_fir_impulse_response)
+
+        self.s.plot_tx("whitebox_fir_impulse_response", decim=self.interp)
+        plt.savefig("test_whitebox_fir_impulse_response.png")
+        assert (self.s.tx(decim=self.interp) == self.y).all()
+
+class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
+    def setUp(self):
+        self.apb3_duration = APB3_DURATION
+        self.interp = 1
+        self.fifo_depth = 64
+        self.bulk_size = 16
+        self.sample_rate = 6.144e6
+        self.freq = 1.7e3 
+        self.status = WES_FILTEREN
+
+        self.cnt = 128
+        self.n = np.arange(0, self.cnt)
+        self.x = np.zeros(self.cnt, dtype=np.complex128)
+        self.x[0] = (1 << 14) + 1j * (1 << 14)
+        self.y = np.zeros(self.interp*self.cnt, dtype=np.complex128)
+        for i in range(self.interp):
+            self.y[i] = (1 << 7) + 1j * (1 << 7)
+        WhiteboxImpulseResponseTestCase.setUp(self)
+        
+    def test_whitebox_cic_impulse_response(self):
+        def test_whitebox_cic_impulse_response():
+            return self.s.cosim_dut("cosim_whitebox_cic_impulse_response",
+                    self.fifo_args, self.whitebox_args)
+
+        self.simulate(test_whitebox_cic_impulse_response)
+
+        self.s.plot_tx("whitebox_cic_impulse_response", decim=self.interp)
+        plt.savefig("test_whitebox_cic_impulse_response.png")
+        assert (self.s.tx() == self.y).all()
+
+class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
+    def setUp(self):
+        from duc import cic_shift
+        self.apb3_duration = APB3_DURATION
+        self.fifo_depth = 64
+        self.bulk_size = 16
+        self.sample_rate = 6.144e6
+        self.freq = 1.7e3 
+        self.duration = 4e-6 # 2 mS
+        self.status = WES_FILTEREN
+        self.coeffs = [1, 4, 10, 16, 19, 16, 10, 4, 1]
+
+        self.interp = 3
+        cic_delay = 1
+        cic_order = 4
+        self.shift = cic_shift(9, 10, self.interp, 4, 1)
+        print 'shift', self.shift
+        self.cnt = self.record_tx = 32 #ceil(self.sample_rate * self.duration)
+        self.n = np.arange(0, self.cnt)
+        self.x = np.zeros(self.cnt, dtype=np.complex128)
+        self.x[0] = (1 << 14) + 1j * (1 << 14)
+        self.y = np.zeros(self.cnt, dtype=np.complex128)
+        for i, c in enumerate(self.coeffs):
+            self.y[i] = (c << 3) + 1j * (c << 3)
+        WhiteboxImpulseResponseTestCase.setUp(self)
+        
+    def test_whitebox_cic_3x_impulse_response(self):
+        def test_whitebox_cic_3x_impulse_response():
+            return self.s.cosim_dut("cosim_whitebox_cic_3x_impulse_response",
+                    self.fifo_args, self.whitebox_args)
+
+        self.simulate(test_whitebox_cic_3x_impulse_response)
+
+        self.s.plot_tx("whitebox_cic_3x_impulse_response")
+        plt.savefig("test_whitebox_cic_3x_impulse_response.png")
+        print len(self.s.tx()), len(self.y)
+        print self.s.tx()
+        print self.y
+        assert (self.s.tx() == self.y).all()
+
 
 if __name__ == '__main__':
     unittest.main()

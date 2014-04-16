@@ -120,8 +120,8 @@ void snipe()
     void *wbptr;
     int buffer_size = sysconf(_SC_PAGE_SIZE)
             << whitebox_parameter_get("user_order");
-    float fstart=144e6;
-    float fstop=148e6;
+    float fstart=440e6;
+    float fstop=480e6;
     float fstep=4e6;
 
     whitebox_init(&wb);

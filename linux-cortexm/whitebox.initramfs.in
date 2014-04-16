@@ -95,9 +95,9 @@ dir /usr/sbin 755 0 0
 dir /usr/share 755 0 0
 dir /usr/share/udhcpc 755 0 0
 
-file /usr/bin/gnuradio_peripheral @CMAKE_BINARY_DIR@/lib/gnuradio_peripheral 755 0 0
 file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
 file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0
 file /usr/bin/test_driver @CMAKE_BINARY_DIR@/lib/test_driver 755 0 0
 file /usr/bin/test_device @CMAKE_BINARY_DIR@/lib/test_device 755 0 0
+file /usr/bin/whiteboxd @CMAKE_BINARY_DIR@/lib/whiteboxd 755 0 0
 file /usr/share/udhcpc/default.script @CMAKE_CURRENT_SOURCE_DIR@/local/usr/share/udhcpc/default.script 755 0 0

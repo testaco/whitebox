@@ -7,14 +7,13 @@ from myhdl import \
         instance, always, always_comb, always_seq, \
         toVerilog
 
+from fir import fir as FIR
 from dsp import Signature
 from duc import duc as DUC
-from duc import duc_fake
 from ddc import ddc as DDC
-from ddc import ddc_fake
 from rfe import rfe as RFE
-from rfe import rfe_fake
 from rfe import print_rfe_ioctl
+from ram import Ram
 
 class OverrunError(Exception):
     """Thrown when the system experiences an overflow on a FIFO buffer."""
@@ -112,6 +111,26 @@ def whitebox(
         rx_fifo_underflow,
         rx_fifo_rdcnt,
         rx_fifo_wrcnt,
+        fir_coeff_ram_addr,
+        fir_coeff_ram_din,
+        fir_coeff_ram_blk,
+        fir_coeff_ram_wen,
+        fir_coeff_ram_dout,
+        fir_load_coeff_ram_addr,
+        fir_load_coeff_ram_din,
+        fir_load_coeff_ram_blk,
+        fir_load_coeff_ram_wen,
+        fir_load_coeff_ram_dout,
+        fir_delay_line_i_ram_addr,
+        fir_delay_line_i_ram_din,
+        fir_delay_line_i_ram_blk,
+        fir_delay_line_i_ram_wen,
+        fir_delay_line_i_ram_dout,
+        fir_delay_line_q_ram_addr,
+        fir_delay_line_q_ram_din,
+        fir_delay_line_q_ram_blk,
+        fir_delay_line_q_ram_wen,
+        fir_delay_line_q_ram_dout,
         **kwargs):
     """The whitebox.
 
@@ -144,6 +163,12 @@ def whitebox(
     print 'interp=', interp_default
 
     interp = Signal(intbv(interp_default)[11:])
+    shift = Signal(intbv(0, min=0, max=21))
+    firen = Signal(bool(0))
+    fir_bank1 = Signal(bool(0))
+    fir_bank0 = Signal(bool(0))
+    fir_N = Signal(intbv(0, min=0, max=2**7))
+
     tx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
     tx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
     tx_gain_i = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
@@ -176,20 +201,41 @@ def whitebox(
     duc_args = (clearn, dac_clock, dac2x_clock,
             loopen, loopback,
             tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
-            txen, txstop, ddsen, txfilteren,
-            interp, fcw, tx_correct_i, tx_correct_q, tx_gain_i, tx_gain_q,
+            txen, txstop,
+            ddsen, txfilteren,
+            interp, shift,
+            fcw,
+            tx_correct_i, tx_correct_q,
+            tx_gain_i, tx_gain_q,
             duc_underrun, tx_sample,
-            dac_en, dac_data, dac_last,)
+            dac_en, dac_data, dac_last,
+            fir_coeff_ram_addr,
+            fir_coeff_ram_din,
+            fir_coeff_ram_blk,
+            fir_coeff_ram_wen,
+            fir_coeff_ram_dout,
+            fir_delay_line_i_ram_addr,
+            fir_delay_line_i_ram_din,
+            fir_delay_line_i_ram_blk,
+            fir_delay_line_i_ram_wen,
+            fir_delay_line_i_ram_dout,
+            fir_delay_line_q_ram_addr,
+            fir_delay_line_q_ram_din,
+            fir_delay_line_q_ram_blk,
+            fir_delay_line_q_ram_wen,
+            fir_delay_line_q_ram_dout,
+            firen, fir_bank1, fir_bank0, fir_N,)
 
     duc_kwargs = dict(dspsim=dspsim,
                     interp=interp_default,
                     cic_enable=kwargs.get('cic_enable', True),
+                    fir_enable=kwargs.get('fir_enable', True),
                     dds_enable=kwargs.get('dds_enable', True),
                     conditioning_enable=kwargs.get('conditioning_enable', True))
     if kwargs.get("duc_enable", True):
         duc = DUC(*duc_args, **duc_kwargs)
     else:
-        duc = duc_fake(*duc_args, **duc_kwargs)
+        duc = None
 
     ######## DIGITAL DOWN CONVERTER ########
     ddc_overrun = Signal(modbv(0, min=0, max=2**16))
@@ -211,7 +257,7 @@ def whitebox(
     if kwargs.get("ddc_enable", True):
         ddc = DDC(*ddc_args, **ddc_kwargs)
     else:
-        ddc = ddc_fake(*ddc_args, **ddc_kwargs)
+        ddc = None
 
     ########### RADIO FRONT END ##############
     rfe_args = (resetn,
@@ -234,17 +280,23 @@ def whitebox(
         rx_fifo_overflow, rx_fifo_underflow,
         rx_fifo_rdcnt, rx_fifo_wrcnt,
 
-        interp, fcw, tx_correct_i, tx_correct_q, tx_gain_i, tx_gain_q,
+        fir_load_coeff_ram_addr,
+        fir_load_coeff_ram_din,
+        fir_load_coeff_ram_blk,
+        fir_load_coeff_ram_wen,
+        fir_load_coeff_ram_dout,
+
+        firen, fir_bank1, fir_bank0, fir_N,
+
+        interp, shift,
+        fcw, tx_correct_i, tx_correct_q, tx_gain_i, tx_gain_q,
         txen, txstop, ddsen, txfilteren,
         decim, rx_correct_i, rx_correct_q,
         rxen, rxstop, rxfilteren,
         duc_underrun, dac_last,
         ddc_overrun, adc_last)
 
-    if kwargs.get("rfe_enable", True):
-        rfe = RFE(*rfe_args)
-    else:
-        rfe = rfe_fake(*rfe_args)
+    rfe = RFE(*rfe_args)
 
     return rfe, duc, ddc
 
@@ -253,7 +305,7 @@ if __name__ == '__main__':
     from fifo import fifo as FIFO
     fifo_depth = 1024
     fifo_width = 32
-    interp = 200
+    interp = 128
     duc_enable = True
     rfe_enable = True
 
@@ -281,6 +333,10 @@ if __name__ == '__main__':
     bus_pslverr = bus.pslverr
     bus_pready = bus.pready
     bus_prdata = bus.prdata
+
+    fir_coeff_ram = Ram(clearn, dac_clock, bus.pclk)
+    fir_delay_line_i_ram = Ram(clearn, dac_clock, dac_clock)
+    fir_delay_line_q_ram = Ram(clearn, dac_clock, dac_clock)
 
     tx_fifo_re = Signal(bool(False))
     tx_fifo_rclk = Signal(bool(False))
@@ -424,13 +480,36 @@ if __name__ == '__main__':
                 rx_fifo_overflow,
                 rx_fifo_underflow,
                 rx_fifo_rdcnt,
-                rx_fifo_wrcnt)
+                rx_fifo_wrcnt,
+                fir_coeff_ram.port['a'].addr,
+                fir_coeff_ram.port['a'].din,
+                fir_coeff_ram.port['a'].blk,
+                fir_coeff_ram.port['a'].wen,
+                fir_coeff_ram.port['a'].dout,
+                fir_coeff_ram.port['b'].addr,
+                fir_coeff_ram.port['b'].din,
+                fir_coeff_ram.port['b'].blk,
+                fir_coeff_ram.port['b'].wen,
+                fir_coeff_ram.port['b'].dout,
+                fir_delay_line_i_ram.port['a'].addr,
+                fir_delay_line_i_ram.port['a'].din,
+                fir_delay_line_i_ram.port['a'].blk,
+                fir_delay_line_i_ram.port['a'].wen,
+                fir_delay_line_i_ram.port['a'].dout,
+                fir_delay_line_q_ram.port['a'].addr,
+                fir_delay_line_q_ram.port['a'].din,
+                fir_delay_line_q_ram.port['a'].blk,
+                fir_delay_line_q_ram.port['a'].wen,
+                fir_delay_line_q_ram.port['a'].dout,
+    )
 
     toVerilog(whitebox, *signals,
             interp=interp,
             rfe_enable=True,
             duc_enable=True,
+            fir_enable=True,
             cic_enable=True,
+            dds_enable=False,
             conditioning_enable=True,
             ddc_enable=True)
 

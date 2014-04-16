@@ -4,7 +4,6 @@
 #include "pdma.h"
 #include "whitebox.h"
 
-//static int whitebox_rf_exciter_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
 	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
@@ -116,6 +115,28 @@ u32 _exciter_get_debug(struct whitebox_exciter *exciter)
     return WHITEBOX_EXCITER(exciter)->debug;
 }
 
+u32 _exciter_get_fir(struct whitebox_exciter *exciter)
+{
+    return WHITEBOX_EXCITER(exciter)->fir;
+}
+
+void _exciter_set_fir(struct whitebox_exciter *exciter, u32 fir)
+{
+    WHITEBOX_EXCITER(exciter)->fir = fir;
+}
+
+s32 _exciter_get_fir_coeff(struct whitebox_exciter *exciter, u8 i)
+{
+    s32* addr = (s32*)exciter->regs;
+    return *addr;
+}
+
+void _exciter_set_fir_coeff(struct whitebox_exciter *exciter, u8 i, s32 c)
+{
+    s32 * addr = (s32*)exciter->regs;
+    *addr = c;
+}
+
 struct whitebox_exciter_operations _exciter_ops = {
     .free = _exciter_free,
     .get_state = _exciter_get_state,
@@ -135,6 +156,10 @@ struct whitebox_exciter_operations _exciter_ops = {
     .space_available = _exciter_space_available,
     .produce = _exciter_produce,
     .get_debug = _exciter_get_debug,
+    .get_fir = _exciter_get_fir,
+    .set_fir = _exciter_set_fir,
+    .get_fir_coeff = _exciter_get_fir_coeff,
+    .set_fir_coeff = _exciter_set_fir_coeff,
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,
@@ -264,6 +289,25 @@ u32 _mock_exciter_get_debug(struct whitebox_exciter *exciter)
     return 0;
 }
 
+void _mock_exciter_set_fir(struct whitebox_exciter *exciter, u32 r)
+{
+    WHITEBOX_EXCITER(exciter)->fir = r & ~WF_ACCESS_COEFFS;
+}
+
+s32 _mock_exciter_get_fir_coeff(struct whitebox_exciter *exciter, u8 i)
+{
+    struct whitebox_mock_exciter *mock_exciter = 
+        container_of(exciter, struct whitebox_mock_exciter, exciter);
+    return mock_exciter->fir_coeff[i];
+}
+
+void _mock_exciter_set_fir_coeff(struct whitebox_exciter *exciter, u8 i, s32 c)
+{
+    struct whitebox_mock_exciter *mock_exciter = 
+        container_of(exciter, struct whitebox_mock_exciter, exciter);
+    mock_exciter->fir_coeff[i] = c;
+}
+
 struct whitebox_exciter_operations _mock_exciter_ops = {
     .free = _mock_exciter_free,
     .get_state = _mock_exciter_get_state,
@@ -283,6 +327,10 @@ struct whitebox_exciter_operations _mock_exciter_ops = {
     .space_available = _mock_exciter_space_available,
     .produce = _mock_exciter_produce,
     .get_debug = _mock_exciter_get_debug,
+    .get_fir = _exciter_get_fir,
+    .set_fir = _mock_exciter_set_fir,
+    .get_fir_coeff = _mock_exciter_get_fir_coeff,
+    .set_fir_coeff = _mock_exciter_set_fir_coeff,
 };
 
 int whitebox_mock_exciter_create(struct whitebox_mock_exciter *mock_exciter,

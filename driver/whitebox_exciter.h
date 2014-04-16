@@ -18,6 +18,7 @@ struct whitebox_exciter_regs {
     u32 available;
     u32 debug;
     u32 gain;
+    u32 fir;
 };
 
 #define WHITEBOX_EXCITER(e) ((volatile struct whitebox_exciter_regs *)((e)->regs))
@@ -40,6 +41,7 @@ struct whitebox_mock_exciter {
     unsigned long buf_size;
     int order;
     struct circ_buf *buf;
+    s32 fir_coeff[WF_COEFF_COUNT];
 };
 
 struct whitebox_exciter_operations {
@@ -72,6 +74,12 @@ struct whitebox_exciter_operations {
             size_t count);
 
     u32 (*get_debug)(struct whitebox_exciter *exctier);
+
+    u32 (*get_fir)(struct whitebox_exciter *exciter);
+    void (*set_fir)(struct whitebox_exciter *exciter, u32 fir);
+
+    s32 (*get_fir_coeff)(struct whitebox_exciter *exciter, u8 i);
+    void (*set_fir_coeff)(struct whitebox_exciter *exciter, u8 i, s32 c);
 };
 
 int whitebox_exciter_create(struct whitebox_exciter *exciter,

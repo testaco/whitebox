@@ -67,6 +67,8 @@ class Apb3Bus(object):
         :param data: The data to write
         :raises Apb3TimeoutError: If slave doesn't set ``pready`` in time
         """
+        assert not addr & 3  # Must be word aligned
+
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 
@@ -118,6 +120,7 @@ class Apb3Bus(object):
         :returns: Nothing, but sets ``self.rdata`` to the received data.
         :raises Apb3TimeoutError: If slave doesn't set ``pready`` in time
         """
+        assert not addr & 3  # Must be word aligned
         duration = self.kwargs['duration']
         timeout = self.kwargs.get('timeout') or 5 * duration
 

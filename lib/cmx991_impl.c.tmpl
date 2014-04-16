@@ -188,6 +188,7 @@ void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
         gain_t gain) {
     rf->tx_mix_pwr = TX_MIX_PWR_POWER_UP;
     rf->iq_mod_pwr = IQ_MOD_PWR_POWER_UP;
+    rf->vbias = VBIAS_POWER_UP;
 
     if (fdes > 600e6) {
         rf->freq = FREQ_GT_600MHZ;
@@ -195,7 +196,7 @@ void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
         rf->freq = FREQ_LT_600MHZ;
     }
 
-    rf->iq_out = IQ_OUT_RFOUT;
+    rf->iq_out = IQ_OUT_IFOUT;
 
     rf->if_filter = if_filter;
     rf->hi_lo = hi_lo;

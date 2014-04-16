@@ -6,10 +6,12 @@
 #include "whitebox_test.h"
 #include "dsp.h"
 
+#define SAMPLE_RATE W_DAC_RATE_HZ / 128
+
 int test_open_close(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(!whitebox_plls_locked(&wb));
     assert(whitebox_close(&wb) == 0);
@@ -19,31 +21,32 @@ int test_open_close(void* data) {
 int test_tx_clear(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
     assert(!whitebox_plls_locked(&wb));
     assert(whitebox_close(&wb) == 0);
 }
 
-int test_tx_50_pll_fails(void* data) {
+int test_tx_50_pll(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 50.00e6) != 0);
-    assert(!whitebox_plls_locked(&wb));
+    assert(whitebox_tx(&wb, 50.00e6) == 0);
+    assert(whitebox_plls_locked(&wb));
     assert(whitebox_close(&wb) == 0);
 }
 
 int test_tx_144_pll(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
+    whitebox_plls_locked(&wb);
     assert(whitebox_plls_locked(&wb));
     assert(whitebox_close(&wb) == 0);
 }
@@ -51,7 +54,7 @@ int test_tx_144_pll(void* data) {
 int test_tx_222_pll(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
     assert(whitebox_tx(&wb, 222.00e6) == 0);
@@ -62,7 +65,7 @@ int test_tx_222_pll(void* data) {
 int test_tx_420_pll(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
     assert(whitebox_tx(&wb, 420.00e6) == 0);
@@ -73,7 +76,7 @@ int test_tx_420_pll(void* data) {
 int test_tx_902_pll(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, 1e6) > 0);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
     assert(whitebox_tx(&wb, 902.00e6) == 0);
@@ -85,10 +88,13 @@ int test_ioctl_exciter(void *data) {
     int fd;
     int16_t ic, qc;
     float ig, qg;
+    int i;
+    int16_t coeffs[WF_COEFF_COUNT], coeffs2[WF_COEFF_COUNT];
+
     whitebox_t wb;
     whitebox_args_t w;
     whitebox_init(&wb);
-    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 1e6)) > 0);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, SAMPLE_RATE)) > 0);
     assert(fd > 0);
     assert(ioctl(fd, WE_GET, &w) == 0);
     w.flags.exciter.interp = 100;
@@ -105,6 +111,21 @@ int test_ioctl_exciter(void *data) {
     assert(whitebox_tx_set_gain(&wb, 0.75, 1.25) == 0);
     whitebox_tx_get_gain(&wb, &ig, &qg);
     assert(ig == 0.75 && qg == 1.25);
+
+    for (i = 0; i < WF_COEFF_COUNT-1; ++i)
+        coeffs[i] = i - WF_COEFF_COUNT + 1;
+
+    assert(whitebox_fir_load_coeffs(&wb, 0, WF_COEFF_COUNT-1, coeffs) == 0);
+    assert(whitebox_fir_get_coeffs(&wb, 0, WF_COEFF_COUNT-1, coeffs2) == WF_COEFF_COUNT-1);
+    for (i = 0; i < WF_COEFF_COUNT-1; ++i)
+        assert(coeffs[i] == coeffs2[i]);
+
+    whitebox_tx_flags_enable(&wb, WS_FIREN);
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(w.flags.exciter.state & WS_FIREN);
+    whitebox_tx_flags_disable(&wb, WS_FIREN);
+    assert(ioctl(fd, WE_GET, &w) == 0);
+    assert(!(w.flags.exciter.state & WS_FIREN));
 
     assert(whitebox_close(&wb) == 0);
     return 0;
@@ -123,7 +144,7 @@ int test_tx_fifo(void *data) {
     whitebox_parameter_set("auto_tx", 0);
     whitebox_parameter_set("check_plls", 0);
     whitebox_init(&wb);
-    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 10e3)) > 0);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, SAMPLE_RATE)) > 0);
     whitebox_tx_get_buffer_threshold(&wb, &aeval, &afval);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
@@ -175,7 +196,7 @@ int test_tx_fifo_dma(void *data) {
     whitebox_parameter_set("auto_tx", 0);
     whitebox_parameter_set("check_plls", 0);
     whitebox_init(&wb);
-    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, 10e3)) > 0);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, SAMPLE_RATE)) > 0);
     whitebox_tx_get_buffer_threshold(&wb, &aeval, &afval);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
@@ -226,7 +247,7 @@ int test_tx_overrun_underrun(void *data) {
     whitebox_parameter_set("check_plls", 0);
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox",
-            O_RDWR | O_NONBLOCK, 50e3)) > 0);
+            O_RDWR | O_NONBLOCK, SAMPLE_RATE)) > 0);
     assert(whitebox_tx(&wb, 144.00e6) == 0);
 
     whitebox_tx_get_buffer_runs(&wb, &o, &u);
@@ -253,7 +274,6 @@ int test_tx_overrun_underrun(void *data) {
 }
 
 #define COUNT 1024 
-#define SAMP_RATE 50e3
 int test_tx_halt(void* data) {
     whitebox_t wb;
     whitebox_args_t w;
@@ -262,16 +282,17 @@ int test_tx_halt(void* data) {
     int fd;
     int runs;
     int last_count = 0;
-    float sample_rate = SAMP_RATE;
+    float sample_rate = SAMPLE_RATE;
     uint32_t fcw = freq_to_fcw(1.7e3, sample_rate);
     uint32_t phase = 0;
     void *wbptr;
     int buffer_size = sysconf(_SC_PAGE_SIZE) << whitebox_parameter_get("user_order");
     whitebox_init(&wb);
+    whitebox_parameter_set("flow_control", 0);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
     wbptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     assert(wbptr != MAP_FAILED && wbptr);
-    assert(whitebox_tx(&wb, 144.00e6) == 0);
+    assert(whitebox_tx(&wb, 54.00e6) == 0);
 
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WES_TXEN));
@@ -279,14 +300,15 @@ int test_tx_halt(void* data) {
 
     assert(whitebox_plls_locked(&wb));
 
-    for (j = 0; j < 200;) {
+    for (j = 0; j < 10;) {
         unsigned long dest, count;
         count = ioctl(fd, W_MMAP_WRITE, &dest) >> 2;
         if (count <= 0) {
             continue;
         } else {
             count = count < COUNT ? count : COUNT;
-            phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
+            //phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
+            assert(whitebox_plls_locked(&wb));
             ret = write(whitebox_fd(&wb), 0, count << 2);
             if (ret != count << 2) {
                 whitebox_debug_to_file(&wb, stdout);
@@ -304,6 +326,7 @@ int test_tx_halt(void* data) {
 
     assert(fsync(fd) == 0);
     //whitebox_debug_to_file(&wb, stdout); ioctl(wb.fd, WE_GET, &w); assert(last_count == w.flags.exciter.debug);
+    whitebox_parameter_set("flow_control", 1);
 
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WES_TXEN));
@@ -318,16 +341,16 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_open_close),
         WHITEBOX_TEST(test_tx_clear),
         WHITEBOX_TEST(test_ioctl_exciter),
+        WHITEBOX_TEST(test_tx_50_pll),
         WHITEBOX_TEST(test_tx_144_pll),
         WHITEBOX_TEST(test_tx_222_pll),
         WHITEBOX_TEST(test_tx_420_pll),
         WHITEBOX_TEST(test_tx_902_pll),
-        WHITEBOX_TEST(test_tx_fifo),
-        WHITEBOX_TEST(test_tx_fifo_dma),
         WHITEBOX_TEST(test_tx_overrun_underrun),
         WHITEBOX_TEST(test_tx_halt),
 #if 0
-        WHITEBOX_TEST(test_tx_50_pll_fails),
+        WHITEBOX_TEST(test_tx_fifo),
+        WHITEBOX_TEST(test_tx_fifo_dma),
 #endif
         WHITEBOX_TEST(0),
     };

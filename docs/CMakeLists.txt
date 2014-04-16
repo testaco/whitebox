@@ -90,5 +90,5 @@ add_custom_target(whitebox_pdf_docs
 
 add_dependencies(whitebox_pdf_docs DEPENDS whitebox_doxygen_docs)
 
-add_custom_target(docs ALL)
+add_custom_target(docs)
 add_dependencies(docs DEPENDS whitebox_pdf_docs whitebox_html_docs)

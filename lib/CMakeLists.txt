@@ -20,7 +20,7 @@ set(WHITEBOX_SRCS
 )
 
 add_library(whitebox ${WHITEBOX_SRCS})
-target_link_libraries(whitebox ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(whitebox m ${CMAKE_REQUIRED_LIBRARIES})
 set_target_properties(whitebox PROPERTIES SOVERSION ${SOVERSION})
 
 set(WHITEBOX_PUBLIC_HEADERS
@@ -67,8 +67,11 @@ target_link_libraries(qa_rx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(whiteboxd whiteboxd.c)
+target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 add_custom_target(apps
-    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx qa_rx qa_lo)
+    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx qa_rx qa_lo whiteboxd)
 
 add_test(NAME target_netboot
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot
