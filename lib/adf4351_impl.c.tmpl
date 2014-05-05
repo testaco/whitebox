@@ -126,12 +126,12 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     rf->aux_output_power = AUX_OUTPUT_POWER_M4DBM;
     rf->aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
     rf->aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
-    rf->charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
+    rf->charge_pump_current = CHARGE_PUMP_CURRENT_5_00MA;
     rf->muxout = MUXOUT_3STATE;
     rf->ld_pin_mode = LD_PIN_MODE_DLD;
     rf->mute_till_lock_detect = MUTE_TILL_LOCK_DETECT_MUTE_ENABLED;
     rf->clock_div_mode = CLOCK_DIV_MODE_CLOCK_DIVIDER_OFF;
-    rf->low_noise_and_spur = LOW_NOISE_AND_SPUR_LOW_NOISE;
+    rf->low_noise_and_spur = LOW_NOISE_AND_SPUR_LOW_SPUR;
 
     return _actual_frequency(FRAC, N, MOD, RFdiv, R, T, D, ref_freq);
 }

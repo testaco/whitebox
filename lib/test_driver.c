@@ -473,7 +473,7 @@ int test_mmap_write_success(void *data) {
     uint32_t buf[] = { 0x00, 0x01, 0x02, 0x03 };
     int i;
     assert(whitebox_parameter_set("check_plls", 0) == 0);
-    fd = open(WHITEBOX_DEV, O_RDWR);
+    fd = open(WHITEBOX_DEV, O_RDWR | O_NONBLOCK);
     assert(fd > 0);
 
     tx_ptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -547,54 +547,6 @@ int test_blocking_xfer_huge(void *data) {
     return 0;
 }
 
-#if 0
-
-
-int test_mmap_write_fail(void *data) {
-    int fd;
-    int ret;
-    int rbsize;
-    void* rbptr;
-    whitebox_args_t w;
-    uint32_t buf[] = { 0x00, 0x01, 0x02, 0x03 };
-
-    fd = open(WHITEBOX_DEV, O_RDWR | O_NONBLOCK);
-    assert(fd > 0);
-    ioctl(fd, WE_GET_RB_INFO, &w);
-    rbsize = w.rb_info.size;
-    rbptr = mmap(0, rbsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    assert(rbptr > 0);
-    ret = write(fd, buf, sizeof(uint32_t) * 4);
-    assert(ret < 0);
-    assert(munmap(rbptr, rbsize) == 0);
-    close(fd);
-    return 0;
-}
-
-int test_mmap_write_not_locked(void *data) {
-    int fd;
-    int ret;
-    int rbsize;
-    void* rbptr;
-    whitebox_args_t w;
-    uint32_t buf[] = { 0x00, 0x01, 0x02, 0x03 };
-    int i;
-    fd = open(WHITEBOX_DEV, O_RDWR | O_NONBLOCK);
-    assert(fd > 0);
-    ioctl(fd, WE_GET_RB_INFO, &w);
-    rbsize = w.rb_info.size;
-    rbptr = mmap(0, rbsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    assert(rbptr > 0);
-    ioctl(fd, WE_GET_RB_PAGE, &w);
-    memcpy(rbptr + w.rb_info.offset, buf, sizeof(uint32_t) * 4);
-    ret = write(fd, 0, sizeof(uint32_t) * 4);
-    assert(ret < 0);
-    assert(munmap(rbptr, rbsize) == 0);
-    close(fd);
-    return 0;
-}
-#endif
-
 int main(int argc, char **argv) {
     int result;
 
@@ -605,13 +557,6 @@ int main(int argc, char **argv) {
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_blocking_open_close),
         WHITEBOX_TEST(test_blocking_open_busy),
-        WHITEBOX_TEST(test_ioctl_reset),
-        WHITEBOX_TEST(test_ioctl_not_locked),
-        WHITEBOX_TEST(test_ioctl_exciter),
-        WHITEBOX_TEST(test_ioctl_fir),
-        WHITEBOX_TEST(test_ioctl_cmx991),
-        WHITEBOX_TEST(test_ioctl_adf4351),
-#if 0
         WHITEBOX_TEST(test_blocking_write),
         WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
@@ -619,13 +564,18 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_xfer2),
         WHITEBOX_TEST(test_blocking_xfer3),
         WHITEBOX_TEST(test_blocking_xfer4),
+        WHITEBOX_TEST(test_ioctl_reset),
+        WHITEBOX_TEST(test_ioctl_not_locked),
+        WHITEBOX_TEST(test_ioctl_exciter),
+        WHITEBOX_TEST(test_ioctl_fir),
+        WHITEBOX_TEST(test_ioctl_cmx991),
+        WHITEBOX_TEST(test_ioctl_adf4351),
         WHITEBOX_TEST(test_mmap_success),
         WHITEBOX_TEST(test_mmap_write_success),
+#if 0
         //WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_blocking_xfer_huge),
         WHITEBOX_TEST(test_tx_fifo),
-        WHITEBOX_TEST(test_mmap_write_fail),
-        WHITEBOX_TEST(test_mmap_write_not_locked),
 #endif
         WHITEBOX_TEST(0),
     };

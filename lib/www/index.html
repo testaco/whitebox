@@ -1,0 +1,252 @@
+<html>
+<head>
+<style type="text/css">
+.ptt-off {
+    width: 166px;
+    height: 20px;
+    background-color: #ff0000;
+}
+.ptt-on {
+    width: 166px;
+    height: 20px;
+    background-color: #00ff00;
+}
+</style>
+
+<script type="text/javascript">
+
+var command_errors = 0;
+
+function command(v, val) {
+    console.log("command " + v + "=" + val);
+    var r = new XMLHttpRequest(); 
+    r.open("POST", "/", true);
+    r.onreadystatechange = function () {
+        if (r.readyState == 4) {
+            if (r.status == 200) {
+                update_display();
+                command_errors = 0;
+            } else {
+                if (command_errors++ < 3)
+                    command(v, val);
+            }
+        }
+    };
+    r.send(v + "=" + val + "\0");
+}
+
+var global_ptt = 0;
+
+function ptt(state) {
+    function debounce() {
+        if (global_ptt && !document.getElementById("ptt").value && !document.getElementById("ptt_sticky").value)
+            ptt(false);
+        else if (global_ptt)
+            window.setTimeout(debounce, 10);
+    }
+
+    if (!!state != global_ptt)
+        command("ptt", state ? "1" : "0");
+    global_ptt = state;
+    if (global_ptt)
+        window.setTimeout(debounce, 10);
+}
+
+function update_display() {
+    var r = new XMLHttpRequest(); 
+    r.open("GET", "/config", true);
+    r.onreadystatechange = function () {
+        if (r.readyState != 4 || r.status != 200) return; 
+        var config = JSON.parse(r.responseText);
+        //console.log(r.responseText);
+        //console.log(config['mode']);
+        document.getElementById('offset_correct_i').value = config['offset_correct_i'];
+        document.getElementById('offset_correct_q').value = config['offset_correct_q'];
+        document.getElementById('gain_i').value = config['gain_i'];
+        document.getElementById('gain_q').value = config['gain_q'];
+        document.getElementById('ptt').value = config['ptt'];
+        if (config['ptt'])
+            document.getElementById('ptt_indicator').className = 'ptt-on';
+        else
+            document.getElementById('ptt_indicator').className = 'ptt-off';
+        document.getElementById('mode').value = config['mode'];
+        document.getElementById('freq').value = config['freq'] / 1e6;
+        document.getElementById('tone_freq').value = config['tone_freq'];
+        document.getElementById('latency').value = config['latency'];
+    };
+    r.send();
+}
+
+function start() {
+    update_display();
+    var update_interval = window.setInterval(update_display, (1/10.)*1000);
+    document.getElementById("window_refresh").addEventListener("change",
+        function (e) {
+            if (update_interval > 0)
+                window.clearInterval(update_interval);
+            var refresh_rate = Number(document.getElementById("window_refresh").value);
+            if (refresh_rate > 0) {
+                console.log("refresh rate " + refresh_rate);
+                update_interval = window.setInterval(update_display, (1/refresh_rate)*1000);
+            } else
+                update_interval = -1;
+            e.preventDefault();
+        });
+
+    document.addEventListener("keydown",
+        function (e) {
+            if (e.keyCode == 74) {
+                ptt(true);
+                e.preventDefault();
+            }
+        });
+    document.addEventListener("keyup",
+        function (e) {
+            if (e.keyCode == 74) {
+                ptt(false);
+                e.preventDefault();
+            }
+        });
+    document.getElementById("ptt").addEventListener("mousedown",
+        function (e) {
+            ptt(true);
+            e.preventDefault();
+        });
+    document.getElementById("ptt").addEventListener("mouseup",
+        function (e) {
+            ptt(false);
+            e.preventDefault();
+        });
+    document.getElementById("ptt").addEventListener("click",
+        function (e) {
+            e.preventDefault();
+        });
+    document.getElementById("ptt_sticky").addEventListener("change",
+        function (e) {
+            var p = document.getElementById("ptt_sticky").checked;
+            ptt(p);
+            e.preventDefault();
+        });
+
+    document.getElementById("mode").addEventListener("change",
+        function (e) {
+            var mode = document.getElementById("mode").value;
+            command("mode", mode);
+            e.preventDefault();
+        });
+    document.getElementById("freq").addEventListener("change",
+        function (e) {
+            var freq = document.getElementById("freq").value;
+            command("freq", freq);
+
+            e.preventDefault();
+        });
+    document.getElementById("tone_freq").addEventListener("change",
+        function (e) {
+            var tone_freq = document.getElementById("tone_freq").value;
+            command("tone_freq", tone_freq);
+
+            e.preventDefault();
+        });
+
+    document.getElementById("offset_correct_i").addEventListener("change",
+        function (e) {
+            var offset_correct_i = document.getElementById("offset_correct_i").value;
+            command("offset_correct_i", offset_correct_i);
+
+            e.preventDefault();
+        });
+    document.getElementById("offset_correct_q").addEventListener("change",
+        function (e) {
+            var offset_correct_q = document.getElementById("offset_correct_q").value;
+            command("offset_correct_q", offset_correct_q);
+
+            e.preventDefault();
+        });
+    document.getElementById("gain_i").addEventListener("change",
+        function (e) {
+            var gain_i = document.getElementById("gain_i").value;
+            command("gain_i", gain_i);
+
+            e.preventDefault();
+        });
+    document.getElementById("gain_q").addEventListener("change",
+        function (e) {
+            var gain_q = document.getElementById("gain_q").value;
+            command("gain_q", gain_q);
+
+            e.preventDefault();
+        });
+    document.getElementById("latency").addEventListener("change",
+        function (e) {
+            var latency = document.getElementById("latency").value;
+            command("latency", latency);
+
+            e.preventDefault();
+        });
+}
+
+document.addEventListener("DOMContentLoaded", start);
+
+</script>
+
+</head>
+<body>
+<h1>Whitebox Control Port</h1>
+<br />
+<div id="ptt_indicator" class="ptt-off">PTT</div>
+
+<form>
+
+<fieldset>
+<legend>Mode</legend>
+<label for="mode">Mode</label>
+<select name="mode" id="mode">
+    <option value="idle">Idle</option>
+    <option value="cw">CW</option>
+    <option value="iq">IQ</option>
+    <option value="audio">Audio</option>
+</select>
+<br />
+<label for="freq">Center Frequency (MHz)</label>
+<input name="freq" id="freq" type="number" min="50" max="1000" step=".004" value="145.000" />
+</fieldset>
+
+<fieldset>
+<legend>Transmit</legend>
+<label for="tone_freq">Tone Frequency (Hz)</label>
+<input type="number" name="tone_freq" id="tone_freq" min="300" max="12000" step="10" value="700" />
+<br />
+<button name="ptt" id="ptt" value="1">PTT</button>
+<br />
+<label for="ptt_sticky">PTT Sticky</label>
+<input type="checkbox" name="ptt_sticky" id="ptt_sticky" value="false" />
+</fieldset>
+
+<fieldset>
+<legend>Analog Qudrature Modulator Correction</legend>
+<label for="offset_correct_i">Offset Real</label>
+<input name="offset_correct_i" id="offset_correct_i" type="number" value="0" min="-512" max="512" />
+<br />
+<label for="offset_correct_q">Offset Imag</label>
+<input name="offset_correct_q" id="offset_correct_q" type="number" value="0" min="-512" max="512" />
+<br />
+<label for="gain_i">Gain Real</label>
+<input name="gain_i" id="gain_i" type="number" value="1" min="-2" max="2" step=".01" />
+<br />
+<label for="gain_q">Gain Imag</label>
+<input name="gain_q" id="gain_q" type="number" value="1" min="-2" max="2" step=".01" />
+</fieldset>
+
+<fieldset>
+<legend>Advanced</legend>
+<label for="latency">Buffer Latency (ms)</label>
+<input name="latency" id="latency" type="number" value="50" min="1" max="1000" />
+<br />
+<label for="window_refresh">Window Refresh Rate (Hz)</label>
+<input name="window_refresh" id="window_refresh" type="number" value="10" min="0" max="120" />
+</fieldset>
+
+</form>
+</body>
+</html>

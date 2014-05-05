@@ -69,6 +69,16 @@ size_t whitebox_user_source_data_available(struct whitebox_user_source *user_sou
     return data;
 }
 
+size_t whitebox_user_source_data_total(struct whitebox_user_source *user_source)
+{
+    long head, tail, data;
+    head = ACCESS_ONCE(user_source->buf.head);
+    tail = user_source->buf.tail;
+    data = CIRC_CNT(head, tail, user_source->buf_size);
+    d_printk(3, "%ld\n", data);
+    return data;
+}
+
 int whitebox_user_source_consume(struct whitebox_user_source *user_source,
         size_t count)
 {

@@ -5,9 +5,8 @@
 
 #include "pdma.h"
 
-static int whitebox_rf_sink_debug = WHITEBOX_VERBOSE_DEBUG;
 #define d_printk(level, fmt, args...)				\
-	if (whitebox_rf_sink_debug >= level) printk(KERN_INFO "%s: " fmt,	\
+	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
 void whitebox_rf_sink_init(struct whitebox_rf_sink *rf_sink,
@@ -43,9 +42,12 @@ size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,
     size_t count;
     if (pdma_buffers_available(rf_sink->dma_ch) > 0)
         count = rf_sink->exciter->ops->space_available(rf_sink->exciter, dest);
-    else
+    else {
+        d_printk(1, "txen %d buffs-avail %d\n",
+                rf_sink->exciter->ops->get_state(rf_sink->exciter) & WES_TXEN,
+                pdma_buffers_available(rf_sink->dma_ch));
         count = 0;
-    d_printk(3, "%d\n", count);
+    }
     return count;
 }
 
@@ -102,6 +104,9 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
         d_printk(0, "failed to start dma\n");
         return -EFAULT;
     }
+    d_printk(1, "pdma started count=%d txen=%d\n",
+        count,
+        rf_sink->exciter->ops->get_state(rf_sink->exciter) & WES_TXEN);
     rf_sink->dma[buf].count = count;
     rf_sink->dma[buf].mapping = mapping;
     d_printk(3, "work finish\n");
@@ -110,6 +115,7 @@ int whitebox_rf_sink_work(struct whitebox_rf_sink *rf_sink,
 
 int whitebox_rf_sink_work_done(struct whitebox_rf_sink *rf_sink, int buf)
 {
+    d_printk(1, "pdma finish\n");
     dma_unmap_single(NULL, rf_sink->dma[buf].mapping,
             rf_sink->dma[buf].count, DMA_TO_DEVICE);
     return (int)rf_sink->dma[buf].count;

@@ -101,3 +101,6 @@ file /usr/bin/test_driver @CMAKE_BINARY_DIR@/lib/test_driver 755 0 0
 file /usr/bin/test_device @CMAKE_BINARY_DIR@/lib/test_device 755 0 0
 file /usr/bin/whiteboxd @CMAKE_BINARY_DIR@/lib/whiteboxd 755 0 0
 file /usr/share/udhcpc/default.script @CMAKE_CURRENT_SOURCE_DIR@/local/usr/share/udhcpc/default.script 755 0 0
+
+dir /var/www 0755 0 0
+file /var/www/index.html @CMAKE_SOURCE_DIR@/lib/www/index.html 644 0 0

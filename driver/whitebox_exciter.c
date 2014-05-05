@@ -91,9 +91,10 @@ void _exciter_get_runs(struct whitebox_exciter *exciter,
 long _exciter_space_available(struct whitebox_exciter *exciter,
         unsigned long *dest)
 {
-    u32 state = exciter->ops->get_state(exciter);
-    if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN))
-        exciter->ops->set_state(exciter, WES_TXEN);
+    //u32 state = exciter->ops->get_state(exciter);
+    //if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN)) {
+    //    exciter->ops->set_state(exciter, WES_TXEN);
+    //}
     *dest = (unsigned long)&WHITEBOX_EXCITER(exciter)->sample;
     //return (WE_FIFO_SIZE << 2) - (long)((WHITEBOX_EXCITER(exciter)->available) << 2);
     return whitebox_frame_size << 2;
@@ -103,9 +104,10 @@ int _exciter_produce(struct whitebox_exciter *exciter,
         size_t count)
 {
     u32 state = exciter->ops->get_state(exciter);
-    d_printk(2, "%08x\n", state);
-    if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN))
+    if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN)) {
+        d_printk(1, "\n********exciter transmit enable****\n");
         exciter->ops->set_state(exciter, WES_TXEN);
+    }
 
     return 0;
 }
@@ -274,6 +276,8 @@ int _mock_exciter_produce(struct whitebox_exciter *exciter,
 {
     struct whitebox_mock_exciter *mock_exciter = 
         container_of(exciter, struct whitebox_mock_exciter, exciter);
+    u32 state;
+
     d_printk(1, "values... %08x %08x %08x %08x\n",
             (u32)*(mock_exciter->buf->buf + mock_exciter->buf->head + 0),
             (u32)*(mock_exciter->buf->buf + mock_exciter->buf->head + 4),
@@ -281,6 +285,13 @@ int _mock_exciter_produce(struct whitebox_exciter *exciter,
             (u32)*(mock_exciter->buf->buf + mock_exciter->buf->head + 12));
     mock_exciter->buf->head = (mock_exciter->buf->head + count) &
         (mock_exciter->buf_size - 1);
+
+    state = exciter->ops->get_state(exciter);
+    d_printk(1, "hi afull=%s txen=%s\n", state & WES_AFULL ? "true" : "false", state & WES_TXEN ? "true" : "false");
+    if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN)) {
+        d_printk(0, "*************exciter transmit enable\n");
+        exciter->ops->set_state(exciter, WES_TXEN);
+    }
     return 0;
 }
 

@@ -62,6 +62,7 @@ int pdma_set_priority_ratio(int ratio);
 
 int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_adj, u32 flags);
 
+void pdma_clear(u8 ch);
 void pdma_release(u8 ch);
 
 int pdma_start(u8 ch, u32 src, u32 dst, u16 cnt);

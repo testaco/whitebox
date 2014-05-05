@@ -65,7 +65,7 @@ int cmx991_pll_enable(cmx991_t* rf, double fref, double fdes) {
     cmx991_copy(rf, &tmp);
 
     // General Control Register
-    tmp.vco_nr = VCO_NR_MID_HIGH_Q;
+    tmp.vco_nr = VCO_NR_LOW_Q;
     if (fdes > 75e6) {
         tmp.ifh = IFH_GT_75MHZ;
     } else {
@@ -149,10 +149,12 @@ void cmx991_resume(cmx991_t* rf) {
     // General Control Register
     rf->en_bias = EN_BIAS_POWER_UP;
     rf->vco_buf_en = VCO_BUF_EN_POWER_UP;
+# if WC_USE_PLL
     rf->vco_nr_en = VCO_NR_EN_POWER_UP;
+# endif
 
     // Rx Control Register
-    //rf->vbias = VBIAS_POWER_UP;
+    rf->vbias = VBIAS_POWER_UP;
 }
 
 void cmx991_shutdown(cmx991_t* rf) {
@@ -168,6 +170,7 @@ void cmx991_shutdown(cmx991_t* rf) {
 
     // Tx Control Register
     rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
+    rf->iq_mod_pwr = IQ_MOD_PWR_POWER_DOWN;
 }
 
 void cmx991_suspend(cmx991_t* rf) {
@@ -178,14 +181,20 @@ void cmx991_suspend(cmx991_t* rf) {
     rf->mix_pwr = MIX_PWR_POWER_DOWN;
     rf->iq_pwr = IQ_PWR_POWER_DOWN;
     rf->vbias = VBIAS_POWER_DOWN;
+    rf->lna = LNA_POWER_DOWN;
 
     // Tx Control Register
     rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
+    rf->iq_mod_pwr = IQ_MOD_PWR_POWER_DOWN;
 }
 
 void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
         hi_lo_t hi_lo, tx_rf_div_t tx_rf_div, tx_if_div_t tx_if_div,
         gain_t gain) {
+    rf->mix_pwr = MIX_PWR_POWER_DOWN;
+    rf->iq_pwr = IQ_PWR_POWER_DOWN;
+    rf->sli_pwr = SLI_PWR_POWER_DOWN;
+    rf->lna = LNA_POWER_DOWN;
     rf->tx_mix_pwr = TX_MIX_PWR_POWER_UP;
     rf->iq_mod_pwr = IQ_MOD_PWR_POWER_UP;
     rf->vbias = VBIAS_POWER_UP;
@@ -208,6 +217,9 @@ void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
 void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div, mix_out_t mix_out,
         if_in_t if_in, iq_filter_t iq_filter, vga_t vga) {
     rf->rx_mode = RX_MODE_IQ;    
+    
+    rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
+    rf->iq_mod_pwr = IQ_MOD_PWR_POWER_DOWN;
 
     rf->mix_pwr = MIX_PWR_POWER_UP;
     rf->iq_pwr = IQ_PWR_POWER_UP;

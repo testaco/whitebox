@@ -277,10 +277,9 @@ int test_tx_overrun_underrun(void *data) {
 int test_tx_halt(void* data) {
     whitebox_t wb;
     whitebox_args_t w;
-    int j;
+    int j, k;
     int ret;
     int fd;
-    int runs;
     int last_count = 0;
     float sample_rate = SAMPLE_RATE;
     uint32_t fcw = freq_to_fcw(1.7e3, sample_rate);
@@ -288,49 +287,51 @@ int test_tx_halt(void* data) {
     void *wbptr;
     int buffer_size = sysconf(_SC_PAGE_SIZE) << whitebox_parameter_get("user_order");
     whitebox_init(&wb);
-    whitebox_parameter_set("flow_control", 0);
+    whitebox_parameter_set("flow_control", 1);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
     wbptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     assert(wbptr != MAP_FAILED && wbptr);
-    assert(whitebox_tx(&wb, 54.00e6) == 0);
 
-    assert(ioctl(fd, WE_GET, &w) == 0);
-    assert(!(w.flags.exciter.state & WES_TXEN));
-    runs = w.flags.exciter.runs;
+    assert(whitebox_tx_set_latency(&wb, 20) == 0);
+    assert(whitebox_tx_get_latency(&wb) == 20);
 
-    assert(whitebox_plls_locked(&wb));
-
-    for (j = 0; j < 10;) {
-        unsigned long dest, count;
-        count = ioctl(fd, W_MMAP_WRITE, &dest) >> 2;
-        if (count <= 0) {
-            continue;
-        } else {
-            count = count < COUNT ? count : COUNT;
-            //phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
-            assert(whitebox_plls_locked(&wb));
-            ret = write(whitebox_fd(&wb), 0, count << 2);
-            if (ret != count << 2) {
-                whitebox_debug_to_file(&wb, stdout);
-                printf("locked: CMX991 %c     ADF4351 %c\n",
-                    ioctl(wb.fd, WC_LOCKED) ? 'Y' : 'N',
-                    ioctl(wb.fd, WA_LOCKED) ? 'Y' : 'N');
-                perror("write: ");
+    for (k = 0; k < 10; ++k) {
+        assert(whitebox_tx(&wb, 54.00e6) == 0);
+        assert(whitebox_plls_locked(&wb));
+        last_count = 0;
+        for (j = 0; j < 10;) {
+            unsigned long dest, count;
+            count = ioctl(fd, W_MMAP_WRITE, &dest) >> 2;
+            if (count <= 0) {
+                continue;
+            } else {
+                count = count < COUNT ? count : COUNT;
+                if (rand() & 1)
+                    count -= 16;
+                //phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
+                ret = write(whitebox_fd(&wb), 0, count << 2);
+                if (ret != count << 2) {
+                    whitebox_debug_to_file(&wb, stdout);
+                    printf("locked: CMX991 %c     ADF4351 %c\n",
+                        ioctl(wb.fd, WC_LOCKED) ? 'Y' : 'N',
+                        ioctl(wb.fd, WA_LOCKED) ? 'Y' : 'N');
+                    perror("write: ");
+                }
+                assert(ret == count << 2);
+                last_count += count;
+                //whitebox_debug_to_file(&wb, stdout);
+                j++;
             }
-            assert(ret == count << 2);
-            last_count += count;
-            //whitebox_debug_to_file(&wb, stdout);
-            j++;
         }
+        assert(fsync(fd) == 0);
+        ioctl(wb.fd, WE_GET, &w);
+        assert(last_count == w.flags.exciter.debug);
+        whitebox_tx_standby(&wb);
     }
-
-    assert(fsync(fd) == 0);
-    //whitebox_debug_to_file(&wb, stdout); ioctl(wb.fd, WE_GET, &w); assert(last_count == w.flags.exciter.debug);
     whitebox_parameter_set("flow_control", 1);
 
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WES_TXEN));
-    assert(w.flags.exciter.runs == runs);
     assert(munmap(wbptr, buffer_size) == 0);
     assert(whitebox_close(&wb) == 0);
 }

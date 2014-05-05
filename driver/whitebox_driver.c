@@ -11,6 +11,7 @@
 #include <linux/interrupt.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/poll.h>
 
 #include <mach/fpga.h>
 
@@ -106,9 +107,10 @@ int whitebox_loopen = 0;
 module_param(whitebox_loopen, int, S_IRUSR | S_IWUSR);
 
 /*
- * Buffer delay size.  latency_secs = (threshold / 4) * sample_rate.
+ * Buffer delay size.  latency_secs = (threshold / 4) / sample_rate.
+ * or threshold = 4 * latency_secs * sample_rate
  */
-int whitebox_user_source_buffer_threshold = PAGE_SIZE * 8;
+int whitebox_user_source_buffer_threshold = 3840;  // 20ms @ 48KSPS
 module_param(whitebox_user_source_buffer_threshold, int, S_IRUSR | S_IWUSR);
 
 int whitebox_flow_control = 1;
@@ -163,7 +165,7 @@ long whitebox_ioctl_reset(void);
 int tx_start(struct whitebox_device *wb);
 int tx_exec(struct whitebox_device* wb);
 void tx_dma_cb(void *data);
-void tx_stop(struct whitebox_device *wb);
+int tx_stop(struct whitebox_device *wb);
 int tx_error(struct whitebox_device *wb);
 
 int rx_start(struct whitebox_device *wb);
@@ -289,8 +291,10 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
         return -ENOENT;
     }
 
-    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING)
-        tx_stop(whitebox_device);
+    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
+        while (tx_stop(whitebox_device) < 0)
+            cpu_relax();
+    }
 
     // Turn off LO
     whitebox_device->adf4351_regs[2] |= WA_PD_MASK;
@@ -363,6 +367,32 @@ static unsigned long whitebox_get_unmapped_area(struct file* filp,
     return dest;
 }
 
+static unsigned int whitebox_poll(struct file *filp, poll_table *wait)
+{
+    unsigned int mask = 0;
+    unsigned long src, dest;
+
+    down(&whitebox_device->sem);
+
+    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
+        if (tx_error(whitebox_device))
+            mask |= POLLERR;
+    }
+
+    poll_wait(filp, &whitebox_device->write_wait_queue, wait);
+    if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0)
+        mask |= POLLOUT | POLLRDNORM;
+
+    if (whitebox_device->state == WDS_RX) {
+        poll_wait(filp, &whitebox_device->read_wait_queue, wait);
+        if (whitebox_user_sink_data_available(&whitebox_device->user_sink, &src) > 0)
+            mask |= POLLIN | POLLWRNORM;
+    }
+
+    up(&whitebox_device->sem);
+
+    return mask;
+}
 
 static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff_t* pos) {
     unsigned long src;
@@ -449,7 +479,7 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
 }
 
 static int whitebox_write(struct file* filp, const char __user* buf, size_t count, loff_t* pos) {
-    unsigned long dest, src;
+    unsigned long dest;
     size_t dest_count;
     int ret = 0, err = 0;
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
@@ -470,7 +500,6 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
         tx_start(whitebox_device);
     }
     if (count == 0) {
-        tx_stop(whitebox_device);
         up(&whitebox_device->sem);
         return 0;
     }
@@ -519,10 +548,12 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     if (whitebox_device->state == WDS_TX_STREAMING) {
         tx_exec(whitebox_device);
     } else {
-        if (whitebox_user_source_data_available(user_source, &src) >=
+        d_printk(1, "so here we are and use source data is %d\n",
+            whitebox_user_source_data_total(user_source));
+        if (whitebox_user_source_data_total(user_source) >=
                 whitebox_user_source_buffer_threshold) {
             d_printk(1, "streaming %d %d\n",
-                whitebox_user_source_data_available(user_source, &src),
+                whitebox_user_source_data_total(user_source),
                 whitebox_user_source_buffer_threshold);
             whitebox_device->state = WDS_TX_STREAMING;
             tx_exec(whitebox_device);
@@ -541,17 +572,25 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
     struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
     unsigned long src;
     size_t src_count;
+    u32 state;
     int err = 0;
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
     d_printk(1, "state=%d\n", whitebox_device->state);
     if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
+        state = exciter->ops->get_state(exciter);
+        d_printk(1, "txen=%s\n", state & WES_TXEN ? "true" : "false");
         whitebox_device->state = WDS_TX_STOPPING;
+        d_printk(1, "draining\n");
+        if (!(state & WES_TXEN))
+            exciter->ops->set_state(exciter, WES_TXEN);
+
         while (((src_count = whitebox_user_source_data_available(user_source, &src)) > 0) && !(err = tx_error(whitebox_device))) {
+            d_printk(1, "upping\n");
             up(&whitebox_device->sem);
 
-            d_printk(1, "waiting for user source to drain %d\n", src_count);
+            d_printk(1, "waiting for user source to drain threshold=%d count=%d\n", whitebox_user_source_buffer_threshold, src_count);
 
             tx_exec(whitebox_device);
 
@@ -560,7 +599,7 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             if (down_interruptible(&whitebox_device->sem))
                 return -ERESTARTSYS;
             else
-                d_printk(1, "no interrupt\n");
+                d_printk(1, "downing, no interrupt\n");
         }
 
         if (err) {
@@ -569,9 +608,20 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
             return -EIO;
         }
 
-        d_printk(2, "stopping tx\n");
+        d_printk(1, "stopping tx %d\n", exciter->ops->get_state(exciter) & WES_TXEN);
 
-        tx_stop(whitebox_device);
+        while ((tx_stop(whitebox_device) < 0) && !(err = tx_error(whitebox_device))) {
+            state = exciter->ops->get_state(exciter);
+            d_printk(1, "waiting for tx to stop %d\n", state & WES_TXEN);
+        }
+
+        if (err) {
+            d_printk(0, "wait for tx to stop tx_error=%d user_source_data=%zd\n", err, src_count);
+            up(&whitebox_device->sem);
+            return -EIO;
+        }
+
+        d_printk(1, "stopped\n");
 
         while ((exciter->ops->get_state(exciter) & WES_TXEN) && !(err = tx_error(whitebox_device))) {
             up(&whitebox_device->sem);
@@ -628,8 +678,12 @@ long whitebox_ioctl_reset(void) {
 long whitebox_ioctl_locked(void) {
     u8 c;
     u8 locked;
+#if WC_USE_PLL
     c = whitebox_gpio_cmx991_read(whitebox_device->platform_data,
         WHITEBOX_CMX991_LD_REG);
+#else
+    c = WHITEBOX_CMX991_LD_REG;
+#endif
     locked = whitebox_gpio_adf4351_locked(whitebox_device->platform_data)
             && (c & WHITEBOX_CMX991_LD_MASK);
     return locked;
@@ -637,6 +691,7 @@ long whitebox_ioctl_locked(void) {
 
 long whitebox_ioctl_exciter_clear(void) {
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
+    pdma_clear(whitebox_device->platform_data->tx_dma_ch);
     exciter->ops->set_state(exciter, WS_CLEAR);
     return 0;
 }
@@ -689,6 +744,7 @@ long whitebox_ioctl_exciter_clear_mask(unsigned long arg) {
 
 long whitebox_ioctl_receiver_clear(void) {
     struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    pdma_clear(whitebox_device->platform_data->rx_dma_ch);
     receiver->ops->set_state(receiver, WS_CLEAR);
     return 0;
 }
@@ -815,6 +871,13 @@ long whitebox_ioctl_mmap_write(unsigned long arg)
     unsigned long dest;
     count = whitebox_user_source_space_available(&whitebox_device->user_source, &dest);
 
+    // TODO: only send how many samples need to go for the interval and
+    // sample rate.
+    if (whitebox_flow_control) {
+        if (whitebox_user_source_data_total(&whitebox_device->user_source) >= whitebox_user_source_buffer_threshold)
+            return 0;
+    }
+
     if (copy_to_user((unsigned long*)arg, &dest,
             sizeof(unsigned long)))
         return -EACCES;
@@ -868,7 +931,6 @@ long whitebox_ioctl_fir_set(unsigned long arg) {
 
     return 0;
 }
-
 
 static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long arg) {
     switch(cmd) {
@@ -928,6 +990,7 @@ static struct file_operations whitebox_fops = {
     .unlocked_ioctl = whitebox_ioctl,
     .mmap = whitebox_mmap,
     .get_unmapped_area = whitebox_get_unmapped_area,
+    .poll = whitebox_poll,
 };
 
 void stats_show(struct seq_file *m, struct whitebox_stats *stats) {

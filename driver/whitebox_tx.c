@@ -15,6 +15,7 @@ int tx_start(struct whitebox_device *wb)
     //struct whitebox_stats *stats = &wb->tx_stats;
     struct whitebox_exciter *exciter = wb->rf_sink.exciter;
     exciter->ops->get_runs(exciter, &wb->cur_overruns, &wb->cur_underruns);
+    pdma_clear(wb->platform_data->tx_dma_ch);
 
     // Reset the SysTick interface
     *STRVR = 0xFFFFFF;
@@ -53,10 +54,6 @@ int tx_exec(struct whitebox_device* wb)
         return 0;
     } else if (dest_count >> 2 == 0) {
         stats->exec_nop_dest++;
-        spin_unlock_irqrestore(&rf_sink->lock, flags);
-        return 0;
-    } else if (whitebox_flow_control && !(wb->state == WDS_TX_STOPPING) && src_count < dest_count) {
-        stats->exec_nop_src++;
         spin_unlock_irqrestore(&rf_sink->lock, flags);
         return 0;
     }
@@ -133,16 +130,17 @@ void tx_dma_cb(void *data, int buf)
     }
 }
 
-void tx_stop(struct whitebox_device *wb)
+int tx_stop(struct whitebox_device *wb)
 {
     struct whitebox_stats *stats = &wb->tx_stats;
 
     stats->stop++;
 
-    while (pdma_buffers_available(wb->platform_data->tx_dma_ch) < 2)
-        cpu_relax();
+    if (pdma_buffers_available(wb->platform_data->tx_dma_ch) < 2)
+        return -1;
 
     wb->rf_sink.exciter->ops->set_state(wb->rf_sink.exciter, WES_TXSTOP);
+    return 0;
 }
 
 int tx_error(struct whitebox_device *wb)
@@ -151,8 +149,12 @@ int tx_error(struct whitebox_device *wb)
 
     if (whitebox_check_plls) {
         int c, locked;
+#if WC_USE_PLL
         c = whitebox_gpio_cmx991_read(wb->platform_data,
             WHITEBOX_CMX991_LD_REG);
+#else
+        c = WHITEBOX_CMX991_LD_REG;
+#endif
         locked = whitebox_gpio_adf4351_locked(wb->platform_data)
                 && (c & WHITEBOX_CMX991_LD_MASK);
         if (!locked) {

@@ -223,7 +223,7 @@ void pdma_snap_channel(struct pdma_channel_t *channel)
 
     channel->stats.snaps_index = (channel->stats.snaps_index + 1) & (PDMA_SNAPS_COUNT - 1);
 
-    d_printk(4,  "%08x %d A %s %s src=%08x/%08x dst=%08x/%08x cnt=%08x/%08x\n",
+    d_printk(1,  "%08x %d A %s %s src=%08x/%08x dst=%08x/%08x cnt=%08x/%08x\n",
         snap->time,
         ch,
         (snap->channel_buf_a_status == PDMA_CHANNEL_BUFFER_STOPPED)
@@ -236,7 +236,7 @@ void pdma_snap_channel(struct pdma_channel_t *channel)
         snap->device_buf_a_cnt,
         snap->channel_buf_a_cnt);
 
-    d_printk(4, "%08x %d B %s %s src=%08x/%08x dst=%08x/%08x cnt=%08x/%08x\n",
+    d_printk(1, "%08x %d B %s %s src=%08x/%08x dst=%08x/%08x cnt=%08x/%08x\n",
         snap->time,
         ch,
         (channel->buf[1].status == PDMA_CHANNEL_BUFFER_STOPPED)
@@ -314,7 +314,7 @@ int pdma_start(u8 ch,
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].src = src;
         PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].dst = dst;
         if (channel->ping_pong == 1) {
-            d_printk(4, "ping\n");
+            d_printk(1, "ping\n");
         } else {
             PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].cnt = cnt;
         }
@@ -328,7 +328,7 @@ int pdma_start(u8 ch,
 pdma_busy:
     // Resume the transfer
     PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
-    pdma_snap_channel(channel);
+    //pdma_snap_channel(channel);
 done_pdma_start:
     spin_unlock_irqrestore(&pdma_lock, flags);
     return ret;
@@ -357,13 +357,20 @@ int pdma_buffers_available(u8 ch) {
     // Pause transfer
     PDMA(pdma_device)->chan[ch].control |= PDMA_CONTROL_PAUSE;
 
+    // First, see if there's a channel in ping mode that hasn't been started yet.
+    if (channel->ping_pong == 1 && channel->buf[PDMA_CHANNEL_BUFFER_A].status == PDMA_CHANNEL_BUFFER_STARTED) {
+        d_printk(1, "pong\n");
+        PDMA(pdma_device)->chan[ch].buf[PDMA_CHANNEL_BUFFER_A].cnt = channel->buf[PDMA_CHANNEL_BUFFER_A].cnt;
+        channel->ping_pong = 2;
+    }
+
     // See if there's an open channel buffer
     if (channel->buf[PDMA_CHANNEL_BUFFER_A].status == PDMA_CHANNEL_BUFFER_STOPPED)
         result += 1;
     if (channel->buf[PDMA_CHANNEL_BUFFER_B].status == PDMA_CHANNEL_BUFFER_STOPPED)
         result += 1;
 
-    //pdma_snap_channel(channel);
+    pdma_snap_channel(channel);
 
     // Resume the transfer
     PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
@@ -374,6 +381,43 @@ int pdma_buffers_available(u8 ch) {
 
     return result;
 } EXPORT_SYMBOL(pdma_buffers_available);
+
+void pdma_clear(u8 ch) {
+    unsigned long flags;
+    struct pdma_channel_t* channel;
+    
+    if (ch >= 8) {
+        d_printk(0, "Invalid channel number %d\n", ch);
+        return;
+    }
+
+    d_printk(1, "clear channel %d\n", ch);
+
+    spin_lock_irqsave(&pdma_lock, flags);
+
+    channel = &pdma_device->channel[ch];
+    channel->ping_pong = pdma_ping_pong;
+    channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STOPPED;
+    channel->next = PDMA_CHANNEL_NEXT_A;
+    memset(&channel->stats, 0, sizeof(struct pdma_channel_stats));
+    channel->stats.snaps_index = 0;
+
+    pdma_device->channel[ch].buf[0].src = 0;
+    pdma_device->channel[ch].buf[0].dst = 0;
+    pdma_device->channel[ch].buf[0].cnt = 0;
+    pdma_device->channel[ch].buf[1].src = 0;
+    pdma_device->channel[ch].buf[1].dst = 0;
+    pdma_device->channel[ch].buf[1].cnt = 0;
+
+    PDMA(pdma_device)->chan[ch].control = PDMA_CONTROL_RESET |
+            PDMA_CONTROL_CLR_A |
+            PDMA_CONTROL_CLR_B;
+    PDMA(pdma_device)->chan[ch].control =
+            ((u32)channel->write_adj << 14) | channel->flags;
+
+    spin_unlock_irqrestore(&pdma_lock, flags);
+} EXPORT_SYMBOL(pdma_clear);
 
 int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_adj, u32 flags) {
     unsigned long irqflags = 0;
@@ -401,19 +445,8 @@ int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_ad
     channel->write_adj = write_adj;
     channel->handler = handler;
     channel->user_data = user_data;
-    channel->ping_pong = pdma_ping_pong;
-    channel->buf[PDMA_CHANNEL_BUFFER_A].status = PDMA_CHANNEL_BUFFER_STOPPED;
-    channel->buf[PDMA_CHANNEL_BUFFER_B].status = PDMA_CHANNEL_BUFFER_STOPPED;
-    channel->next = PDMA_CHANNEL_NEXT_A;
-    memset(&channel->stats, 0, sizeof(struct pdma_channel_stats));
-    channel->stats.snaps_index = 0;
 
-    PDMA(pdma_device)->chan[ch].control = PDMA_CONTROL_RESET |
-            PDMA_CONTROL_CLR_A |
-            PDMA_CONTROL_CLR_B;
-
-    PDMA(pdma_device)->chan[ch].control =
-            ((u32)channel->write_adj << 14) | channel->flags;
+    pdma_clear(ch);
 
     //pdma_snap_channel(channel);
 fail_args:
@@ -427,18 +460,10 @@ void pdma_release(u8 ch) {
 
     spin_lock_irqsave(&pdma_lock, flags);
 
+    pdma_clear(ch);
     pdma_device->channel[ch].in_use = 0;
     pdma_device->channel[ch].handler = 0;
     pdma_device->channel[ch].user_data = 0;
-    pdma_device->channel[ch].buf[0].src = 0;
-    pdma_device->channel[ch].buf[0].dst = 0;
-    pdma_device->channel[ch].buf[0].cnt = 0;
-    pdma_device->channel[ch].buf[1].src = 0;
-    pdma_device->channel[ch].buf[1].dst = 0;
-    pdma_device->channel[ch].buf[1].cnt = 0;
-    PDMA(pdma_device)->chan[ch].control = PDMA_CONTROL_RESET |
-            PDMA_CONTROL_CLR_A |
-            PDMA_CONTROL_CLR_B;
 
     spin_unlock_irqrestore(&pdma_lock, flags);
 } EXPORT_SYMBOL(pdma_release);
@@ -492,7 +517,7 @@ static irqreturn_t pdma_irq_cb(int irq, void* ptr) {
     u8 ch;
     u32 status;
     int buf = -1;
-    d_printk(2, "irq\n");
+    d_printk(1, "irq\n");
 
     spin_lock_irqsave(&pdma_lock, flags);
 
@@ -519,7 +544,6 @@ static irqreturn_t pdma_irq_cb(int irq, void* ptr) {
         }
         PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;
     }
-
 
     spin_unlock_irqrestore(&pdma_lock, flags);
 

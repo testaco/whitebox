@@ -57,6 +57,7 @@ int whitebox_user_source_produce(struct whitebox_user_source *user_source,
         size_t count);
 size_t whitebox_user_source_data_available(struct whitebox_user_source *user_source,
         unsigned long *src);
+size_t whitebox_user_source_data_total(struct whitebox_user_source *user_source);
 int whitebox_user_source_consume(struct whitebox_user_source *user_source,
         size_t count);
 int whitebox_user_source_work(struct whitebox_user_source *user_source,

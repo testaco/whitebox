@@ -13,7 +13,7 @@
 #include "whitebox.h"
 #include "whitebox_test.h"
 
-#define CARRIER_FREQ 146.00e6
+#define CARRIER_FREQ 145.00e6
 #define TONE_FREQ    7e3
 #define N 512
 #define COUNT 1024 
@@ -81,6 +81,11 @@ void calibrate_dc_offset(int use_dds, int16_t *i, int16_t *q)
             }
             else if ((char)ch == 'e') {
                 *i = 512; *q = 512;
+            }
+            else if ((char)ch == 's') {
+                int fd = open("/sys/power/state", O_WRONLY);
+                write(fd, "standby\n", strlen("standby\n"));
+                sleep(10);
             }
             else if (ch == 65)
                 *i += 1;
