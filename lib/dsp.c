@@ -8,18 +8,24 @@
 
 import numpy as np
 
+sample_rate = 48e3
 scale_factor = 1.0
 sample_resolution = 16 # in bits
+
 num_samples = 1024
+fstep = sample_rate / num_samples
+print 'Sample Rate %d kHz, Step Size %.3f Hz' % (sample_rate/1e3, fstep) 
+
 
 half = scale_factor*pow(2, sample_resolution - 1)
 pack = lambda i, q: np.int32(i & 0xffff) | ((q & 0xffff) << 16)
 unpack = lambda s: (np.int16(s & 0xffff), np.int16((s >> 16) & 0xffff))
 
 t = np.arange(0, 2*np.pi, (2*np.pi) / num_samples)
-i = np.array(np.floor(np.cos(t)*(half-1)+.5), dtype=np.int16)
+theta = 2 * np.pi * fstep * np.arange(num_samples) / sample_rate
+i = np.array(np.floor(np.cos(theta)*(half-1)+.5), dtype=np.int16)
 assert(sum(i) == 0)
-q = np.array(np.floor(np.sin(t)*(half-1)+.5), dtype=np.int16)
+q = np.array(np.floor(np.sin(theta)*(half-1)+.5), dtype=np.int16)
 assert(sum(q) == 0)
 
 lut = [pack(a, b) for a, b in zip(i, q)]
@@ -56,9 +62,14 @@ inline void sincos16(uint32_t phase, int16_t *i, int16_t *q) {
 uint32_t sincos16c(uint32_t fcw, uint32_t *phase) {
     int i = 0;
     uint16_t entry;
+    int16_t ci, cq, si, sq;
     entry = (*phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
+    QUAD_UNPACK(sincos_lut_addr[entry],
+            ci, cq);
+    QUAD_UNPACK(sincos_lut_addr[(entry + DDS_PI_OVER_4) & (DDS_PA_MAX - 1)],
+            si, sq);
     *phase = (*phase + fcw) & (DDS_PA_MAX - 1);
-    return sincos_lut_addr[entry];
+    return QUAD_PACK(ci, si);
 }
 
 uint32_t freq_to_fcw(float freq, float sample_rate) {

@@ -1,13 +1,14 @@
 #ifndef __WHITEBOX_DSP_H__
 #define __WHITEBOX_DSP_H__
 
-#define DDS_PA_LENGTH            25U
+#define DDS_PA_LENGTH            10U
 #define DDS_PA_MAX               (1U << DDS_PA_LENGTH)
 #define DDS_ROM_SAMPLES_ORDER    10U
 #define DDS_ROM_NUM_SAMPLES      (1U << DDS_ROM_SAMPLES_ORDER)
 #define DDS_ROM_DEPTH            32U
 #define DDS_RAM_SIZE_BITS        (DDS_ROM_NUM_SAMPLES * DDS_ROM_DEPTH)
 #define DDS_PHASE_SHIFT          (DDS_PA_LENGTH - DDS_ROM_SAMPLES_ORDER)
+#define DDS_PI_OVER_4           (1U << (DDS_PA_LENGTH - 3))
 
 #define DDS_LUT_ADDR         0x20001000
 

@@ -21,7 +21,7 @@
 #define FRAME_SIZE 512
 
 #define NUM_WEAVER_TAPS 109
-int16_t weaver_fir_taps[] = { 0, 0, 0, 0, 1, 1, 0, -1, -2, -1, 0, 1, 2, 2, 0, -2, -3, -2, 0, 3, 5, 3, 0, -4, -6, -5, 0, 5, 8, 6, 0, -7, -11, -8, 0, 9, 14, 11, 0, -13, -20, -15, 0, 19, 30, 23, 0, -31, -51, -44, 0, 74, 158, 224, 249, 224, 158, 74, 0, -44, -51, -31, 0, 23, 30, 19, 0, -15, -20, -13, 0, 11, 14, 9, 0, -8, -11, -7, 0, 6, 8, 5, 0, -5, -6, -4, 0, 3, 5, 3, 0, -2, -3, -2, 0, 2, 2, 1, 0, -1, -2, -1, 0, 1, 1, 0, 0, 0, 0 };
+int16_t weaver_fir_taps[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 1, 0, -1, 0, 2, 0, -2, 0, 2, 0, -3, 0, 3, 0, -4, 0, 4, 0, -5, 0, 6, 0, -6, 0, 8, 0, -9, 0, 11, 0, -13, 0, 16, 0, -21, 0, 31, 0, -52, 0, 157, 247, 157, 0, -52, 0, 31, 0, -21, 0, 16, 0, -13, 0, 11, 0, -9, 0, 8, 0, -6, 0, 6, 0, -5, 0, 4, 0, -4, 0, 3, 0, -3, 0, 2, 0, -2, 0, 2, 0, -1, 0, 1, 0, -1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 static int done;
 
@@ -39,22 +39,24 @@ float diff(struct timespec start, struct timespec end)
 }
 
 enum whitebox_mode {
-    WBM_IDLE        = 0x00000000,
-    WBM_IQ_SOCKET   = 0x00000001,
-    WBM_IQ_FILE     = 0x00000002,
-    WBM_IQ_TONE     = 0x00000004,
-    WBM_IQ_TEST     = 0x00000010,
-    WBM_AUDIO_TONE  = 0x00000100,
+    WBM_IDLE         = 0x00000000,
+    WBM_IQ_SOCKET    = 0x00000001,
+    WBM_IQ_FILE      = 0x00000002,
+    WBM_IQ_TONE      = 0x00000004,
+    WBM_IQ_TEST      = 0x00000010,
+    WBM_AUDIO_TONE   = 0x00000100,
+    WBM_AUDIO_SOCKET = 0x00000200,
 };
 
 #define WBM_DEFAULT   WBM_IQ_SOCKET
-#define WBM_IQ_DIRECT (WBM_IQ_SOCKET | WBM_IQ_FILE)
-#define WBM_IQ_MIXED  (WBM_AUDIO_TONE)
+#define WBM_IQ_FD (WBM_IQ_SOCKET | WBM_IQ_FILE)
+#define WBM_IQ_MIXED  (WBM_AUDIO_TONE | WBM_AUDIO_SOCKET)
+#define WBM_AUDIO_FD (WBM_AUDIO_SOCKET)
 #define WBM_FROM_SOCKET (WBM_IQ_SOCKET)
 
 char *whitebox_mode_to_string(enum whitebox_mode mode)
 {
-    if (mode & WBM_IQ_DIRECT)
+    if (mode & WBM_IQ_FD)
         return "iq";
     else if (mode & WBM_IQ_TONE)
         return "cw";
@@ -62,6 +64,8 @@ char *whitebox_mode_to_string(enum whitebox_mode mode)
         return "test";
     else if (mode & WBM_AUDIO_TONE)
         return "2tone";
+    else if (mode & WBM_AUDIO_FD)
+        return "audio";
     else
         return "idle";
 }
@@ -73,21 +77,23 @@ struct whitebox_config {
     int sample_rate;
     float carrier_freq;
     unsigned short ctl_port;
+    unsigned short audio_port;
     unsigned short port;
     float duration;
     int debug;
     
     // complex variable z
     char *z_filename;
-    float z_tone;
+    float tone1;
 
     // real variable x
-    float x_tone;
-    int16_t x_offset;
+    float tone2;
+    int16_t tone2_offset;
 
     int ctl_enable;
     int dat_enable;
     int httpd_enable;
+    int audio_enable;
 };
 
 struct whitebox_runtime {
@@ -107,11 +113,18 @@ struct whitebox_runtime {
     int dat_fd;
     int dat_needs_poll;
 
-    uint32_t z_fcw;
-    uint32_t z_phase;
+    int audio_listening_fd;
+    struct sockaddr_in audio_sock_me, audio_sock_other;
+    size_t audio_slen;
+    int audio_fd;
+    int audio_needs_poll;
 
-    uint32_t x_fcw;
-    uint32_t x_phase;
+
+    uint32_t tone1_fcw;
+    uint32_t tone1_phase;
+
+    uint32_t tone2_fcw;
+    uint32_t tone2_phase;
 
     int16_t global_re;
     int16_t global_im;
@@ -129,15 +142,17 @@ void whitebox_config_init(struct whitebox_config *config)
     config->carrier_freq = 145.00e6;
     config->port = PORT;
     config->ctl_port = PORT + 10;
+    config->audio_port = PORT + 20;
     config->duration = 0.00;
 
     config->z_filename = NULL;
-    config->z_tone = 700;
+    config->tone1 = 700;
 
-    config->x_tone = 700;
-    config->x_offset = 0;
+    config->tone2 = 1900;
+    config->tone2_offset = 0;
     
-    config->dat_enable = 0;
+    config->dat_enable = 1;
+    config->audio_enable = 1;
     config->ctl_enable = 1;
     config->httpd_enable = 1;
 }
@@ -154,10 +169,14 @@ void whitebox_runtime_init(struct whitebox_runtime *rt)
     rt->dat_needs_poll = 0;
     rt->dat_listening_fd = -1;
     rt->dat_slen = sizeof(rt->dat_sock_other);
-    rt->z_fcw = 0;
-    rt->z_phase = 0;
-    rt->x_fcw = 0;
-    rt->x_phase = 0;
+    rt->audio_fd = -1;
+    rt->audio_needs_poll = 0;
+    rt->audio_listening_fd = -1;
+    rt->audio_slen = sizeof(rt->audio_sock_other);
+    rt->tone1_fcw = 0;
+    rt->tone1_phase = 0;
+    rt->tone2_fcw = 0;
+    rt->tone2_phase = 0;
     rt->global_re = -1;
     rt->global_im = -1;
     rt->ptt = 0;
@@ -195,13 +214,14 @@ int reconfigure_runtime(whitebox_t *wb, struct whitebox_config *config,
         if (config->verbose_flag)
             printf("Changed mode to %d\n", mode);
         if (config->mode & WBM_IQ_MIXED) {
+            printf("fir on\n");
             whitebox_tx_flags_enable(wb, WS_FIREN);
         } else {
             whitebox_tx_flags_disable(wb, WS_FIREN);
         }
 
         if (config->mode & WBM_IQ_SOCKET) {
-            // TODO
+            rt->ptt = 1;
         }
         if (config->mode & WBM_IQ_FILE) {
             if ((rt->dat_fd = open(config->z_filename, O_RDONLY | O_NONBLOCK)) < 0) {
@@ -210,10 +230,17 @@ int reconfigure_runtime(whitebox_t *wb, struct whitebox_config *config,
             }
         }
         if (config->mode & WBM_IQ_TONE) {
-            rt->z_fcw = freq_to_fcw(config->z_tone, config->sample_rate);
+            //rt->tone1_fcw = freq_to_fcw(config->tone1, config->sample_rate);
+            config_change(wb, config, rt, "tone1", "440");
         }
         if (config->mode & WBM_AUDIO_TONE) {
-            rt->x_fcw = freq_to_fcw(config->x_tone, config->sample_rate);
+            //rt->tone2_fcw = freq_to_fcw(config->tone2, config->sample_rate);
+            config_change(wb, config, rt, "tone1", "12000");
+            config_change(wb, config, rt, "tone2", "440");
+        }
+        if (config->mode & WBM_AUDIO_SOCKET) {
+            config_change(wb, config, rt, "tone1", "12000");
+            rt->ptt = 1;
         }
     }
 
@@ -226,7 +253,13 @@ int reconfigure_runtime(whitebox_t *wb, struct whitebox_config *config,
 int change_mode(whitebox_t *wb, struct whitebox_config *config,
         struct whitebox_runtime *rt, enum whitebox_mode mode)
 {
-    config->mode = mode;
+    printf("hi %s\n", whitebox_mode_to_string(mode));
+    if (config->mode != mode) {
+        config->mode = mode;
+        if (config->verbose_flag)
+            printf("Changing mode to %s\n", whitebox_mode_to_string(config->mode));
+    }
+    return 0;
 }
 
 int whitebox_start(whitebox_t *wb, struct whitebox_config *config,
@@ -311,11 +344,72 @@ int whitebox_start(whitebox_t *wb, struct whitebox_config *config,
         }
     }
 
+    if (config->audio_enable) {
+        if ((rt->audio_listening_fd=socket(AF_INET, SOCK_STREAM, IPPROTO_TCP))==-1) {
+            perror("socket");
+            return -1;
+        }
+        setsockopt(rt->audio_listening_fd, SOL_SOCKET, SO_REUSEADDR, (void*)&optval, optlen);
+        memset((char *) &rt->audio_sock_me, 0, sizeof(rt->audio_sock_me));
+        rt->audio_sock_me.sin_family = AF_INET;
+        rt->audio_sock_me.sin_port = htons(config->audio_port);
+        rt->audio_sock_me.sin_addr.s_addr = htonl(INADDR_ANY);
+        if (bind(rt->audio_listening_fd, (struct sockaddr*)&rt->audio_sock_me, sizeof(rt->audio_sock_me))==-1) {
+            perror("bind");
+            return -1;
+        }
+        if (listen(rt->audio_listening_fd, 0) == -1) {
+            perror("listen");
+            return -1;
+        }
+    }
+
     change_mode(wb, config, rt, config->mode);
 
     rt->latency_ms = whitebox_tx_get_latency(wb);
 
     return 0;
+}
+
+int x_read(whitebox_t *wb, struct whitebox_config *config,
+        struct whitebox_runtime *rt, int out_available, int16_t *x_dest)
+{
+    int in_available = 0;
+    int16_t *x_dest_offset = x_dest;
+    out_available >>= 1; // audio is 16-bit while IQ samples are 32-bit
+
+    if (config->mode & WBM_AUDIO_SOCKET && rt->audio_needs_poll) {
+        int recvd;
+        while (out_available > 0) {
+            if ((recvd = recvfrom(rt->audio_fd, (void*)x_dest_offset, out_available, 0, (struct sockaddr*)&rt->audio_sock_other, &rt->audio_slen)) < 0) {
+                if (errno == EAGAIN) {
+                    break;
+                }
+                perror("recvfrom");
+                exit(1);
+            }
+            if ((recvd == 1 && *((char*)x_dest_offset) == '\0') || (recvd == 0))
+                break;
+            if (recvd % 2 != 0)
+                printf("not word aligned\n");
+            rt->ptt = 1;
+            //printf("x"); fflush(stdout);
+            in_available += recvd << 1;
+            out_available -= recvd;
+            x_dest_offset += recvd >> 1;
+        }
+        if ((recvd == 1 && *((char*)x_dest_offset) == '\0') || (recvd == 0)) {
+            rt->audio_needs_poll = 0;
+            rt->ptt = 0;
+            close(rt->audio_fd);
+            rt->audio_fd = -1;
+            change_mode(wb, config, rt, WBM_IDLE);
+            if (config->verbose_flag)
+                printf("Connection closed\n");
+            return 0;
+        }
+    }
+    return in_available;
 }
 
 int z_read(whitebox_t *wb, struct whitebox_config *config,
@@ -350,6 +444,7 @@ int z_read(whitebox_t *wb, struct whitebox_config *config,
             rt->ptt = 0;
             close(rt->dat_fd);
             rt->dat_fd = -1;
+            change_mode(wb, config, rt, WBM_IDLE);
             if (config->verbose_flag)
                 printf("Connection closed\n");
             return 0;
@@ -378,13 +473,13 @@ int z_read(whitebox_t *wb, struct whitebox_config *config,
         }
         if (recvd == 0)
             return 0;
-    } else if (config->mode & WBM_IQ_TONE) {
+    } else if (config->mode & WBM_IQ_TONE || config->mode & WBM_IQ_MIXED) {
         int n;
         int16_t re, im;
         if (!rt->ptt)
             return 0;
         for (n = 0; n < out_available >> 2; ++n) {
-            QUAD_UNPACK(sincos16c(rt->z_fcw, &rt->z_phase), re, im);
+            QUAD_UNPACK(sincos16c(rt->tone1_fcw, &rt->tone1_phase), re, im);
             *((uint32_t*)(z_dest + n)) = QUAD_PACK(re >> 1, im >> 1);
         }
         in_available = out_available;
@@ -409,17 +504,27 @@ void z_test(whitebox_t *wb, struct whitebox_config *config,
 }
 
 void mix_z_and_x(whitebox_t *wb, struct whitebox_config *config,
-        struct whitebox_runtime *rt, int in_available, uint32_t *z_dest,
+        struct whitebox_runtime *rt, int in_available,
+        int16_t *x_src, uint32_t *z_src,
         uint32_t *dest)
 {
     if (config->mode & WBM_AUDIO_TONE) {
         int n;
         int16_t x, foo, re, im;
         for (n = 0; n < in_available >> 2; ++n) {
-            QUAD_UNPACK(sincos16c(rt->x_fcw, &rt->x_phase), x, foo);
-            QUAD_UNPACK(*(uint32_t*)(z_dest + n), re, im);
-            re = ((x + config->x_offset) * re) >> 16;
-            im = ((x + config->x_offset) * im) >> 16;
+            QUAD_UNPACK(sincos16c(rt->tone2_fcw, &rt->tone2_phase), x, foo);
+            QUAD_UNPACK(*(uint32_t*)(z_src + n), re, im);
+            re = ((x * re) + (1 << 15)) >> 16;
+            im = ((x * im) + (1 << 15)) >> 16;
+            *((uint32_t*)(dest + n)) = QUAD_PACK(re, im);
+        }
+    } else if (config->mode & WBM_AUDIO_SOCKET) {
+        int n;
+        int16_t re, im;
+        for (n = 0; n < in_available >> 2; ++n) {
+            QUAD_UNPACK(*(uint32_t*)(z_src + n), re, im);
+            re = ((x_src[n] * re) + (1 << 15)) >> 16;
+            im = ((x_src[n] * im) + (1 << 15)) >> 16;
             *((uint32_t*)(dest + n)) = QUAD_PACK(re, im);
         }
     }
@@ -454,12 +559,14 @@ int config_change(whitebox_t *wb, struct whitebox_config *config,
         gain_q = atof(val);
         printf("gain_q=%.2f\n", gain_q);
         whitebox_tx_set_gain(wb, gain_i, gain_q);
-    } else if (strncmp(var, "tone_freq", strlen("tone_freq")) == 0) {
-        config->z_tone = atof(val);
-        config->x_tone = atof(val);
-        printf("tone_freq=%.3f kHz\n", config->z_tone / 1e3);
-        rt->z_fcw = freq_to_fcw(config->z_tone, config->sample_rate);
-        rt->x_fcw = freq_to_fcw(config->x_tone, config->sample_rate);
+    } else if (strncmp(var, "tone1", strlen("tone1")) == 0) {
+        config->tone1 = atof(val);
+        printf("tone1=%.3f kHz\n", config->tone1 / 1e3);
+        rt->tone1_fcw = freq_to_fcw(config->tone1, config->sample_rate);
+    } else if (strncmp(var, "tone2", strlen("tone2")) == 0) {
+        config->tone2 = atof(val);
+        printf("tone2=%.3f kHz\n", config->tone2 / 1e3);
+        rt->tone2_fcw = freq_to_fcw(config->tone2, config->sample_rate);
     } else if (strncmp(var, "freq", strlen("freq")) == 0) {
         config->carrier_freq = atof(val) * 1e6;
         printf("carrier_freq=%.3f MHz\n", config->carrier_freq / 1e6);
@@ -473,8 +580,10 @@ int config_change(whitebox_t *wb, struct whitebox_config *config,
             change_mode(wb, config, rt, WBM_IQ_TONE);
         else if (strcmp(val, "iq") == 0)
             change_mode(wb, config, rt, WBM_IQ_SOCKET);
-        else if (strcmp(val, "audio") == 0)
+        else if (strcmp(val, "2tone") == 0)
             change_mode(wb, config, rt, WBM_AUDIO_TONE);
+        else if (strcmp(val, "audio") == 0)
+            change_mode(wb, config, rt, WBM_AUDIO_SOCKET);
     } else if (strncmp(var, "latency", strlen("latency")) == 0) {
         rt->latency_ms = atoi(val);
         printf("latency_ms=%d\n", rt->latency_ms);
@@ -531,7 +640,8 @@ int http_ctl(whitebox_t *wb, struct whitebox_config *config,
                 "\"offset_correct_q\": %d,"
                 "\"gain_i\": %.2f,"
                 "\"gain_q\": %.2f,"
-                "\"tone_freq\": %.1f,"
+                "\"tone1\": %.1f,"
+                "\"tone2\": %.1f,"
                 "\"freq\": %.3f,"
                 "\"ptt\": %d,"
                 "\"mode\": \"%s\","
@@ -539,7 +649,8 @@ int http_ctl(whitebox_t *wb, struct whitebox_config *config,
                 "}",
                 correct_i, correct_q,
                 gain_i, gain_q,
-                config->z_tone, config->carrier_freq,
+                config->tone1, config->tone2,
+                config->carrier_freq,
                 rt->ptt, whitebox_mode_to_string(config->mode),
                 rt->latency_ms);
     } else if (strcmp(r->method, "POST") == 0 && strcmp(r->url, "/") == 0) {
@@ -568,13 +679,14 @@ done:
 int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         struct whitebox_runtime *rt, long total_samples)
 {
+    static struct pollfd fds[255];
+    static uint32_t z_buf[FRAME_SIZE];
+    static int16_t x_buf[FRAME_SIZE];
     struct timespec tl_start, tl_poll, tl_sink, tl_source, tl_mix, tl_finish;
     long in_available = 0, out_available = 0;
-    struct pollfd fds[255];
     int fcnt, f;
     uint32_t *dest;
     uint32_t *z_dest;
-    uint32_t z_buf[FRAME_SIZE];
 
     clock_gettime(CLOCK_MONOTONIC, &tl_start);
 
@@ -597,6 +709,11 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         fds[fcnt].events = POLLIN;
         fcnt++;
     }
+    if (config->audio_enable) {
+        fds[fcnt].fd = rt->audio_listening_fd;
+        fds[fcnt].events = POLLIN;
+        fcnt++;
+    }
     if (rt->ctl_needs_poll) {
         fds[fcnt].fd = rt->ctl_fd;
         fds[fcnt].events = POLLIN;
@@ -604,6 +721,11 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
     }
     if (rt->dat_needs_poll) {
         fds[fcnt].fd = rt->dat_fd;
+        fds[fcnt].events = POLLIN | POLLPRI;
+        fcnt++;
+    }
+    if (rt->audio_needs_poll) {
+        fds[fcnt].fd = rt->audio_fd;
         fds[fcnt].events = POLLIN | POLLPRI;
         fcnt++;
     }
@@ -623,8 +745,9 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         out_available = out_available < (FRAME_SIZE << 2) ? out_available : (FRAME_SIZE << 2);
         if (total_samples > 0 && (out_available >> 2) + rt->i > total_samples)
             out_available = (total_samples - rt->i) << 2;
-    } else
+    } else {
         out_available = 0;
+    }
 
     if (!(config->mode & WBM_IQ_MIXED))
         z_dest = dest;
@@ -635,7 +758,6 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
 
     // step 3. recv_from from the iq/z source
     in_available = 0;
-
     if (out_available > 0 && !rt->dat_needs_poll) {
         in_available = z_read(wb, config, rt, out_available, z_dest);
         //printf("out %d, in %d\n", out_available, in_available);
@@ -667,8 +789,7 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
             http_ctl(wb, config, rt);
         }
         if ((fds[f].fd == rt->dat_listening_fd)
-                && (fds[f].revents & POLLIN)
-                && (config->mode & WBM_FROM_SOCKET)) {
+                && (fds[f].revents & POLLIN)) {
             if (rt->dat_fd > 0) {
                 printf("Warning: too many dat connections\n");
                 return -1;
@@ -688,10 +809,31 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
                 || (fds[f].revents & POLLPRI))) {
             in_available = z_read(wb, config, rt, out_available, z_dest);
         }
+        if ((fds[f].fd == rt->audio_listening_fd)
+                && (fds[f].revents & POLLIN)) {
+            if (rt->audio_fd > 0) {
+                printf("Warning: too many audio connections\n");
+                return -1;
+            }
+            if ((rt->audio_fd = accept(rt->audio_listening_fd, (struct sockaddr*)&rt->audio_sock_other, &rt->audio_slen)) == -1) {
+                perror("accept");
+                return -1;
+            }
+            if (config->verbose_flag > 2)
+                printf("Accepted client\n");
+            change_mode(wb, config, rt, WBM_AUDIO_SOCKET);
+            rt->audio_needs_poll = 1;
+            printf("now audio\n");
+        }
+        if ((fds[f].fd == rt->audio_fd)
+                && (((out_available > 0)
+                && (rt->audio_needs_poll && (fds[f].revents & POLLIN))))) {
+            in_available = x_read(wb, config, rt, out_available, x_buf);
+        }
     }
 
     if (in_available < 0) {
-        perror("z_read\n");
+        printf("z_read\n");
     }
 
     if (config->mode & WBM_IQ_TEST) {
@@ -711,7 +853,7 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
 
     // step 4. mix x and z
     if (in_available > 0 && config->mode & WBM_IQ_MIXED) {
-        mix_z_and_x(wb, config, rt, in_available, z_dest, dest);
+        mix_z_and_x(wb, config, rt, in_available, x_buf, z_dest, dest);
     }
 
     clock_gettime(CLOCK_MONOTONIC, &tl_mix);
@@ -724,13 +866,13 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
             return -1;
         }
         else {
-            if (config->verbose_flag) {
+            if (config->verbose_flag == 1) {
                 printf(".");
                 fflush(stdout);
             }
         }
     } else {
-            if (config->verbose_flag) {
+            if (config->verbose_flag == 1) {
                 if (out_available == 0) printf("-");
                 else printf(">");
                 fflush(stdout);
@@ -744,16 +886,18 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         sleep(10);
     }*/
     clock_gettime(CLOCK_MONOTONIC, &tl_finish);
-    /*if (config->verbose_flag >= 2) {
-        printf("poll=%f sink=%f source=%f mix=%f write=%f (total=%f) processed=%d\n",
-                diff(tl_start, tl_poll),
-                diff(tl_poll, tl_sink),
-                diff(tl_sink, tl_source),
-                diff(tl_source, tl_mix),
-                diff(tl_mix, tl_finish),
-                diff(tl_start, tl_finish),
-                in_available >> 2);
-    }*/
+    if (config->verbose_flag >= 2) {
+        if (diff(tl_start, tl_finish) > 1.0)
+            printf("poll=%f sink=%f source=%f mix=%f write=%f (total=%f) out_available=%d in_available=%d\n",
+                    diff(tl_start, tl_poll),
+                    diff(tl_poll, tl_sink),
+                    diff(tl_sink, tl_source),
+                    diff(tl_source, tl_mix),
+                    diff(tl_mix, tl_finish),
+                    diff(tl_start, tl_finish),
+                    out_available >> 2,
+                    in_available >> 2);
+    }
     return 0;
 }
 
@@ -786,6 +930,8 @@ void whitebox_finish(whitebox_t *wb, struct whitebox_config *config, struct whit
 
     if (config->dat_enable)
         close(rt->dat_listening_fd);
+    if (config->audio_enable)
+        close(rt->audio_listening_fd);
     if (config->ctl_enable)
         close(rt->ctl_listening_fd);
 
@@ -851,7 +997,7 @@ int main(int argc, char **argv)
             case 0:
                 if (strcmp("audio_tone", long_options[option_index].name) == 0) {
                     //config->mode = WBM_AUDIO_TONE | WBM_IQ_TONE;
-                    config->x_tone = atof(optarg);
+                    //config->tone2 = atof(optarg);
                     break;
                 }
                 if (strcmp("test", long_options[option_index].name) == 0) {
@@ -887,12 +1033,12 @@ int main(int argc, char **argv)
                 break;
 
             case 't':
-                config->z_tone = atof(optarg);
+                config->tone1 = atof(optarg);
                 //config->mode = WBM_IQ_TONE;
                 break;
 
             case 'A':
-                config->x_offset = atoi(optarg);
+                config->tone2_offset = atoi(optarg);
                 break;
 
             case 'd':

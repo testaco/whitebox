@@ -15,6 +15,25 @@
 
 <script type="text/javascript">
 
+/* Based on the jsmorse tool by Fabian Krtz */
+var cw_encode = new Array();
+cw_encode["0"] = "-----"; cw_encode["1"] = ".----"; cw_encode["2"] = "..---";
+cw_encode["3"] = "...--"; cw_encode["4"] = "....-"; cw_encode["5"] = ".....";
+cw_encode["6"] = "-...."; cw_encode["7"] = "--..."; cw_encode["8"] = "---..";
+cw_encode["9"] = "----.";
+cw_encode["A"] = ".-"; cw_encode["B"] = "-..."; cw_encode["C"] = "-.-.";
+cw_encode["D"] = "-.."; cw_encode["E"] = "."; cw_encode["F"] = "..-.";
+cw_encode["G"] = "--."; cw_encode["I"] = ".."; cw_encode["H"] = "....";
+cw_encode["J"] = ".---"; cw_encode["K"] = "-.-"; cw_encode["L"] = ".-..";
+cw_encode["M"] = "--"; cw_encode["N"] = "-."; cw_encode["O"] = "---";
+cw_encode["P"] = ".--."; cw_encode["Q"] = "--.-"; cw_encode["R"] = ".-.";
+cw_encode["S"] = "..."; cw_encode["T"] = "-"; cw_encode["U"] = "..-";
+cw_encode["V"] = "...-"; cw_encode["W"] = ".--"; cw_encode["X"] = "-..-";
+cw_encode["Y"] = "-.--"; cw_encode["Z"] = "--.."; cw_encode[")"] = "-.--.-";
+cw_encode["("] = "-.--."; cw_encode["+"] = ".-.-.";
+cw_encode["-"] = "-....-"; cw_encode["."] = ".-.-.-";
+cw_encode[":"] = "---..."; cw_encode["?"] = "..--..";
+
 var command_errors = 0;
 
 function command(v, val) {
@@ -24,7 +43,7 @@ function command(v, val) {
     r.onreadystatechange = function () {
         if (r.readyState == 4) {
             if (r.status == 200) {
-                update_display();
+                //update_display();
                 command_errors = 0;
             } else {
                 if (command_errors++ < 3)
@@ -53,6 +72,10 @@ function ptt(state) {
 }
 
 function update_display() {
+    function update_if_not_focused(id, value) {
+        if (!(document.activeElement == document.getElementById(id)))
+            document.getElementById(id).value = value;
+    }
     var r = new XMLHttpRequest(); 
     r.open("GET", "/config", true);
     r.onreadystatechange = function () {
@@ -60,19 +83,20 @@ function update_display() {
         var config = JSON.parse(r.responseText);
         //console.log(r.responseText);
         //console.log(config['mode']);
-        document.getElementById('offset_correct_i').value = config['offset_correct_i'];
-        document.getElementById('offset_correct_q').value = config['offset_correct_q'];
-        document.getElementById('gain_i').value = config['gain_i'];
-        document.getElementById('gain_q').value = config['gain_q'];
-        document.getElementById('ptt').value = config['ptt'];
+        update_if_not_focused('offset_correct_i', config['offset_correct_i']);
+        update_if_not_focused('offset_correct_q', config['offset_correct_q']);
+        update_if_not_focused('gain_i', config['gain_i']);
+        update_if_not_focused('gain_q', config['gain_q']);
+        update_if_not_focused('mode', config['mode']);
+        update_if_not_focused('freq', config['freq'] / 1e6);
+        update_if_not_focused('tone1', config['tone1']);
+        update_if_not_focused('tone2', config['tone2']);
+        update_if_not_focused('latency', config['latency']);
+        update_if_not_focused('ptt', config['ptt']);
         if (config['ptt'])
             document.getElementById('ptt_indicator').className = 'ptt-on';
         else
             document.getElementById('ptt_indicator').className = 'ptt-off';
-        document.getElementById('mode').value = config['mode'];
-        document.getElementById('freq').value = config['freq'] / 1e6;
-        document.getElementById('tone_freq').value = config['tone_freq'];
-        document.getElementById('latency').value = config['latency'];
     };
     r.send();
 }
@@ -141,14 +165,20 @@ function start() {
 
             e.preventDefault();
         });
-    document.getElementById("tone_freq").addEventListener("change",
+    document.getElementById("tone1").addEventListener("change",
         function (e) {
-            var tone_freq = document.getElementById("tone_freq").value;
-            command("tone_freq", tone_freq);
+            var tone1 = document.getElementById("tone1").value;
+            command("tone1", tone1);
 
             e.preventDefault();
         });
+    document.getElementById("tone2").addEventListener("change",
+        function (e) {
+            var tone2 = document.getElementById("tone2").value;
+            command("tone2", tone2);
 
+            e.preventDefault();
+        });
     document.getElementById("offset_correct_i").addEventListener("change",
         function (e) {
             var offset_correct_i = document.getElementById("offset_correct_i").value;
@@ -205,6 +235,7 @@ document.addEventListener("DOMContentLoaded", start);
     <option value="idle">Idle</option>
     <option value="cw">CW</option>
     <option value="iq">IQ</option>
+    <option value="2tone">Two-Tone</option>
     <option value="audio">Audio</option>
 </select>
 <br />
@@ -214,8 +245,11 @@ document.addEventListener("DOMContentLoaded", start);
 
 <fieldset>
 <legend>Transmit</legend>
-<label for="tone_freq">Tone Frequency (Hz)</label>
-<input type="number" name="tone_freq" id="tone_freq" min="300" max="12000" step="10" value="700" />
+<label for="tone1">Tone1 Frequency (Hz)</label>
+<input type="number" name="tone1" id="tone1" min="300" max="12000" step="10" value="700" />
+<br />
+<label for="tone2">Tone2 Frequency (Hz)</label>
+<input type="number" name="tone2" id="tone2" min="300" max="12000" step="10" value="1900" />
 <br />
 <button name="ptt" id="ptt" value="1">PTT</button>
 <br />
