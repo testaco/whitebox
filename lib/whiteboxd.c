@@ -676,10 +676,19 @@ done:
     return result;
 }
 
+#define WFD_WHITEBOX     0
+#define WFD_AUDIO_SOCK   1
+#define WFD_DAT_SOCK     2
+#define WFD_AUDIO_LISTEN 3
+#define WFD_DAT_LISTEN   4
+#define WFD_CTL_LISTEN   5
+#define WFD_CTL_SOCK     6
+#define WFD_END          7
+
 int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         struct whitebox_runtime *rt, long total_samples)
 {
-    static struct pollfd fds[255];
+    static struct pollfd fds[WFD_END];
     static uint32_t z_buf[FRAME_SIZE];
     static int16_t x_buf[FRAME_SIZE];
     struct timespec tl_start, tl_poll, tl_sink, tl_source, tl_mix, tl_finish;
@@ -694,11 +703,26 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
 
     // step 1. poll
     fcnt = 0;
-    fds[fcnt].fd = rt->fd;
-    fds[fcnt].events = 0;
+    fds[WFD_WHITEBOX].fd = rt->fd;
+    fds[WFD_WHITEBOX].events = 0;
     if (rt->ptt)
-        fds[fcnt].events |= POLLOUT;
+        fds[WFD_WHITEBOX].events |= POLLOUT;
     fcnt++;
+
+    fds[WFD_AUDIO_SOCK].fd = rt->audio_fd;
+    fds[WFD_AUDIO_SOCK].events = 0;
+    if (rt->audio_needs_poll) {
+        fds[fcnt].events |= POLLIN;
+    }
+    fcnt++;
+
+    fds[WFD_DAT_SOCK].fd = rt->dat_fd;
+    fds[WFD_DAT_SOCK].events = 0;
+    if (rt->dat_needs_poll) {
+        fds[fcnt].events |= POLLIN;
+    }
+    fcnt++;
+
     if (config->ctl_enable) {
         fds[fcnt].fd = rt->ctl_listening_fd;
         fds[fcnt].events = POLLIN;
@@ -719,16 +743,6 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         fds[fcnt].events = POLLIN;
         fcnt++;
     }
-    if (rt->dat_needs_poll) {
-        fds[fcnt].fd = rt->dat_fd;
-        fds[fcnt].events = POLLIN | POLLPRI;
-        fcnt++;
-    }
-    if (rt->audio_needs_poll) {
-        fds[fcnt].fd = rt->audio_fd;
-        fds[fcnt].events = POLLIN | POLLPRI;
-        fcnt++;
-    }
 
     if (poll(fds, fcnt, rt->latency_ms) < 0) {
         if (errno == EINTR)
@@ -740,7 +754,7 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
     clock_gettime(CLOCK_MONOTONIC, &tl_poll);
 
     // step 2. get the destination address and available space in whitebox sink
-    if (fds[0].revents & POLLOUT) {
+    if (fds[WFD_WHITEBOX].revents & POLLOUT) {
         out_available = ioctl(rt->fd, W_MMAP_WRITE, &dest);
         out_available = out_available < (FRAME_SIZE << 2) ? out_available : (FRAME_SIZE << 2);
         if (total_samples > 0 && (out_available >> 2) + rt->i > total_samples)
@@ -756,16 +770,59 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
 
     clock_gettime(CLOCK_MONOTONIC, &tl_sink);
 
-    // step 3. recv_from from the iq/z source
+    // step 3. recv_from from the xiq/z source
     in_available = 0;
-    if (out_available > 0 && !rt->dat_needs_poll) {
-        in_available = z_read(wb, config, rt, out_available, z_dest);
-        //printf("out %d, in %d\n", out_available, in_available);
-    } else {
+    if (out_available > 0 && fds[WFD_AUDIO_SOCK].revents & POLLIN) {
         //printf("no out\n");
+        in_available = x_read(wb, config, rt, out_available, x_buf);
+        z_read(wb, config, rt, in_available, z_dest);
+    } else if (out_available > 0 && fds[WFD_DAT_SOCK].revents & POLLIN) {
+        in_available = z_read(wb, config, rt, out_available, z_dest);
+    } else if (!(rt->dat_needs_poll || rt->audio_needs_poll) && out_available > 0) {
+        in_available = z_read(wb, config, rt, out_available, z_dest);
     }
 
-    for (f = 1; f < fcnt; ++f) {
+    if (in_available < 0) {
+        printf("z_read\n");
+    }
+
+    if (config->mode & WBM_IQ_TEST) {
+        z_test(wb, config, rt, in_available, z_dest);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &tl_source);
+
+    // step 4. mix x and z
+    if (in_available > 0 && config->mode & WBM_IQ_MIXED) {
+        mix_z_and_x(wb, config, rt, in_available, x_buf, z_dest, dest);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &tl_mix);
+
+    // step 5. call write on the whitebox device with how much data was received
+    if (in_available > 0) {
+        if (write(rt->fd, 0, in_available) != in_available) {
+            printf("Underrun\n");
+            fflush(stdout);
+            return -1;
+        }
+        else {
+            if (config->verbose_flag == 1) {
+                printf(".");
+                fflush(stdout);
+            }
+        }
+    } else {
+            if (config->verbose_flag == 1) {
+                if (out_available == 0) printf("-");
+                else printf(">");
+                fflush(stdout);
+            }
+    }
+
+    rt->i += in_available >> 2;
+
+    for (f = 3; f < fcnt; ++f) {
         if ((fds[f].fd == rt->ctl_listening_fd)
                 && (fds[f].revents & POLLIN)) {
             int fd;
@@ -803,12 +860,6 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
             change_mode(wb, config, rt, WBM_IQ_SOCKET);
             rt->dat_needs_poll = 1;
         }
-        if ((fds[f].fd == rt->dat_fd)
-                && (((out_available > 0)
-                && (rt->dat_needs_poll && (fds[f].revents & POLLIN)))
-                || (fds[f].revents & POLLPRI))) {
-            in_available = z_read(wb, config, rt, out_available, z_dest);
-        }
         if ((fds[f].fd == rt->audio_listening_fd)
                 && (fds[f].revents & POLLIN)) {
             if (rt->audio_fd > 0) {
@@ -825,19 +876,6 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
             rt->audio_needs_poll = 1;
             printf("now audio\n");
         }
-        if ((fds[f].fd == rt->audio_fd)
-                && (((out_available > 0)
-                && (rt->audio_needs_poll && (fds[f].revents & POLLIN))))) {
-            in_available = x_read(wb, config, rt, out_available, x_buf);
-        }
-    }
-
-    if (in_available < 0) {
-        printf("z_read\n");
-    }
-
-    if (config->mode & WBM_IQ_TEST) {
-        z_test(wb, config, rt, in_available, z_dest);
     }
 
     if (config->verbose_flag >= 3) {
@@ -849,37 +887,6 @@ int whitebox_step(whitebox_t *wb, struct whitebox_config *config,
         }
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &tl_source);
-
-    // step 4. mix x and z
-    if (in_available > 0 && config->mode & WBM_IQ_MIXED) {
-        mix_z_and_x(wb, config, rt, in_available, x_buf, z_dest, dest);
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &tl_mix);
-
-    // step 5. call write on the whitebox device with how much data was received
-    if (in_available > 0) {
-        if (write(rt->fd, 0, in_available) != in_available) {
-            printf("Underrun\n");
-            fflush(stdout);
-            return -1;
-        }
-        else {
-            if (config->verbose_flag == 1) {
-                printf(".");
-                fflush(stdout);
-            }
-        }
-    } else {
-            if (config->verbose_flag == 1) {
-                if (out_available == 0) printf("-");
-                else printf(">");
-                fflush(stdout);
-            }
-    }
-
-    rt->i += in_available >> 2;
     /*if (rt->i > 48e3*20) {
         int fd = open("/sys/power/state", O_WRONLY);
         write(fd, "standby\n", strlen("standby\n"));
