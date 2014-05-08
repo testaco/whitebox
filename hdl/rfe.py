@@ -94,10 +94,12 @@ def rfe(resetn,
         rx_fifo_rdcnt, rx_fifo_wrcnt,
 
         fir_load_coeff_ram_addr,
-        fir_load_coeff_ram_din,
+        fir_load_coeff_ram_din0,
+        fir_load_coeff_ram_din1,
         fir_load_coeff_ram_blk,
         fir_load_coeff_ram_wen,
-        fir_load_coeff_ram_dout,
+        fir_load_coeff_ram_dout0,
+        fir_load_coeff_ram_dout1,
 
         firen, fir_bank1, fir_bank0, fir_N,
 
@@ -180,7 +182,7 @@ def rfe(resetn,
         sync_rxlast.next = adc_last
         rxlast.next = sync_rxlast
 
-    len_fir_load_coeff_ram_din = len(fir_load_coeff_ram_din)
+    len_fir_load_coeff_ram_din = len(fir_load_coeff_ram_din0) + len(fir_load_coeff_ram_din1)
     len_fir_N = len(fir_N)
     fir_load_coeff_k = Signal(intbv(0, min=0, max=fir_N.max))
     fir_accessing = Signal(bool(0))
@@ -193,7 +195,8 @@ def rfe(resetn,
                 fir_load_coeff_ram_blk.next = False
                 fir_load_coeff_ram_addr.next = concat(fir_bank1, fir_bank0, fir_load_coeff_k)
                 fir_load_coeff_ram_wen.next = not pwrite # active high to active low
-                fir_load_coeff_ram_din.next = intbv(pwdata[len_fir_load_coeff_ram_din:])
+                fir_load_coeff_ram_din0.next = pwdata[9:]
+                fir_load_coeff_ram_din1.next = pwdata[18:9]
             else:
                 fir_load_coeff_ram_blk.next = True
         elif state == state_t.ACCESS:
@@ -395,7 +398,7 @@ def rfe(resetn,
             state.next = state_t.READ2
         elif state == state_t.READ2:
             pready.next = True
-            prdata.next = fir_load_coeff_ram_dout.signed()
+            prdata.next = concat(fir_load_coeff_ram_dout1, fir_load_coeff_ram_dout0).signed()
             state.next = state_t.DONE
         elif state == state_t.DONE:
             tx_fifo_we.next = False

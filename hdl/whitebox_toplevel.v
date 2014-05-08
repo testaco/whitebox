@@ -76,7 +76,8 @@ module whitebox_toplevel(
     wire [10:0] rx_fifo_wrcnt;
 
     wire [8:0] fir_coeff_ram_addr;
-    wire [8:0] fir_coeff_ram_din;
+    wire [8:0] fir_coeff_ram_din0;
+    wire [8:0] fir_coeff_ram_din1;
     wire fir_coeff_ram_width0 = 1;
     wire fir_coeff_ram_width1 = 1;
     wire fir_coeff_ram_pipe = 1;
@@ -84,10 +85,12 @@ module whitebox_toplevel(
     wire fir_coeff_ram_blk;
     wire fir_coeff_ram_wen;
     wire fir_coeff_ram_clk = dac_clock;
-    wire [8:0] fir_coeff_ram_dout;
+    wire [8:0] fir_coeff_ram_dout0;
+    wire [8:0] fir_coeff_ram_dout1;
 
     wire [8:0] fir_load_coeff_ram_addr;
-    wire [8:0] fir_load_coeff_ram_din;
+    wire [8:0] fir_load_coeff_ram_din0;
+    wire [8:0] fir_load_coeff_ram_din1;
     wire fir_load_coeff_ram_width0 = 1;
     wire fir_load_coeff_ram_width1 = 1;
     wire fir_load_coeff_ram_pipe = 1;
@@ -95,7 +98,8 @@ module whitebox_toplevel(
     wire fir_load_coeff_ram_blk;
     wire fir_load_coeff_ram_wen;
     wire fir_load_coeff_ram_clk = pclk;
-    wire [8:0] fir_load_coeff_ram_dout;
+    wire [8:0] fir_load_coeff_ram_dout0;
+    wire [8:0] fir_load_coeff_ram_dout1;
 
     wire [8:0] fir_delay_line_i_ram_addr;
     wire [8:0] fir_delay_line_i_ram_din;
@@ -176,18 +180,18 @@ module whitebox_toplevel(
     );
     
     // FIR COEFFICIENT RAM
-    RAM4K9 fir_coeff_ram(
+    RAM4K9 fir_coeff_ram_a(
         .RESET(clearn),
         .ADDRA8(fir_coeff_ram_addr[8]), .ADDRA7(fir_coeff_ram_addr[7]),
         .ADDRA6(fir_coeff_ram_addr[6]), .ADDRA5(fir_coeff_ram_addr[5]),
         .ADDRA4(fir_coeff_ram_addr[4]), .ADDRA3(fir_coeff_ram_addr[3]),
         .ADDRA2(fir_coeff_ram_addr[2]), .ADDRA1(fir_coeff_ram_addr[1]),
         .ADDRA0(fir_coeff_ram_addr[0]),
-        .DINA8(fir_coeff_ram_din[8]), .DINA7(fir_coeff_ram_din[7]),
-        .DINA6(fir_coeff_ram_din[6]), .DINA5(fir_coeff_ram_din[5]),
-        .DINA4(fir_coeff_ram_din[4]), .DINA3(fir_coeff_ram_din[3]),
-        .DINA2(fir_coeff_ram_din[2]), .DINA1(fir_coeff_ram_din[1]),
-        .DINA0(fir_coeff_ram_din[0]),
+        .DINA8(fir_coeff_ram_din0[8]), .DINA7(fir_coeff_ram_din0[7]),
+        .DINA6(fir_coeff_ram_din0[6]), .DINA5(fir_coeff_ram_din0[5]),
+        .DINA4(fir_coeff_ram_din0[4]), .DINA3(fir_coeff_ram_din0[3]),
+        .DINA2(fir_coeff_ram_din0[2]), .DINA1(fir_coeff_ram_din0[1]),
+        .DINA0(fir_coeff_ram_din0[0]),
         .WIDTHA0(fir_coeff_ram_width0),
         .WIDTHA1(fir_coeff_ram_width1),
         .PIPEA(fir_coeff_ram_pipe),
@@ -195,21 +199,21 @@ module whitebox_toplevel(
         .BLKA(fir_coeff_ram_blk),
         .WENA(fir_coeff_ram_wen),
         .CLKA(fir_coeff_ram_clk),
-        .DOUTA8(fir_coeff_ram_dout[8]), .DOUTA7(fir_coeff_ram_dout[7]),
-        .DOUTA6(fir_coeff_ram_dout[6]), .DOUTA5(fir_coeff_ram_dout[5]),
-        .DOUTA4(fir_coeff_ram_dout[4]), .DOUTA3(fir_coeff_ram_dout[3]),
-        .DOUTA2(fir_coeff_ram_dout[2]), .DOUTA1(fir_coeff_ram_dout[1]),
-        .DOUTA0(fir_coeff_ram_dout[0]),
+        .DOUTA8(fir_coeff_ram_dout0[8]), .DOUTA7(fir_coeff_ram_dout0[7]),
+        .DOUTA6(fir_coeff_ram_dout0[6]), .DOUTA5(fir_coeff_ram_dout0[5]),
+        .DOUTA4(fir_coeff_ram_dout0[4]), .DOUTA3(fir_coeff_ram_dout0[3]),
+        .DOUTA2(fir_coeff_ram_dout0[2]), .DOUTA1(fir_coeff_ram_dout0[1]),
+        .DOUTA0(fir_coeff_ram_dout0[0]),
         .ADDRB8(fir_load_coeff_ram_addr[8]), .ADDRB7(fir_load_coeff_ram_addr[7]),
         .ADDRB6(fir_load_coeff_ram_addr[6]), .ADDRB5(fir_load_coeff_ram_addr[5]),
         .ADDRB4(fir_load_coeff_ram_addr[4]), .ADDRB3(fir_load_coeff_ram_addr[3]),
         .ADDRB2(fir_load_coeff_ram_addr[2]), .ADDRB1(fir_load_coeff_ram_addr[1]),
         .ADDRB0(fir_load_coeff_ram_addr[0]),
-        .DINB8(fir_load_coeff_ram_din[8]), .DINB7(fir_load_coeff_ram_din[7]),
-        .DINB6(fir_load_coeff_ram_din[6]), .DINB5(fir_load_coeff_ram_din[5]),
-        .DINB4(fir_load_coeff_ram_din[4]), .DINB3(fir_load_coeff_ram_din[3]),
-        .DINB2(fir_load_coeff_ram_din[2]), .DINB1(fir_load_coeff_ram_din[1]),
-        .DINB0(fir_load_coeff_ram_din[0]),
+        .DINB8(fir_load_coeff_ram_din0[8]), .DINB7(fir_load_coeff_ram_din0[7]),
+        .DINB6(fir_load_coeff_ram_din0[6]), .DINB5(fir_load_coeff_ram_din0[5]),
+        .DINB4(fir_load_coeff_ram_din0[4]), .DINB3(fir_load_coeff_ram_din0[3]),
+        .DINB2(fir_load_coeff_ram_din0[2]), .DINB1(fir_load_coeff_ram_din0[1]),
+        .DINB0(fir_load_coeff_ram_din0[0]),
         .WIDTHB0(fir_load_coeff_ram_width0),
         .WIDTHB1(fir_load_coeff_ram_width1),
         .PIPEB(fir_load_coeff_ram_pipe),
@@ -217,11 +221,58 @@ module whitebox_toplevel(
         .BLKB(fir_load_coeff_ram_blk),
         .WENB(fir_load_coeff_ram_wen),
         .CLKB(fir_load_coeff_ram_clk),
-        .DOUTB8(fir_load_coeff_ram_dout[8]), .DOUTB7(fir_load_coeff_ram_dout[7]),
-        .DOUTB6(fir_load_coeff_ram_dout[6]), .DOUTB5(fir_load_coeff_ram_dout[5]),
-        .DOUTB4(fir_load_coeff_ram_dout[4]), .DOUTB3(fir_load_coeff_ram_dout[3]),
-        .DOUTB2(fir_load_coeff_ram_dout[2]), .DOUTB1(fir_load_coeff_ram_dout[1]),
-        .DOUTB0(fir_load_coeff_ram_dout[0])
+        .DOUTB8(fir_load_coeff_ram_dout0[8]), .DOUTB7(fir_load_coeff_ram_dout0[7]),
+        .DOUTB6(fir_load_coeff_ram_dout0[6]), .DOUTB5(fir_load_coeff_ram_dout0[5]),
+        .DOUTB4(fir_load_coeff_ram_dout0[4]), .DOUTB3(fir_load_coeff_ram_dout0[3]),
+        .DOUTB2(fir_load_coeff_ram_dout0[2]), .DOUTB1(fir_load_coeff_ram_dout0[1]),
+        .DOUTB0(fir_load_coeff_ram_dout0[0])
+    );
+    RAM4K9 fir_coeff_ram_b(
+        .RESET(clearn),
+        .ADDRA8(fir_coeff_ram_addr[8]), .ADDRA7(fir_coeff_ram_addr[7]),
+        .ADDRA6(fir_coeff_ram_addr[6]), .ADDRA5(fir_coeff_ram_addr[5]),
+        .ADDRA4(fir_coeff_ram_addr[4]), .ADDRA3(fir_coeff_ram_addr[3]),
+        .ADDRA2(fir_coeff_ram_addr[2]), .ADDRA1(fir_coeff_ram_addr[1]),
+        .ADDRA0(fir_coeff_ram_addr[0]),
+        .DINA8(fir_coeff_ram_din1[8]), .DINA7(fir_coeff_ram_din1[7]),
+        .DINA6(fir_coeff_ram_din1[6]), .DINA5(fir_coeff_ram_din1[5]),
+        .DINA4(fir_coeff_ram_din1[4]), .DINA3(fir_coeff_ram_din1[3]),
+        .DINA2(fir_coeff_ram_din1[2]), .DINA1(fir_coeff_ram_din1[1]),
+        .DINA0(fir_coeff_ram_din1[0]),
+        .WIDTHA0(fir_coeff_ram_width0),
+        .WIDTHA1(fir_coeff_ram_width1),
+        .PIPEA(fir_coeff_ram_pipe),
+        .WMODEA(fir_coeff_ram_wmode),
+        .BLKA(fir_coeff_ram_blk),
+        .WENA(fir_coeff_ram_wen),
+        .CLKA(fir_coeff_ram_clk),
+        .DOUTA8(fir_coeff_ram_dout1[8]), .DOUTA7(fir_coeff_ram_dout1[7]),
+        .DOUTA6(fir_coeff_ram_dout1[6]), .DOUTA5(fir_coeff_ram_dout1[5]),
+        .DOUTA4(fir_coeff_ram_dout1[4]), .DOUTA3(fir_coeff_ram_dout1[3]),
+        .DOUTA2(fir_coeff_ram_dout1[2]), .DOUTA1(fir_coeff_ram_dout1[1]),
+        .DOUTA0(fir_coeff_ram_dout1[0]),
+        .ADDRB8(fir_load_coeff_ram_addr[8]), .ADDRB7(fir_load_coeff_ram_addr[7]),
+        .ADDRB6(fir_load_coeff_ram_addr[6]), .ADDRB5(fir_load_coeff_ram_addr[5]),
+        .ADDRB4(fir_load_coeff_ram_addr[4]), .ADDRB3(fir_load_coeff_ram_addr[3]),
+        .ADDRB2(fir_load_coeff_ram_addr[2]), .ADDRB1(fir_load_coeff_ram_addr[1]),
+        .ADDRB0(fir_load_coeff_ram_addr[0]),
+        .DINB8(fir_load_coeff_ram_din1[8]), .DINB7(fir_load_coeff_ram_din1[7]),
+        .DINB6(fir_load_coeff_ram_din1[6]), .DINB5(fir_load_coeff_ram_din1[5]),
+        .DINB4(fir_load_coeff_ram_din1[4]), .DINB3(fir_load_coeff_ram_din1[3]),
+        .DINB2(fir_load_coeff_ram_din1[2]), .DINB1(fir_load_coeff_ram_din1[1]),
+        .DINB0(fir_load_coeff_ram_din1[0]),
+        .WIDTHB0(fir_load_coeff_ram_width0),
+        .WIDTHB1(fir_load_coeff_ram_width1),
+        .PIPEB(fir_load_coeff_ram_pipe),
+        .WMODEB(fir_load_coeff_ram_wmode),
+        .BLKB(fir_load_coeff_ram_blk),
+        .WENB(fir_load_coeff_ram_wen),
+        .CLKB(fir_load_coeff_ram_clk),
+        .DOUTB8(fir_load_coeff_ram_dout1[8]), .DOUTB7(fir_load_coeff_ram_dout1[7]),
+        .DOUTB6(fir_load_coeff_ram_dout1[6]), .DOUTB5(fir_load_coeff_ram_dout1[5]),
+        .DOUTB4(fir_load_coeff_ram_dout1[4]), .DOUTB3(fir_load_coeff_ram_dout1[3]),
+        .DOUTB2(fir_load_coeff_ram_dout1[2]), .DOUTB1(fir_load_coeff_ram_dout1[1]),
+        .DOUTB0(fir_load_coeff_ram_dout1[0])
     );
 
     // FIR REAL DELAY LINE RAM
@@ -344,15 +395,19 @@ module whitebox_toplevel(
         .rx_fifo_rdcnt(rx_fifo_rdcnt),
         .rx_fifo_wrcnt(rx_fifo_wrcnt),
         .fir_coeff_ram_addr(fir_coeff_ram_addr),
-        .fir_coeff_ram_din(fir_coeff_ram_din),
+        .fir_coeff_ram_din0(fir_coeff_ram_din0),
+        .fir_coeff_ram_din1(fir_coeff_ram_din1),
         .fir_coeff_ram_blk(fir_coeff_ram_blk),
         .fir_coeff_ram_wen(fir_coeff_ram_wen),
-        .fir_coeff_ram_dout(fir_coeff_ram_dout),
+        .fir_coeff_ram_dout0(fir_coeff_ram_dout0),
+        .fir_coeff_ram_dout1(fir_coeff_ram_dout1),
         .fir_load_coeff_ram_addr(fir_load_coeff_ram_addr),
-        .fir_load_coeff_ram_din(fir_load_coeff_ram_din),
+        .fir_load_coeff_ram_din0(fir_load_coeff_ram_din0),
+        .fir_load_coeff_ram_din1(fir_load_coeff_ram_din1),
         .fir_load_coeff_ram_blk(fir_load_coeff_ram_blk),
         .fir_load_coeff_ram_wen(fir_load_coeff_ram_wen),
-        .fir_load_coeff_ram_dout(fir_load_coeff_ram_dout),
+        .fir_load_coeff_ram_dout0(fir_load_coeff_ram_dout0),
+        .fir_load_coeff_ram_dout1(fir_load_coeff_ram_dout1),
         .fir_delay_line_i_ram_addr(fir_delay_line_i_ram_addr),
         .fir_delay_line_i_ram_din(fir_delay_line_i_ram_din),
         .fir_delay_line_i_ram_blk(fir_delay_line_i_ram_blk),

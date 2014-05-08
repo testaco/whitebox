@@ -44,7 +44,7 @@ typedef struct whitebox_args {
         struct {
             uint8_t bank;
             uint8_t n;
-            int16_t coeff[WF_COEFF_COUNT];
+            int32_t coeff[WF_COEFF_COUNT];
         } fir;
     } flags;
     uint8_t locked;

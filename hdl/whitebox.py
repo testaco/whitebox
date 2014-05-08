@@ -13,7 +13,7 @@ from duc import duc as DUC
 from ddc import ddc as DDC
 from rfe import rfe as RFE
 from rfe import print_rfe_ioctl
-from ram import Ram
+from ram import Ram, Ram2
 
 class OverrunError(Exception):
     """Thrown when the system experiences an overflow on a FIFO buffer."""
@@ -112,15 +112,19 @@ def whitebox(
         rx_fifo_rdcnt,
         rx_fifo_wrcnt,
         fir_coeff_ram_addr,
-        fir_coeff_ram_din,
+        fir_coeff_ram_din0,
+        fir_coeff_ram_din1,
         fir_coeff_ram_blk,
         fir_coeff_ram_wen,
-        fir_coeff_ram_dout,
+        fir_coeff_ram_dout0,
+        fir_coeff_ram_dout1,
         fir_load_coeff_ram_addr,
-        fir_load_coeff_ram_din,
+        fir_load_coeff_ram_din0,
+        fir_load_coeff_ram_din1,
         fir_load_coeff_ram_blk,
         fir_load_coeff_ram_wen,
-        fir_load_coeff_ram_dout,
+        fir_load_coeff_ram_dout0,
+        fir_load_coeff_ram_dout1,
         fir_delay_line_i_ram_addr,
         fir_delay_line_i_ram_din,
         fir_delay_line_i_ram_blk,
@@ -210,10 +214,12 @@ def whitebox(
             duc_underrun, tx_sample,
             dac_en, dac_data, dac_last,
             fir_coeff_ram_addr,
-            fir_coeff_ram_din,
+            fir_coeff_ram_din0,
+            fir_coeff_ram_din1,
             fir_coeff_ram_blk,
             fir_coeff_ram_wen,
-            fir_coeff_ram_dout,
+            fir_coeff_ram_dout0,
+            fir_coeff_ram_dout1,
             fir_delay_line_i_ram_addr,
             fir_delay_line_i_ram_din,
             fir_delay_line_i_ram_blk,
@@ -281,10 +287,12 @@ def whitebox(
         rx_fifo_rdcnt, rx_fifo_wrcnt,
 
         fir_load_coeff_ram_addr,
-        fir_load_coeff_ram_din,
+        fir_load_coeff_ram_din0,
+        fir_load_coeff_ram_din1,
         fir_load_coeff_ram_blk,
         fir_load_coeff_ram_wen,
-        fir_load_coeff_ram_dout,
+        fir_load_coeff_ram_dout0,
+        fir_load_coeff_ram_dout1,
 
         firen, fir_bank1, fir_bank0, fir_N,
 
@@ -334,7 +342,7 @@ if __name__ == '__main__':
     bus_pready = bus.pready
     bus_prdata = bus.prdata
 
-    fir_coeff_ram = Ram(clearn, dac_clock, bus.pclk)
+    fir_coeff_ram = Ram2(clearn, dac_clock, bus.pclk)
     fir_delay_line_i_ram = Ram(clearn, dac_clock, dac_clock)
     fir_delay_line_q_ram = Ram(clearn, dac_clock, dac_clock)
 
@@ -482,15 +490,19 @@ if __name__ == '__main__':
                 rx_fifo_rdcnt,
                 rx_fifo_wrcnt,
                 fir_coeff_ram.port['a'].addr,
-                fir_coeff_ram.port['a'].din,
+                fir_coeff_ram.port['a'].din[0],
+                fir_coeff_ram.port['a'].din[1],
                 fir_coeff_ram.port['a'].blk,
                 fir_coeff_ram.port['a'].wen,
-                fir_coeff_ram.port['a'].dout,
+                fir_coeff_ram.port['a'].dout[0],
+                fir_coeff_ram.port['a'].dout[1],
                 fir_coeff_ram.port['b'].addr,
-                fir_coeff_ram.port['b'].din,
+                fir_coeff_ram.port['b'].din[0],
+                fir_coeff_ram.port['b'].din[1],
                 fir_coeff_ram.port['b'].blk,
                 fir_coeff_ram.port['b'].wen,
-                fir_coeff_ram.port['b'].dout,
+                fir_coeff_ram.port['b'].dout[0],
+                fir_coeff_ram.port['b'].dout[1],
                 fir_delay_line_i_ram.port['a'].addr,
                 fir_delay_line_i_ram.port['a'].din,
                 fir_delay_line_i_ram.port['a'].blk,

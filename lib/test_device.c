@@ -89,7 +89,7 @@ int test_ioctl_exciter(void *data) {
     int16_t ic, qc;
     float ig, qg;
     int i;
-    int16_t coeffs[WF_COEFF_COUNT], coeffs2[WF_COEFF_COUNT];
+    int32_t coeffs[WF_COEFF_COUNT], coeffs2[WF_COEFF_COUNT];
 
     whitebox_t wb;
     whitebox_args_t w;
@@ -113,12 +113,13 @@ int test_ioctl_exciter(void *data) {
     assert(ig == 0.75 && qg == 1.25);
 
     for (i = 0; i < WF_COEFF_COUNT-1; ++i)
-        coeffs[i] = i - WF_COEFF_COUNT + 1;
+        coeffs[i] = i - (WF_COEFF_COUNT >> 1) + 1;
 
     assert(whitebox_fir_load_coeffs(&wb, 0, WF_COEFF_COUNT-1, coeffs) == 0);
     assert(whitebox_fir_get_coeffs(&wb, 0, WF_COEFF_COUNT-1, coeffs2) == WF_COEFF_COUNT-1);
-    for (i = 0; i < WF_COEFF_COUNT-1; ++i)
+    for (i = 0; i < WF_COEFF_COUNT-1; ++i) {
         assert(coeffs[i] == coeffs2[i]);
+    }
 
     whitebox_tx_flags_enable(&wb, WS_FIREN);
     assert(ioctl(fd, WE_GET, &w) == 0);
@@ -297,6 +298,7 @@ int test_tx_halt(void* data) {
 
     for (k = 0; k < 10; ++k) {
         assert(whitebox_tx(&wb, 54.00e6) == 0);
+        while (!whitebox_plls_locked(&wb)) continue;
         assert(whitebox_plls_locked(&wb));
         last_count = 0;
         for (j = 0; j < 10;) {
@@ -309,6 +311,7 @@ int test_tx_halt(void* data) {
                 if (rand() & 1)
                     count -= 16;
                 //phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
+                assert(whitebox_plls_locked(&wb));
                 ret = write(whitebox_fd(&wb), 0, count << 2);
                 if (ret != count << 2) {
                     whitebox_debug_to_file(&wb, stdout);
@@ -324,9 +327,9 @@ int test_tx_halt(void* data) {
             }
         }
         assert(fsync(fd) == 0);
+        whitebox_tx_standby(&wb);
         ioctl(wb.fd, WE_GET, &w);
         assert(last_count == w.flags.exciter.debug);
-        whitebox_tx_standby(&wb);
     }
     whitebox_parameter_set("flow_control", 1);
 

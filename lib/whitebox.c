@@ -458,7 +458,7 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
     ioctl(wb->fd, WA_SET, &w);
 }
 
-int whitebox_fir_load_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int16_t *coeffs)
+int whitebox_fir_load_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int32_t *coeffs)
 {
     int i;
     whitebox_args_t w;
@@ -471,7 +471,7 @@ int whitebox_fir_load_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int16_t *coe
     return 0;
 }
 
-int whitebox_fir_get_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int16_t *coeffs)
+int whitebox_fir_get_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int32_t *coeffs)
 {
     int i;
     int n;

@@ -3,10 +3,12 @@ from myhdl import Signal, always, always_comb, always_seq, \
 
 def fir(clearn, clock, in_sign, out_sign,
         coeff_ram_addr,
-        coeff_ram_din,
+        coeff_ram_din0,
+        coeff_ram_din1,
         coeff_ram_blk,
         coeff_ram_wen,
-        coeff_ram_dout,
+        coeff_ram_dout0,
+        coeff_ram_dout1,
         delay_line_i_ram_addr,
         delay_line_i_ram_din,
         delay_line_i_ram_blk,
@@ -23,6 +25,11 @@ def fir(clearn, clock, in_sign, out_sign,
     state_t = enum('READY', 'WAIT1', 'WAIT2', 'WAIT3', 'RUN', 'DONE')
     state = Signal(state_t.READY)
 
+    coeff_width = len(coeff_ram_dout1) + len(coeff_ram_dout0)
+    delay_line_width = len(delay_line_i_ram_dout)
+    mo = coeff_width + delay_line_width - 1
+    ao = mo + 1
+
     in_valid = in_sign.valid
     in_last = in_sign.last
     in_i = in_sign.i
@@ -36,10 +43,10 @@ def fir(clearn, clock, in_sign, out_sign,
     last = Signal(bool(0))
     n = Signal(modbv(0, min=0, max=2**7))
     k = Signal(modbv(0, min=0, max=2**7))
-    m_i = Signal(intbv(0, min=-2**17, max=2**17))
-    m_q = Signal(intbv(0, min=-2**17, max=2**17))
-    ac_i = Signal(intbv(0, min=-2**18, max=2**18))
-    ac_q = Signal(intbv(0, min=-2**18, max=2**18))
+    m_i = Signal(intbv(0, min=-2**mo, max=2**mo))
+    m_q = Signal(intbv(0, min=-2**mo, max=2**mo))
+    ac_i = Signal(intbv(0, min=-2**ao, max=2**ao))
+    ac_q = Signal(intbv(0, min=-2**ao, max=2**ao))
 
     @always_seq(clock.posedge, reset=clearn)
     def accessor():
@@ -104,8 +111,8 @@ def fir(clearn, clock, in_sign, out_sign,
             k.next = 0
         else:
             k.next = k + 1
-            m_i.next = coeff_ram_dout.signed() * delay_line_i_ram_dout.signed()
-            m_q.next = coeff_ram_dout.signed() * delay_line_q_ram_dout.signed()
+            m_i.next = concat(coeff_ram_dout1, coeff_ram_dout0).signed() * delay_line_i_ram_dout.signed()
+            m_q.next = concat(coeff_ram_dout1, coeff_ram_dout0).signed() * delay_line_q_ram_dout.signed()
             if state == state_t.RUN:
                 ac_i.next = ac_i + m_i
                 ac_q.next = ac_q + m_q

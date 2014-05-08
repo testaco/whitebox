@@ -23,7 +23,7 @@ from whitebox import whitebox
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
 from test_dsp import figure_discrete_quadrature, figure_fft_power, figure_fft_phase
 from dds import freq_to_fcw
-from ram import Ram, RamSimulation
+from ram import Ram, Ram2
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
     globals()[name] = intbv(1 << bit)[32:]
@@ -58,7 +58,7 @@ class WhiteboxSim(object):
         self.tx_i = []
         self.tx_n = []
         pclk = self.bus.pclk
-        self.fir_coeff_ram = Ram(self.bus.presetn, self.dac_clock, pclk)
+        self.fir_coeff_ram = Ram2(self.bus.presetn, self.dac_clock, pclk)
         self.fir_delay_line_i_ram = Ram(self.bus.presetn, self.dac_clock, self.dac_clock)
         self.fir_delay_line_q_ram = Ram(self.bus.presetn, self.dac_clock, self.dac_clock)
 
@@ -272,7 +272,8 @@ class WhiteboxSim(object):
         os.system(cmd)
 
         fir_coeff_ram_addr = self.fir_coeff_ram.port['a'].addr
-        fir_coeff_ram_din = self.fir_coeff_ram.port['a'].din
+        fir_coeff_ram_din0 = self.fir_coeff_ram.port['a'].din[0]
+        fir_coeff_ram_din1 = self.fir_coeff_ram.port['a'].din[1]
         fir_coeff_ram_width0 = self.fir_coeff_ram.port['a'].width0
         fir_coeff_ram_width1 = self.fir_coeff_ram.port['a'].width1
         fir_coeff_ram_pipe = self.fir_coeff_ram.port['a'].pipe
@@ -280,9 +281,11 @@ class WhiteboxSim(object):
         fir_coeff_ram_blk = self.fir_coeff_ram.port['a'].blk
         fir_coeff_ram_wen = self.fir_coeff_ram.port['a'].wen
         fir_coeff_ram_clk = self.fir_coeff_ram.port['a'].clk
-        fir_coeff_ram_dout = self.fir_coeff_ram.port['a'].dout
+        fir_coeff_ram_dout0 = self.fir_coeff_ram.port['a'].dout[0]
+        fir_coeff_ram_dout1 = self.fir_coeff_ram.port['a'].dout[1]
         fir_load_coeff_ram_addr = self.fir_coeff_ram.port['b'].addr
-        fir_load_coeff_ram_din = self.fir_coeff_ram.port['b'].din
+        fir_load_coeff_ram_din0 = self.fir_coeff_ram.port['b'].din[0]
+        fir_load_coeff_ram_din1 = self.fir_coeff_ram.port['b'].din[1]
         fir_load_coeff_ram_width0 = self.fir_coeff_ram.port['b'].width0
         fir_load_coeff_ram_width1 = self.fir_coeff_ram.port['b'].width1
         fir_load_coeff_ram_pipe = self.fir_coeff_ram.port['b'].pipe
@@ -290,7 +293,8 @@ class WhiteboxSim(object):
         fir_load_coeff_ram_blk = self.fir_coeff_ram.port['b'].blk
         fir_load_coeff_ram_wen = self.fir_coeff_ram.port['b'].wen
         fir_load_coeff_ram_clk = self.fir_coeff_ram.port['b'].clk
-        fir_load_coeff_ram_dout = self.fir_coeff_ram.port['b'].dout
+        fir_load_coeff_ram_dout0 = self.fir_coeff_ram.port['b'].dout[0]
+        fir_load_coeff_ram_dout1 = self.fir_coeff_ram.port['b'].dout[1]
         fir_delay_line_i_ram_addr = self.fir_delay_line_i_ram.port['a'].addr
         fir_delay_line_i_ram_din = self.fir_delay_line_i_ram.port['a'].din
         fir_delay_line_i_ram_width0 = self.fir_delay_line_i_ram.port['a'].width0
@@ -373,7 +377,8 @@ class WhiteboxSim(object):
                     rx_fifo_rdcnt=rx_fifo_rdcnt,
                     rx_fifo_wrcnt=rx_fifo_wrcnt,
                     fir_coeff_ram_addr=fir_coeff_ram_addr,
-                    fir_coeff_ram_din=fir_coeff_ram_din,
+                    fir_coeff_ram_din0=fir_coeff_ram_din0,
+                    fir_coeff_ram_din1=fir_coeff_ram_din1,
                     fir_coeff_ram_width0=fir_coeff_ram_width0,
                     fir_coeff_ram_width1=fir_coeff_ram_width1,
                     fir_coeff_ram_pipe=fir_coeff_ram_pipe,
@@ -381,9 +386,11 @@ class WhiteboxSim(object):
                     fir_coeff_ram_blk=fir_coeff_ram_blk,
                     fir_coeff_ram_wen=fir_coeff_ram_wen,
                     fir_coeff_ram_clk=fir_coeff_ram_clk,
-                    fir_coeff_ram_dout=fir_coeff_ram_dout,
+                    fir_coeff_ram_dout0=fir_coeff_ram_dout0,
+                    fir_coeff_ram_dout1=fir_coeff_ram_dout1,
                     fir_load_coeff_ram_addr=fir_load_coeff_ram_addr,
-                    fir_load_coeff_ram_din=fir_load_coeff_ram_din,
+                    fir_load_coeff_ram_din0=fir_load_coeff_ram_din0,
+                    fir_load_coeff_ram_din1=fir_load_coeff_ram_din1,
                     fir_load_coeff_ram_width0=fir_load_coeff_ram_width0,
                     fir_load_coeff_ram_width1=fir_load_coeff_ram_width1,
                     fir_load_coeff_ram_pipe=fir_load_coeff_ram_pipe,
@@ -391,7 +398,8 @@ class WhiteboxSim(object):
                     fir_load_coeff_ram_blk=fir_load_coeff_ram_blk,
                     fir_load_coeff_ram_wen=fir_load_coeff_ram_wen,
                     fir_load_coeff_ram_clk=fir_load_coeff_ram_clk,
-                    fir_load_coeff_ram_dout=fir_load_coeff_ram_dout,
+                    fir_load_coeff_ram_dout0=fir_load_coeff_ram_dout0,
+                    fir_load_coeff_ram_dout1=fir_load_coeff_ram_dout1,
                     fir_delay_line_i_ram_addr=fir_delay_line_i_ram_addr,
                     fir_delay_line_i_ram_din=fir_delay_line_i_ram_din,
                     fir_delay_line_i_ram_width0=fir_delay_line_i_ram_width0,
@@ -413,7 +421,7 @@ class WhiteboxSim(object):
                     fir_delay_line_q_ram_clk=fir_delay_line_q_ram_clk,
                     fir_delay_line_q_ram_dout=fir_delay_line_q_ram_dout,
         )
-        return tx_fifo, rx_fifo, self.fir_coeff_ram.ram, self.fir_delay_line_i_ram.ram, self.fir_delay_line_q_ram.ram, whitebox_test
+        return tx_fifo, rx_fifo, self.fir_coeff_ram.rama, self.fir_coeff_ram.ramb, self.fir_delay_line_i_ram.ram, self.fir_delay_line_q_ram.ram, whitebox_test
 
 def whitebox_clear(bus):
     yield bus.transmit(WE_STATUS_ADDR, WS_CLEAR)
@@ -1123,7 +1131,7 @@ class WhiteboxImpulseResponseTestCase(unittest.TestCase):
             if hasattr(self, 'taps') and self.taps:
                 yield bus.transmit(W_FIR_ADDR, len(self.taps) | WF_ACCESS_COEFFS)
                 for t in self.taps:
-                    yield bus.transmit(0, intbv(t << 3)[32:])
+                    yield bus.transmit(0, intbv(t << 12)[32:])
 
                 yield bus.receive(W_FIR_ADDR)
                 assert bus.rdata == len(self.taps)
@@ -1132,7 +1140,7 @@ class WhiteboxImpulseResponseTestCase(unittest.TestCase):
 
                 for t in self.taps:
                     yield bus.receive(0)
-                    assert bus.rdata.signed() == t << 3
+                    assert bus.rdata.signed() == t << 12
 
             # Check the fifo flags
             yield bus.receive(WE_STATUS_ADDR)
@@ -1285,7 +1293,7 @@ class TestFirImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.bulk_size = 16
         self.sample_rate = 6.144e6
         self.freq = 1.7e3 
-        self.taps = [1, 2, 3, 5, 8, -5, -3, -2, -1]
+        self.taps = [1, 2, 3, 5, 31, -5, -3, -2, -1]
         self.interp = 16
         self.status = WS_FIREN
 

@@ -213,6 +213,99 @@ class Ram(object):
                 self.clkb,
                 self.doutb) }
 
+class Ram2(object):
+    def __init__(self, resetn, clka, clkb, **kwargs):
+        self.resetn = resetn
+        self.width1 = Signal(bool(1))
+        self.width0 = Signal(bool(1))
+        self.pipe = Signal(bool(1))
+        self.wmode = Signal(bool(0))
+
+        self.addra = Signal(intbv(0, min=0, max=2**9))
+        self.blka = Signal(bool(1))
+        self.wena = Signal(bool(1))
+        self.clka = clka
+
+        self.a_dina = Signal(intbv(0, min=0, max=2**9))
+        self.a_douta = Signal(intbv(0, min=0, max=2**9))
+        self.b_dina = Signal(intbv(0, min=0, max=2**9))
+        self.b_douta = Signal(intbv(0, min=0, max=2**9))
+        
+        self.addrb = Signal(intbv(0, min=0, max=2**9))
+        self.blkb = Signal(bool(1))
+        self.wenb = Signal(bool(1))
+        self.clkb = clkb
+
+        self.a_dinb = Signal(intbv(0, min=0, max=2**9))
+        self.a_doutb = Signal(intbv(0, min=0, max=2**9))
+        self.b_dinb = Signal(intbv(0, min=0, max=2**9))
+        self.b_doutb = Signal(intbv(0, min=0, max=2**9))
+
+        self.rama = ram4k9(reset=self.resetn,
+                addra=self.addra,
+                dina=self.a_dina,
+                widtha0=self.width0,
+                widtha1=self.width1,
+                pipea=self.pipe,
+                wmodea=self.wmode,
+                blka=self.blka,
+                wena=self.wena,
+                clka=self.clka,
+                douta=self.a_douta,
+                addrb=self.addrb,
+                dinb=self.a_dinb,
+                widthb0=self.width0,
+                widthb1=self.width1,
+                pipeb=self.pipe,
+                wmodeb=self.wmode,
+                blkb=self.blkb,
+                wenb=self.wenb,
+                clkb=self.clkb,
+                doutb=self.a_doutb)
+        self.ramb = ram4k9(reset=self.resetn,
+                addra=self.addra,
+                dina=self.b_dina,
+                widtha0=self.width0,
+                widtha1=self.width1,
+                pipea=self.pipe,
+                wmodea=self.wmode,
+                blka=self.blka,
+                wena=self.wena,
+                clka=self.clka,
+                douta=self.b_douta,
+                addrb=self.addrb,
+                dinb=self.b_dinb,
+                widthb0=self.width0,
+                widthb1=self.width1,
+                pipeb=self.pipe,
+                wmodeb=self.wmode,
+                blkb=self.blkb,
+                wenb=self.wenb,
+                clkb=self.clkb,
+                doutb=self.b_doutb)
+        self.port = { 'a': RamPort(
+                self.addra,
+                [self.a_dina, self.b_dina],
+                self.width0,
+                self.width1,
+                self.pipe,
+                self.wmode,
+                self.blka,
+                self.wena,
+                self.clka,
+                [self.a_douta, self.b_douta]),
+                     'b': RamPort(
+                self.addrb,
+                [self.a_dinb, self.b_dinb],
+                self.width0,
+                self.width1,
+                self.pipe,
+                self.wmode,
+                self.blkb,
+                self.wenb,
+                self.clkb,
+                [self.a_doutb, self.b_doutb]) }
+
 class RamSimulation(object):
     def __init__(self, ram=None, duration=None):
         if ram:

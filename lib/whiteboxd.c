@@ -192,18 +192,21 @@ int reconfigure_runtime(whitebox_t *wb, struct whitebox_config *config,
         ptt = rt->ptt;
         if (ptt) {
             whitebox_tx(wb, config->carrier_freq);
-            while (!whitebox_plls_locked(wb)) {
-                if (done)
-                    exit(1);
-                printf("U");
-                fflush(stdout);
-            }
         } else {
             fsync(wb->fd);
             whitebox_tx_standby(wb);
         }
         if (config->mode == WBM_IDLE) {
             change_mode(wb, config, rt, WBM_IQ_TONE);  // Web browser causes CW on PTT
+        }
+    }
+
+    if (ptt) {
+        while (!whitebox_plls_locked(wb)) {
+            if (done)
+                exit(1);
+            printf("U");
+            fflush(stdout);
         }
     }
 
