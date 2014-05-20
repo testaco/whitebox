@@ -1,14 +1,14 @@
 #ifndef __WHITEBOX_DSP_H__
 #define __WHITEBOX_DSP_H__
 
-#define DDS_PA_LENGTH            10U
-#define DDS_PA_MAX               (1U << DDS_PA_LENGTH)
-#define DDS_ROM_SAMPLES_ORDER    10U
-#define DDS_ROM_NUM_SAMPLES      (1U << DDS_ROM_SAMPLES_ORDER)
-#define DDS_ROM_DEPTH            32U
+#define DDS_PA_LENGTH            25UL
+#define DDS_PA_MAX               (1UL << DDS_PA_LENGTH)
+#define DDS_ROM_SAMPLES_ORDER    10UL
+#define DDS_ROM_NUM_SAMPLES      (1UL << DDS_ROM_SAMPLES_ORDER)
+#define DDS_ROM_DEPTH            32UL
 #define DDS_RAM_SIZE_BITS        (DDS_ROM_NUM_SAMPLES * DDS_ROM_DEPTH)
 #define DDS_PHASE_SHIFT          (DDS_PA_LENGTH - DDS_ROM_SAMPLES_ORDER)
-#define DDS_PI_OVER_4           (1U << (DDS_PA_LENGTH - 3))
+#define DDS_PI_OVER_4           (1UL << (DDS_ROM_SAMPLES_ORDER - 3))
 
 #define DDS_LUT_ADDR         0x20001000
 
@@ -38,7 +38,7 @@ void accum32(int n, uint32_t fcw, uint32_t p0, uint32_t *phases);
 /*
  * Computes the cos (i) and sin (q) given the associated phase with the DDS.
  */
-void sincos16(uint32_t phase, int16_t *i, int16_t *q);
+inline void sincos16(uint32_t fcw, uint32_t *phase, int16_t *i, int16_t *q);
 
 /*
  * ret = cos(phase) + 1j * sin(phase)

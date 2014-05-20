@@ -71,6 +71,13 @@ function ptt(state) {
         window.setTimeout(debounce, 10);
 }
 
+function update_radio_buttons(name, value) {
+    var buttons = document.getElementsByName(name);
+    for (var i = 0; i < buttons.length; ++i) {
+        buttons[i].checked = (buttons[i].value == value);
+    }
+}
+
 function update_display() {
     function update_if_not_focused(id, value) {
         if (!(document.activeElement == document.getElementById(id)))
@@ -97,6 +104,9 @@ function update_display() {
             document.getElementById('ptt_indicator').className = 'ptt-on';
         else
             document.getElementById('ptt_indicator').className = 'ptt-off';
+        update_radio_buttons('modulation', config['modulation']);
+        update_radio_buttons('audio_source', config['audio_source']);
+        update_radio_buttons('iq_source', config['iq_source']);
     };
     r.send();
 }
@@ -245,11 +255,66 @@ document.addEventListener("DOMContentLoaded", start);
 
 <fieldset>
 <legend>Transmit</legend>
-<label for="tone1">Tone1 Frequency (Hz)</label>
+<label for="modulation">Modulation</label>
+<input type="radio" id="modulation_iq" name="modulation" value="iq"
+    onclick="command('modulation', 'iq');" />
+<label for="modulation_iq">IQ</label>
+<input type="radio" id="modulation_ssb" name="modulation" value="ssb"
+    onclick="command('modulation', 'ssb');" />
+<label for="modulation_ssb">SSB</label>
+<input type="radio" id="modulation_am" name="modulation" value="am"
+    onclick="command('modulation', 'am');" />
+<label for="modulation_am">AM</label>
+<input type="radio" id="modulation_fm" name="modulation" value="fm"
+    onclick="command('modulation', 'fm');" />
+<label for="modulation_fm">FM</label>
+<br />
+<label for="iq_source">Audio Source</label>
+<input type="radio" id="audio_source_constant"
+    name="audio_source" value="constant"
+    onclick="command('audio_source', 'constant')" />
+<label for="audio_source_constant">Constant</label>
+<input type="radio" id="audio_source_synth"
+    name="audio_source" value="synth"
+    onclick="command('audio_source', 'synth')" />
+<label for="audio_source_synth">Synthesizer</label>
+<input type="radio" id="audio_source_socket"
+    name="audio_source" value="socket"
+    onclick="command('audio_source', 'socket')" />
+<label for="audio_source_socket">Socket</label>
+<br />
+<label for="iq_source">IQ Source</label>
+<input type="radio" id="iq_source_constant"
+    name="iq_source" value="constant"
+    onclick="command('iq_source', 'constant')" />
+<label for="iq_source_constant">Constant</label>
+<input type="radio" id="iq_source_lsb"
+    name="iq_source" value="lsb"
+    onclick="command('iq_source', 'lsb')" />
+<label for="iq_source_lsb">LSB Synthesizer<label>
+<input type="radio" id="iq_source_usb"
+    name="iq_source" value="usb"
+    onclick="command('iq_source', 'usb')" />
+<label for="iq_source_usb">USB Synthesizer<label>
+<input type="radio" id="iq_source_socket"
+    name="iq_source" value="socket"
+    onclick="command('iq_source', 'socket')" />
+<label for="iq_source_socket">Socket</label>
+<br />
+<label for="tone1">BFO Frequency (Hz)</label>
+<input type="number" name="bfo" id="bfo" min="6000" max="12000" step="1000" value="12000" />
+<br />
+<label for="tone1">Audio Tone 1 Frequency (Hz)</label>
 <input type="number" name="tone1" id="tone1" min="300" max="12000" step="10" value="700" />
 <br />
-<label for="tone2">Tone2 Frequency (Hz)</label>
+<label for="tone2">Audio Tone 2 Frequency (Hz)</label>
 <input type="number" name="tone2" id="tone2" min="300" max="12000" step="10" value="1900" />
+<br />
+<label for="modulation_index">Modulation Index (%)</label>
+<input type="number" name="modulation_index" id="modulation_index" min="0" max="100" step="1" value="80" />
+<br />
+<label for="deviation">Deviation (Hz)</label>
+<input type="number" name="deviation" id="deviation" min="0" max="6000" step="500" value="2500" />
 <br />
 <button name="ptt" id="ptt" value="1">PTT</button>
 <br />

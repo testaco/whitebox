@@ -69,7 +69,7 @@ target_link_libraries(qa_rx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(whiteboxd whiteboxd.c)
+add_executable(whiteboxd whiteboxd.c modulators.c sources.c)
 target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_custom_target(apps

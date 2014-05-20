@@ -54,9 +54,15 @@ int dsp_init()
     return 0;
 }
 
-inline void sincos16(uint32_t phase, int16_t *i, int16_t *q) {
-    uint16_t entry = (phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
-    QUAD_UNPACK(sincos_lut[entry], *i, *q);
+inline void sincos16(uint32_t fcw, uint32_t *phase, int16_t *i, int16_t *q) {
+    uint16_t entry;
+    int16_t cq, sq;
+    entry = (*phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
+    QUAD_UNPACK(sincos_lut_addr[entry],
+            *i, cq);
+    QUAD_UNPACK(sincos_lut_addr[(entry + DDS_PI_OVER_4) & (DDS_ROM_NUM_SAMPLES - 1)],
+            *q, sq);
+    *phase = (*phase + fcw) & (DDS_PA_MAX - 1);
 }
 
 uint32_t sincos16c(uint32_t fcw, uint32_t *phase) {
@@ -66,7 +72,7 @@ uint32_t sincos16c(uint32_t fcw, uint32_t *phase) {
     entry = (*phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
     QUAD_UNPACK(sincos_lut_addr[entry],
             ci, cq);
-    QUAD_UNPACK(sincos_lut_addr[(entry + DDS_PI_OVER_4) & (DDS_PA_MAX - 1)],
+    QUAD_UNPACK(sincos_lut_addr[(entry + DDS_PI_OVER_4) & (DDS_ROM_NUM_SAMPLES - 1)],
             si, sq);
     *phase = (*phase + fcw) & (DDS_PA_MAX - 1);
     return QUAD_PACK(ci, si);

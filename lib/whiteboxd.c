@@ -15,7 +15,7 @@
 #include <netinet/in.h>
 #include <regex.h>
 #include "whitebox.h"
-#include "http.h"
+#include "whiteboxd.h"
 
 #define PORT 11287
 #define FRAME_SIZE 512
@@ -94,6 +94,10 @@ struct whitebox_config {
     int dat_enable;
     int httpd_enable;
     int audio_enable;
+
+    char modulation[256];
+    char audio_source[256];
+    char iq_source[256];
 };
 
 struct whitebox_runtime {
@@ -129,7 +133,44 @@ struct whitebox_runtime {
     int16_t global_re;
     int16_t global_im;
 
+    struct whitebox_source *iq_source;
+    struct whitebox_source *audio_source;
+
     int ptt;
+};
+
+struct whitebox_modulator {
+    char name[256];
+    int (*modulate)(struct whitebox_source *iq_source,
+            struct whitebox_source *audio_source);
+};
+
+struct whitebox_modulator modulators[] = {
+/*    { "iq", modulate_iq },
+    { "ssb", modulate_ssb },
+    { "am", modulate_am },
+    { "fm", modulate_fm },*/
+    { 0, 0 },
+};
+
+struct whitebox_source_entry {
+    char name[256];
+    int (*alloc)(struct whitebox_source **source);
+};
+
+struct whitebox_source_entry audio_sources[] = {
+/*    { "constant", whitebox_const },
+    { "synth", whitebox_synth },
+    { "socket", whitebox_socket },*/
+    { 0, 0 },
+};
+
+struct whitebox_source_entry iq_sources[] = {
+    { "lsb", whitebox_qsynth_lsb_alloc },
+    { "usb", whitebox_qsynth_usb_alloc },
+    { "constant", whitebox_qconst_alloc },
+//    { "socket", whitebox_qsocket },
+    { 0, 0 },
 };
 
 void whitebox_config_init(struct whitebox_config *config)
@@ -155,6 +196,10 @@ void whitebox_config_init(struct whitebox_config *config)
     config->audio_enable = 1;
     config->ctl_enable = 1;
     config->httpd_enable = 1;
+
+    strncpy(config->modulation, "iq", 255);
+    strncpy(config->audio_source, "constant", 255);
+    strncpy(config->iq_source, "constant", 255);
 }
 
 void whitebox_runtime_init(struct whitebox_runtime *rt)
@@ -180,6 +225,8 @@ void whitebox_runtime_init(struct whitebox_runtime *rt)
     rt->global_re = -1;
     rt->global_im = -1;
     rt->ptt = 0;
+    whitebox_qsynth_lsb_alloc(&rt->iq_source);
+    whitebox_source_tune(rt->iq_source, 12.000e3);
 }
 
 int reconfigure_runtime(whitebox_t *wb, struct whitebox_config *config,
@@ -235,6 +282,7 @@ int reconfigure_runtime(whitebox_t *wb, struct whitebox_config *config,
         if (config->mode & WBM_IQ_TONE) {
             //rt->tone1_fcw = freq_to_fcw(config->tone1, config->sample_rate);
             config_change(wb, config, rt, "tone1", "440");
+            //rt->iq_source = &rt->bfo.source;
         }
         if (config->mode & WBM_AUDIO_TONE) {
             //rt->tone2_fcw = freq_to_fcw(config->tone2, config->sample_rate);
@@ -477,15 +525,9 @@ int z_read(whitebox_t *wb, struct whitebox_config *config,
         if (recvd == 0)
             return 0;
     } else if (config->mode & WBM_IQ_TONE || config->mode & WBM_IQ_MIXED) {
-        int n;
-        int16_t re, im;
         if (!rt->ptt)
             return 0;
-        for (n = 0; n < out_available >> 2; ++n) {
-            QUAD_UNPACK(sincos16c(rt->tone1_fcw, &rt->tone1_phase), re, im);
-            *((uint32_t*)(z_dest + n)) = QUAD_PACK(re >> 1, im >> 1);
-        }
-        in_available = out_available;
+        in_available = whitebox_source_work(rt->iq_source, 0, 0, (unsigned long)z_dest, out_available);
     }
     return in_available;
 }
@@ -537,6 +579,7 @@ int config_change(whitebox_t *wb, struct whitebox_config *config,
         struct whitebox_runtime *rt,
         const char *var, const char *val)
 {
+    int i;
     if (strncmp(var, "offset_correct_i", strlen("offset_correct_i")) == 0) {
         int16_t correct_i, correct_q;
         whitebox_tx_get_correction(wb, &correct_i, &correct_q);
@@ -591,6 +634,26 @@ int config_change(whitebox_t *wb, struct whitebox_config *config,
         rt->latency_ms = atoi(val);
         printf("latency_ms=%d\n", rt->latency_ms);
         whitebox_tx_set_latency(wb, rt->latency_ms);
+    } else if (strncmp(var, "modulation", strlen("modulation")) == 0) {
+        strncpy(config->modulation, val, 255);
+        config->modulation[255] = '\0';
+        printf("modulation=%s\n", config->modulation);
+    } else if (strncmp(var, "audio_source", strlen("audio_source")) == 0) {
+        strncpy(config->audio_source, val, 255);
+        config->audio_source[255] = '\0';
+        printf("audio_source=%s\n", config->audio_source);
+    } else if (strncmp(var, "iq_source", strlen("iq_source")) == 0) {
+        strncpy(config->iq_source, val, 255);
+        config->iq_source[255] = '\0';
+        printf("iq_source=%s\n", config->iq_source);
+        whitebox_source_free(rt->iq_source);
+        for (i = 0; iq_sources[i].alloc; ++i) {
+            if (strncmp(iq_sources[i].name, val, 255) == 0) {
+                iq_sources[i].alloc(&rt->iq_source);
+                return 0;
+            }
+        }
+        return -1;
     } else {
         printf("bad bad %s\n", var);
         return -1;
@@ -648,14 +711,21 @@ int http_ctl(whitebox_t *wb, struct whitebox_config *config,
                 "\"freq\": %.3f,"
                 "\"ptt\": %d,"
                 "\"mode\": \"%s\","
-                "\"latency\": \"%d\""
+                "\"latency\": \"%d\","
+                "\"modulation\": \"%s\","
+                "\"audio_source\": \"%s\","
+                "\"iq_source\": \"%s\""
                 "}",
                 correct_i, correct_q,
                 gain_i, gain_q,
                 config->tone1, config->tone2,
                 config->carrier_freq,
                 rt->ptt, whitebox_mode_to_string(config->mode),
-                rt->latency_ms);
+                rt->latency_ms,
+                config->modulation,
+                config->audio_source,
+                config->iq_source
+                );
     } else if (strcmp(r->method, "POST") == 0 && strcmp(r->url, "/") == 0) {
         int i = 0;
         while (i < HTTP_PARAMS_MAX && strlen(r->params[i].name) > 0) {
