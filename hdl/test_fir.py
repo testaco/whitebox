@@ -186,7 +186,7 @@ class FirSim(DSPSim):
 
         savefig('input.png')
 
-        show()
+        #show()
 
 class TestFirImpulse(unittest.TestCase):
     def test_fir_impulse(self):
@@ -194,7 +194,7 @@ class TestFirImpulse(unittest.TestCase):
         out_sign = Signature("out", True, bits=9)
 
         s = FirSim(in_sign=in_sign, out_sign=out_sign)
-        s.design(48e3, 6e3, 1e3, 40.0)
+        #s.design(48e3, 6e3, 1e3, 40.0)
         taps = (4 << COEFF_SHIFT, 3 << COEFF_SHIFT, 2 << COEFF_SHIFT, 1 << COEFF_SHIFT)
         coeff_ram = Ram2(s.clearn, s.clock, s.clock, data=taps)
         delay_line_i_ram = Ram(s.clearn, s.clock, s.clock)
@@ -244,7 +244,7 @@ class TestFirImpulse(unittest.TestCase):
 
         new_shape = tuple([in_t.shape[i] for i in range(len(in_t.shape))])
         assert out_t.shape == new_shape
-        print out_i
+        print 'out_i', out_i
         assert array_equal(out_i, [4, 3, 2, 1, 4, 3, 2, 1])
 
 class TestFirBypass(unittest.TestCase):
@@ -365,7 +365,8 @@ class TestFirDesign(unittest.TestCase):
         f = figure("fir_output")
         title("fir filter output")
         f_out = figure_discrete_quadrature('FIR Filter Output', (1, 1, 1), f, s.input, out_t, out_i / (2.**8-1), out_q / (2.**8-1))
-        show()
+        savefig('output.png')
+        #show()
 
 
 if __name__ == '__main__':

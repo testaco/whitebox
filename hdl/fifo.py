@@ -64,6 +64,7 @@ def fifo(resetn,
     max_threshold = kwargs.get('max_threshold', None) 
     state_t = enum('IDLE', 'ACCESS',)
     rstate = Signal(state_t.IDLE)
+    verbose = kwargs.get('verbose', False)
 
     _fifo = kwargs.get('load', [])
 
@@ -78,9 +79,13 @@ def fifo(resetn,
         full.next = len(_fifo) >= depth
         if write_active(we):
             if len(_fifo) >= depth:
+                if verbose:
+                    print 'overflow'
                 overflow.next = True
                 wack.next = False
             else:
+                if verbose:
+                    print 'adding %d' % int(data)
                 _fifo.insert(0, int(data))
                 overflow.next = False
                 wack.next = True
@@ -96,9 +101,13 @@ def fifo(resetn,
         empty.next = len(_fifo) == 0
         if read_active(re):
             if len(_fifo) == 0:
+                if verbose:
+                    print 'underflow'
                 underflow.next = True
                 dvld_pipe1.next = False
             else:
+                if verbose:
+                    print 'removing %d' % _fifo[-1]
                 Q_pipe1.next = _fifo.pop()
                 dvld_pipe1.next = True
                 underflow.next = False

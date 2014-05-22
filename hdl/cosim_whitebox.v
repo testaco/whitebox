@@ -14,8 +14,8 @@ wire [31:0] prdata;
 reg dac_clock;
 wire [9:0] dac_data;
 wire dac_en;
-wire [9:0] adc_idata;
-wire [9:0] adc_qdata;
+reg [9:0] adc_idata;
+reg [9:0] adc_qdata;
 wire tx_status_led;
 wire tx_dma_ready;
 wire rx_status_led;
@@ -122,6 +122,7 @@ initial begin
             rx_fifo_wack, rx_fifo_dvld, rx_fifo_overflow, rx_fifo_underflow,
             rx_fifo_rdcnt, rx_fifo_wrcnt,
             rx_fifo_rclk, rx_fifo_wclk,
+            adc_idata, adc_qdata,
             fir_coeff_ram_clk,
             fir_coeff_ram_dout0, fir_coeff_ram_dout1,
             fir_load_coeff_ram_clk,

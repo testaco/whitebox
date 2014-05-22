@@ -241,6 +241,12 @@ class Ram2(object):
         self.b_dinb = Signal(intbv(0, min=0, max=2**9))
         self.b_doutb = Signal(intbv(0, min=0, max=2**9))
 
+        a_kwargs = kwargs.copy()
+        b_kwargs = kwargs.copy()
+        if 'data' in kwargs:
+            a_kwargs['data'] = [d & 0x1ff for d in kwargs['data']]
+            b_kwargs['data'] = [(d >> 9) & 0x1ff for d in kwargs['data']]
+
         self.rama = ram4k9(reset=self.resetn,
                 addra=self.addra,
                 dina=self.a_dina,
@@ -261,7 +267,8 @@ class Ram2(object):
                 blkb=self.blkb,
                 wenb=self.wenb,
                 clkb=self.clkb,
-                doutb=self.a_doutb)
+                doutb=self.a_doutb,
+                **a_kwargs)
         self.ramb = ram4k9(reset=self.resetn,
                 addra=self.addra,
                 dina=self.b_dina,
@@ -282,7 +289,8 @@ class Ram2(object):
                 blkb=self.blkb,
                 wenb=self.wenb,
                 clkb=self.clkb,
-                doutb=self.b_doutb)
+                doutb=self.b_doutb,
+                **b_kwargs)
         self.port = { 'a': RamPort(
                 self.addra,
                 [self.a_dina, self.b_dina],

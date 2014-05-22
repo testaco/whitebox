@@ -123,7 +123,7 @@ def rfe(resetn,
     :returns: A MyHDL synthesizable module
     """
 
-    state_t = enum('IDLE', 'ACCESS', 'READ', 'READ2', 'DONE',)
+    state_t = enum('IDLE', 'ACCESS', 'READ', 'READ2', 'READ_SAMPLE', 'READ_SAMPLE2', 'READ_SAMPLE3', 'READ_SAMPLE4', 'DONE',)
     state = Signal(state_t.IDLE)
 
     addr = Signal(intbv(0)[8:])
@@ -158,6 +158,7 @@ def rfe(resetn,
     rxlast = Signal(bool(0))
 
     write_count = Signal(intbv(0)[32:])
+    read_count = Signal(intbv(0)[32:])
 
     @always_seq(pclk.posedge, reset=resetn)
     def synchronizer():
@@ -253,8 +254,12 @@ def rfe(resetn,
                     pready.next = False
                     state.next = state_t.READ
             else:
-                pready.next = True
-                state.next = state_t.DONE
+                if not pwrite and addr == WR_SAMPLE_ADDR:
+                    pready.next = False
+                    state.next = state_t.READ_SAMPLE
+                else:
+                    pready.next = True
+                    state.next = state_t.DONE
                 if pwrite:
                     if addr == WE_SAMPLE_ADDR:
                         write_count.next = write_count + 1
@@ -356,16 +361,17 @@ def rfe(resetn,
                     elif addr == W_FIR_ADDR:
                         prdata.next = concat(intbv(0)[32-len_fir_N-2:], fir_bank1, fir_bank0, fir_N)
                     elif addr == WR_SAMPLE_ADDR:
+                        read_count.next = read_count + 1
                         if rx_fifo_empty:
                             underrun.next = underrun + 1
                         else:
-                            # TODO: I need a wait state here!
-                            prdata.next = rx_fifo_rdata
                             rx_fifo_re.next = True
                     elif addr == WR_STATUS_ADDR:
                         prdata.next = concat(
-                            # BYTE 3 - RESERVED
-                            intbv(0)[8:],
+                            # BYTE 3 NIBBLE 2 - RESERVED
+                            intbv(0)[4:],
+                            # BYTE 3 NIBBLE 1 - COMBINED FLAGS
+                            intbv(0)[3:], firen,
                             # BYTE 2 NIBBLE 2 - RX FIFO FLAGS
                             not rx_fifo_empty, not rx_fifo_full,
                             rx_afull, rx_aempty,
@@ -399,6 +405,23 @@ def rfe(resetn,
         elif state == state_t.READ2:
             pready.next = True
             prdata.next = concat(fir_load_coeff_ram_dout1, fir_load_coeff_ram_dout0).signed()
+            state.next = state_t.DONE
+        elif state == state_t.READ_SAMPLE:
+            pready.next = False
+            rx_fifo_re.next = False
+            state.next = state_t.READ_SAMPLE2
+        elif state == state_t.READ_SAMPLE2:
+            pready.next = False
+            rx_fifo_re.next = False
+            state.next = state_t.READ_SAMPLE3
+        elif state == state_t.READ_SAMPLE3:
+            pready.next = False
+            rx_fifo_re.next = False
+            state.next = state_t.READ_SAMPLE4
+        elif state == state_t.READ_SAMPLE4:
+            pready.next = True
+            rx_fifo_re.next = False
+            prdata.next = rx_fifo_rdata
             state.next = state_t.DONE
         elif state == state_t.DONE:
             tx_fifo_we.next = False

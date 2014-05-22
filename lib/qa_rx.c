@@ -12,11 +12,11 @@
 #include "whitebox.h"
 #include "whitebox_test.h"
 
-#define CARRIER_FREQ 144.00e6
+#define CARRIER_FREQ 145.00e6
 #define TONE_FREQ    1e3
 #define N 512
 #define COUNT 1024 
-#define SAMPLE_RATE 10e3 
+#define SAMPLE_RATE 48e3
 #define DURATION_IN_SECS 1
 #define TOTAL_SAMPLES (DURATION_IN_SECS * SAMPLE_RATE)
 
@@ -129,7 +129,7 @@ void snipe()
     wbptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, wb.fd, 0);
     assert(wbptr != MAP_FAILED && wbptr);
 
-    assert(whitebox_rx(&wb, fstart) == 0);
+    assert(whitebox_rx(&wb, CARRIER_FREQ) == 0);
 
     while (ch != 10) {
         ch = getch();
@@ -147,8 +147,8 @@ void snipe()
 
         if (new_i != i) {
             i = new_i;
-            fsync(wb.fd);
-            whitebox_rx_fine_tune(&wb, fstart + i * fstep);
+            //fsync(wb.fd);
+            //whitebox_rx_fine_tune(&wb, fstart + i * fstep);
         }
 
         count = ioctl(wb.fd, W_MMAP_READ, &src) >> 2;

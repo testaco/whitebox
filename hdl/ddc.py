@@ -29,7 +29,7 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
         if in_valid:
             if cnt == 0:
                 out_i.next = in_i
-                out_q.next = out_q
+                out_q.next = in_q
                 out_valid.next = True
                 cnt.next = decim - 1
             else:
@@ -42,7 +42,7 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
             out_q.next = 0
             out_valid.next = False
             out_last.next = False
-            cnt.next = decim - 1
+            cnt.next = 0
 
     return downsample
 

@@ -168,6 +168,17 @@ class Apb3Bus(object):
         self.pclk.next = False
         yield delay(duration // 2)
 
+    def dma_receive(self, ready, addr, count, **kwargs):
+        """Receive multiple samples."""
+        rdata = []
+        for i in range(count):
+            while not ready:
+                yield self.delay(1)
+            yield self.receive(addr)
+            rdata.append(int(self.rdata))
+            yield self.delay(2)
+        self.rdata = rdata
+
     def delay(self, cycles):
         """Delay the bus a number of cycles."""
         duration = self.kwargs['duration']

@@ -418,10 +418,12 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
     ioctl(wb->fd, WC_GET, &w);
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_resume(&wb->cmx991);
+#if WC_USE_PLL
     if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
         fprintf(stderr, "Error setting the pll\n");
         return 1;
     }
+#endif
 
     vco_frequency = (frequency + 45.00e6) * 4.0;
     if (vco_frequency <= 35.00e6) {
@@ -429,6 +431,7 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
         return 2;
     }
 
+    printf("%f %f\n", frequency, vco_frequency);
     cmx991_rx_tune(&wb->cmx991, //vco_frequency,
         RX_RF_DIV_BY_4, MIX_OUT_MIXOUT1, IF_IN_IFIP1,
         IQ_FILTER_BW_1MHZ, VGA_N0DB);

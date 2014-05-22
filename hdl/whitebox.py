@@ -196,11 +196,21 @@ def whitebox(
     duc_underrun = Signal(modbv(0, min=0, max=2**16))
     dac_last = Signal(bool(0))
 
+    ddc_overrun = Signal(modbv(0, min=0, max=2**16))
+    ddc_flags = Signal(intbv(0)[4:])
+    adc_last = Signal(bool(0))
+
     tx_sample = Signature("tx_sample", True, bits=16)
     tx_sample_valid = tx_sample.valid
     tx_sample_last = tx_sample.last
     tx_sample_i = tx_sample.i
     tx_sample_q = tx_sample.q
+
+    rx_sample = Signature("rx_sample", True, bits=16)
+    rx_sample_valid = rx_sample.valid
+    rx_sample_last = rx_sample.last
+    rx_sample_i = rx_sample.i
+    rx_sample_q = rx_sample.q
 
     duc_args = (clearn, dac_clock, dac2x_clock,
             loopen, loopback,
@@ -213,6 +223,13 @@ def whitebox(
             tx_gain_i, tx_gain_q,
             duc_underrun, tx_sample,
             dac_en, dac_data, dac_last,
+
+            rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
+            rxen, rxstop, rxfilteren,
+            decim, rx_correct_i, rx_correct_q,
+            ddc_overrun, rx_sample,
+            adc_idata, adc_qdata, adc_last,
+
             fir_coeff_ram_addr,
             fir_coeff_ram_din0,
             fir_coeff_ram_din1,
@@ -242,28 +259,6 @@ def whitebox(
         duc = DUC(*duc_args, **duc_kwargs)
     else:
         duc = None
-
-    ######## DIGITAL DOWN CONVERTER ########
-    ddc_overrun = Signal(modbv(0, min=0, max=2**16))
-    ddc_flags = Signal(intbv(0)[4:])
-    adc_last = Signal(bool(0))
-
-    ddc_args = (clearn, dac_clock,
-            loopen, loopback,
-            rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
-            rxen, rxstop, rxfilteren,
-            decim, rx_correct_i, rx_correct_q,
-            ddc_overrun,
-            adc_idata, adc_qdata, adc_last,)
-
-    ddc_kwargs = dict(dspsim=dspsim,
-                    interp=interp_default,
-                    cic_enable=kwargs.get('cic_enable', True),
-                    conditioning_enable=kwargs.get('conditioning_enable', True))
-    if kwargs.get("ddc_enable", True):
-        ddc = DDC(*ddc_args, **ddc_kwargs)
-    else:
-        ddc = None
 
     ########### RADIO FRONT END ##############
     rfe_args = (resetn,
@@ -306,7 +301,7 @@ def whitebox(
 
     rfe = RFE(*rfe_args)
 
-    return rfe, duc, ddc
+    return rfe, duc
 
 if __name__ == '__main__':
     from apb3_utils import Apb3Bus

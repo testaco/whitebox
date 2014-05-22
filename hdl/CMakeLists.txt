@@ -32,7 +32,7 @@ find_python_module(numpy REQUIRED)
 add_custom_command(
     OUTPUT whitebox.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/whitebox.py
-    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py dds.py rfe.py dsp.py ram.py fir.py
+    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py ddc.py dds.py rfe.py dsp.py ram.py fir.py
 ) 
 
 add_custom_target(hdl
@@ -92,33 +92,12 @@ add_test(NAME test_whitebox_apb3_transaction
 )
     
 
-add_test(NAME test_whitebox_dds
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestDDS
-)
-
-add_test(NAME test_whitebox_tx_fifo
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestTxFifo
-)
-
-
 add_test(NAME test_whitebox_overrun_underrun
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestOverrunUnderrun
 )
 
-add_test(NAME test_whitebox_halt
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestHalt
-)
-
 add_test(NAME test_whitebox_loop
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestLoop
-)
-
-add_test(NAME test_whitebox_cic
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestCic
-)
-
-add_test(NAME test_whitebox_pipe_samples
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestPipeSamples
 )
 
 add_test(NAME test_whitebox_upsampler_impulse_response
@@ -139,6 +118,10 @@ add_test(NAME test_whitebox_cic_impulse_response
 
 add_test(NAME test_whitebox_cic_3x_impulse_response
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestCic3xImpulseResponse
+)
+
+add_test(NAME test_whitebox_rx
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestRx
 )
 
 add_subdirectory(constraint)

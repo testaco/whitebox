@@ -7,6 +7,7 @@ from dsp import Signature
 from dsp import offset_corrector, binary_offseter, gain_corrector
 from dsp import iqmux, iqdemux
 from fir import fir as FIR
+from ddc import downsampler
 
 from dds import dds as DDS
 DDS_NUM_SAMPLES=256
@@ -649,6 +650,13 @@ def duc(clearn, dac_clock, dac2x_clock,
         system_gain_i, system_gain_q,
         underrun, sample,
         dac_en, dac_data, dac_last,
+
+        rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
+        rxen, rxstop, rxfilteren,
+        decim, rx_correct_i, rx_correct_q,
+        rx_overrun, rx_sample,
+        adc_idata, adc_qdata, adc_last,
+
         fir_coeff_ram_addr,
         fir_coeff_ram_din0,
         fir_coeff_ram_din1,
@@ -699,6 +707,8 @@ def duc(clearn, dac_clock, dac2x_clock,
     """
 
     dspsim = kwargs.get('dspsim', None)
+
+    # DIGIAL UP CONVERTER
     interp_default = kwargs.get('interp', 1)
 
     sync_txen = Signal(bool(0))
@@ -736,6 +746,17 @@ def duc(clearn, dac_clock, dac2x_clock,
     sample_last = sample.last
     sample_i = sample.i
     sample_q = sample.q
+
+    rx_sample_valid = rx_sample.valid
+    rx_sample_last = rx_sample.last
+    rx_sample_i = rx_sample.i
+    rx_sample_q = rx_sample.q
+
+    adc_sample = Signature("adc", True, bits=10,
+        valid=rxen,
+        last=adc_last,
+        i=adc_idata,
+        q=adc_qdata)
 
     truncated_1 = Signature("truncated1", True, bits=9)
     truncator_1 = truncator(clearn, dac_clock, sample, truncated_1)
@@ -836,6 +857,15 @@ def duc(clearn, dac_clock, dac2x_clock,
             dac_en, dac_data, dac_last)
     duc_chain = duc_chain + (interleaver_0, )
 
+    # DIGITAL DOWN CONVERTER
+    downsampled = Signature("downsampled", True, bits=10)
+    downsampled_i = downsampled.i
+    downsampled_q = downsampled.q
+    downsampled_valid = downsampled.valid
+    downsampler_0 = downsampler(clearn, dac_clock, adc_sample,
+            downsampled, decim)
+    ddc_chain = (downsampler_0, )
+
     @always_seq(dac_clock.posedge, reset=clearn)
     def synchronizer():
         sync_txen.next = system_txen
@@ -872,6 +902,9 @@ def duc(clearn, dac_clock, dac2x_clock,
     interp_counter = Signal(intbv(0)[32:])
     done = Signal(bool(0))
 
+    decim_counter = Signal(intbv(0)[32:])
+    rx_done = Signal(bool(0))
+
     @always_seq(dac_clock.posedge, reset=clearn)
     def consumer():
         if txen:
@@ -891,6 +924,24 @@ def duc(clearn, dac_clock, dac2x_clock,
             else:
                 interp_counter.next = interp_counter - 1
                 fifo_re.next = False
+
+    @always_seq(dac_clock.posedge, reset=clearn)
+    def producer():
+        if rxen and downsampled_valid:
+            if rx_fifo_full:
+                if rxstop:
+                    rx_done.next = True
+                    rx_fifo_we.next = False
+                else:
+                    rx_overrun.next = rx_overrun + 1
+                    rx_done.next = False
+                    rx_fifo_we.next = False
+            else:
+                rx_done.next = False
+                rx_fifo_we.next = True
+        else:
+            rx_done.next = False
+            rx_fifo_we.next = False
 
     @always_seq(dac_clock.posedge, reset=clearn)
     def sampler():
@@ -915,5 +966,12 @@ def duc(clearn, dac_clock, dac2x_clock,
             sample_q.next = 0
             sample_valid.next = False
             sample_last.next = False
+
+        if rxen and downsampled_valid:
+            rx_fifo_wdata.next = concat(
+                intbv(downsampled_q.signed(), min=-2**15, max=2**15),
+                intbv(downsampled_i.signed(), min=-2**15, max=2**15))
+        else:
+            rx_fifo_wdata.next = 0
     
-    return (synchronizer, consumer, sampler, ) + duc_chain
+    return (synchronizer, consumer, producer, sampler, ) + duc_chain + ddc_chain
