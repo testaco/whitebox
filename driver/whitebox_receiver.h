@@ -10,10 +10,13 @@
 struct whitebox_receiver_regs {
     u32 sample;
     u32 state;
-    u32 interp;
+    u32 decim;
     u32 fcw;
     u32 runs;
     u32 threshold;
+    u32 correction;
+    u32 available;
+    u32 debug;
 };
 
 #define WHITEBOX_RECEIVER(e) ((volatile struct whitebox_receiver_regs *)((e)->regs))
@@ -23,6 +26,9 @@ struct whitebox_receiver_operations;
 struct whitebox_receiver {
     void *regs;
     size_t quantum;
+    int incr_src;
+    int dma_enable;
+    int copy_enable;
     u32 pdma_config;
     struct whitebox_receiver_operations *ops;
 };
@@ -40,14 +46,17 @@ struct whitebox_receiver_operations {
     void (*set_state)(struct whitebox_receiver *receiver, u32 state_mask);
     void (*clear_state)(struct whitebox_receiver *receiver, u32 state_mask);
 
-    u32 (*get_interp)(struct whitebox_receiver *receiver);
-    void (*set_interp)(struct whitebox_receiver *receiver, u32 interp);
+    u32 (*get_decim)(struct whitebox_receiver *receiver);
+    void (*set_decim)(struct whitebox_receiver *receiver, u32 decim);
 
     u32 (*get_fcw)(struct whitebox_receiver *receiver);
     void (*set_fcw)(struct whitebox_receiver *receiver, u32 fcw);
 
     u32 (*get_threshold)(struct whitebox_receiver *receiver);
     void (*set_threshold)(struct whitebox_receiver *receiver, u32 threshold);
+
+    u32 (*get_correction)(struct whitebox_receiver *receiver);
+    void (*set_correction)(struct whitebox_receiver *receiver, u32 correction);
 
     void (*get_runs)(struct whitebox_receiver *receiver,
             u16 *overruns, u16 *underruns);
@@ -56,6 +65,8 @@ struct whitebox_receiver_operations {
             unsigned long *src);
     int (*consume)(struct whitebox_receiver *receiver,
             size_t count);
+
+    u32 (*get_debug)(struct whitebox_receiver *receiver);
 };
 
 int whitebox_receiver_create(struct whitebox_receiver *receiver,

@@ -63,6 +63,8 @@ enum whitebox_device_state {
     WDS_TX_STREAMING,
     WDS_TX_STOPPING,
     WDS_RX,
+    WDS_RX_STREAMING,
+    WDS_RX_STOPPING,
 };
 
 #define W_ERROR_PLL_LOCK_LOST 1

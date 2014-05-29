@@ -85,16 +85,13 @@ int tx_exec(struct whitebox_device* wb)
         wake_up_interruptible(&wb->write_wait_queue);
         if (whitebox_loopen) {
             wake_up_interruptible(&wb->read_wait_queue);
-            rx_exec(wb);
+            //rx_exec(wb);
         }
         tx_exec(wb);
     } else {
         stats->exec_dma_start++;
         spin_unlock_irqrestore(&rf_sink->lock, flags);
-        // NOTE: Do not unlock the rf_sink's lock if result is 0 as a DMA was
-        // started.
     }
-
 
     return result;
 }
@@ -125,7 +122,7 @@ void tx_dma_cb(void *data, int buf)
     wake_up_interruptible(&wb->write_wait_queue);
     if (whitebox_loopen) {
         wake_up_interruptible(&wb->read_wait_queue);
-        rx_exec(wb);
+        //rx_exec(wb);
         d_printk_loop(4);
     }
 }

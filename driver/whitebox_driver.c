@@ -112,6 +112,8 @@ module_param(whitebox_loopen, int, S_IRUSR | S_IWUSR);
  */
 int whitebox_user_source_buffer_threshold = 3840;  // 20ms @ 48KSPS
 module_param(whitebox_user_source_buffer_threshold, int, S_IRUSR | S_IWUSR);
+int whitebox_user_sink_buffer_threshold = 3840;  // 20ms @ 48KSPS
+module_param(whitebox_user_sink_buffer_threshold, int, S_IRUSR | S_IWUSR);
 
 int whitebox_flow_control = 1;
 module_param(whitebox_flow_control, int, S_IRUSR | S_IWUSR);
@@ -171,7 +173,7 @@ int tx_error(struct whitebox_device *wb);
 int rx_start(struct whitebox_device *wb);
 int rx_exec(struct whitebox_device* wb);
 void rx_dma_cb(void *data);
-void rx_stop(struct whitebox_device *wb);
+int rx_stop(struct whitebox_device *wb);
 int rx_error(struct whitebox_device *wb);
 
 static int whitebox_open(struct inode* inode, struct file* filp) {
@@ -401,50 +403,62 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
     struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
     
     d_printk(1, "whitebox read\n");
-    d_printk_loop(4);
+    d_printk_loop(1);
 
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
 
+
     if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING || whitebox_device->state == WDS_TX_STOPPING) {
         up(&whitebox_device->sem);
-        d_printk(1, "in transmit\n");
+        d_printk(2, "in transmit\n");
         return -EBUSY;
     }
 
     if (whitebox_device->state == WDS_IDLE) {
         whitebox_device->state = WDS_RX;
+        d_printk(1, "rx_start\n");
         rx_start(whitebox_device);
     }
 
     if (count == 0) {
-        rx_stop(whitebox_device);
         up(&whitebox_device->sem);
         return 0;
     }
 
+    d_printk(1, "checking for error\n");
     if (rx_error(whitebox_device)) {
         d_printk(1, "rx_error\n");
         up(&whitebox_device->sem);
         return -EIO;
     }
 
-    /*if (whitebox_loopen)
-        tx_exec(whitebox_device);*/
+    d_printk_loop(1);
 
-    rx_exec(whitebox_device);
+    //up(&whitebox_device->sem);
 
-    d_printk_loop(4);
+    if (whitebox_device->state == WDS_RX_STREAMING) {
+        d_printk(1, "RX_EXEC streaming\n");
+        rx_exec(whitebox_device);
+    } else if (whitebox_rf_source_data_available(&whitebox_device->rf_source, &src) > 0) {
+        d_printk(1, "RX_ECEC starting to stream\n");
+        whitebox_device->state = WDS_RX_STREAMING;
+        rx_exec(whitebox_device);
+    }
+
+    /*if (down_interruptible(&whitebox_device->sem)) {
+        return -ERESTARTSYS;
+    }*/
 
     while (((src_count = whitebox_user_sink_data_available(user_sink, &src)) < count) && !(err = rx_error(whitebox_device))) {
-        /*if (whitebox_loopen)
-            tx_exec(whitebox_device);*/
         up(&whitebox_device->sem);
         if (filp->f_flags & O_NONBLOCK)
             return -EAGAIN;
 
-        d_printk(5, "waiting\n");
+        d_printk(1, "RX_EXEC waiting %d\n", count);
+        rx_exec(whitebox_device);
+        d_printk_loop(2);
 
         if (wait_event_interruptible(whitebox_device->read_wait_queue,
                 (((src_count = whitebox_user_sink_data_available(user_sink, &src)) >= count) || (err = rx_error(whitebox_device)))))
@@ -452,7 +466,7 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
         if (down_interruptible(&whitebox_device->sem))
             return -ERESTARTSYS;
 
-        d_printk(5, "waiting done\n");
+        d_printk(1, "waiting done\n");
     }
 
     if (err) {
@@ -472,9 +486,6 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
 
     up(&whitebox_device->sem);
 
-    /*if (whitebox_loopen)
-        tx_exec(whitebox_device);*/
-
     return ret;
 }
 
@@ -489,7 +500,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
     }
-    if (whitebox_device->state == WDS_RX) {
+    if (whitebox_device->state == WDS_RX || whitebox_device->state == WDS_RX_STREAMING || whitebox_device->state == WDS_RX_STOPPING) {
         up(&whitebox_device->sem);
         d_printk(1, "in receive\n");
         d_printk_loop(4);
@@ -568,10 +579,11 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
 static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
+    struct whitebox_user_sink *user_sink = &whitebox_device->user_sink;
     struct whitebox_exciter *exciter = whitebox_device->rf_sink.exciter;
-    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
-    unsigned long src;
-    size_t src_count;
+    //struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    unsigned long src, dest;
+    size_t src_count, dest_count;
     u32 state;
     int err = 0;
     if (down_interruptible(&whitebox_device->sem)) {
@@ -603,7 +615,7 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
         }
 
         if (err) {
-            d_printk(0, "wait for user_source to drain error tx_error=%d user_source_data=%zd\n", err, src_count);
+            d_printk(1, "wait for user_source to drain error tx_error=%d user_source_data=%zd\n", err, src_count);
             up(&whitebox_device->sem);
             return -EIO;
         }
@@ -616,7 +628,7 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
         }
 
         if (err) {
-            d_printk(0, "wait for tx to stop tx_error=%d user_source_data=%zd\n", err, src_count);
+            d_printk(1, "wait for tx to stop tx_error=%d user_source_data=%zd\n", err, src_count);
             up(&whitebox_device->sem);
             return -EIO;
         }
@@ -641,18 +653,36 @@ static int whitebox_fsync(struct file *file, struct dentry *dentry, int datasync
         whitebox_device->state = WDS_IDLE;
     }
 
-    if (whitebox_device->state == WDS_RX) {
+    if (whitebox_device->state == WDS_RX || whitebox_device->state == WDS_RX_STREAMING) {
+        whitebox_device->state = WDS_RX_STOPPING;
         if (rx_error(whitebox_device)) {
             up(&whitebox_device->sem);
             return -EFAULT;
         }
-        rx_stop(whitebox_device);
-        while (receiver->ops->get_state(receiver) & WRS_RXEN) {
-            if (rx_error(whitebox_device)) {
-                up(&whitebox_device->sem);
-                return -EFAULT;
-            }
-            cpu_relax();
+
+        while (((dest_count = whitebox_user_sink_data_available(user_sink, &dest)) > 0) && !(err == rx_error(whitebox_device))) {
+            up(&whitebox_device->sem);
+
+            d_printk(1, "RX_EXEC waiting\n");
+            rx_exec(whitebox_device);
+
+            if (down_interruptible(&whitebox_device->sem))
+                return -ERESTARTSYS;
+        }
+
+        if (err) {
+            up(&whitebox_device->sem);
+            return -EIO;
+        }
+
+        d_printk(1, "rx_stop\n");
+        while ((rx_stop(whitebox_device) < 0) && !(err = rx_error(whitebox_device))) {
+            d_printk(1, "waiting for rx to stop\n");
+        }
+
+        if (err) {
+            up(&whitebox_device->sem);
+            return -EIO;
         }
 
         whitebox_device->state = WDS_IDLE;
@@ -754,7 +784,7 @@ long whitebox_ioctl_receiver_get(unsigned long arg) {
     whitebox_args_t w;
     unsigned long dest;
     w.flags.receiver.state = receiver->ops->get_state(receiver);
-    w.flags.receiver.interp = receiver->ops->get_interp(receiver);
+    w.flags.receiver.decim = receiver->ops->get_decim(receiver);
     w.flags.receiver.fcw = receiver->ops->get_fcw(receiver);
     // TODO w.flags.receiver.runs = receiver->ops->get_runs(receiver);
     w.flags.receiver.threshold = receiver->ops->get_threshold(receiver);
@@ -772,7 +802,7 @@ long whitebox_ioctl_receiver_set(unsigned long arg) {
             sizeof(whitebox_args_t)))
         return -EACCES;
     receiver->ops->set_state(receiver, w.flags.receiver.state);
-    receiver->ops->set_interp(receiver, w.flags.receiver.interp);
+    receiver->ops->set_decim(receiver, w.flags.receiver.decim);
     receiver->ops->set_fcw(receiver, w.flags.receiver.fcw);
     receiver->ops->set_threshold(receiver, w.flags.receiver.threshold);
     return 0;
@@ -858,8 +888,9 @@ long whitebox_ioctl_mock_command(unsigned long arg) {
                 0x00010000;
     }
     if (w.mock_command == WMC_CAUSE_OVERRUN) {
+        d_printk(1, "causing overrun\n");
         WHITEBOX_RECEIVER(&whitebox_device->mock_receiver.receiver)->runs +=
-                0x00000001;
+                0x00010000;
     }
 
     return 0;

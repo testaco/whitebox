@@ -159,7 +159,7 @@ class WhiteboxSim(object):
         f3 = figure_fft_phase("Phase", (3, 1, 3), f_parent,
                 frq, Y)
 
-    def rx(self, sig):
+    def rx_signal(self, sig):
         self.rx_n = len(sig)
         self.rx_i = [intbv(int(i.real), min=-2**9, max=2**9) for i in sig]
         #re = [intbv(concat(not i[len(i)-1], i[len(i)-1:])).signed() for i in re]
@@ -210,6 +210,13 @@ class WhiteboxSim(object):
         ss = [dac_clock, dac2x_clock, stimulus, traced, rx_player]
         s = Simulation(ss)
         s.run()
+
+    def rx(self, data):
+        rx = []
+        for x in data:
+            xi = intbv(x)[32:]
+            rx.append(xi[16:].signed() + 1j*xi[32:16].signed())
+        return rx
 
     def start_receive(self):
         self.receive_started = True
@@ -983,14 +990,52 @@ class TestRx(unittest.TestCase):
             raise StopSimulation
 
         rx_signal = np.zeros(1024, dtype=np.complex64)
-        rx_signal[0] = (1 << 8) + 0j*(1 << 8)
-        s.rx(rx_signal)
+        rx_signal[0] = (1 << 8) + 1j*(1 << 8)
+        s.rx_signal(rx_signal)
 
         s.simulate_rx(stimulus, test_whitebox_rx)
         y = np.zeros(8, dtype=np.complex64)
-        y[0] = (1 << 8) + 0j*(1 << 8)
-        assert (self.rx_data == y).all()
+        y[0] = (1 << 8) + 1j*(1 << 8)
+        assert (s.rx(self.rx_data) == y).all()
 
+class TestRxOverrun(unittest.TestCase):
+    def test_rx_overrun(self):
+        bus = Apb3Bus(duration=APB3_DURATION)
+
+        s = WhiteboxSim(bus)
+
+        fifo_args = {'width': 32, 'depth': 1024,}
+        whitebox_args = {'decim': 128,}
+        def test_whitebox_rx_overrun():
+            return s.cosim_dut("cosim_whitebox_rx_overrun",
+                    fifo_args, whitebox_args)
+
+        @instance
+        def stimulus():
+            yield bus.reset()
+            yield whitebox_clear(bus)
+            yield bus.transmit(WR_DECIM_ADDR, 1)
+            yield bus.transmit(WE_FCW_ADDR, 100)
+            yield bus.receive(WR_DECIM_ADDR)
+            assert bus.rdata == 1
+            yield bus.receive(WE_FCW_ADDR)
+            assert bus.rdata == 100
+            s.start_receive()
+            yield bus.delay(1)
+            yield bus.transmit(WR_STATUS_ADDR, WRS_RXEN)
+            yield bus.receive(WR_STATUS_ADDR)
+            assert bus.rdata & WRS_RXEN
+
+            yield bus.delay(int(2048*(40/6.)))
+
+            yield bus.receive(WR_RUNS_ADDR)
+            assert bus.rdata > 0
+
+            raise StopSimulation
+
+        rx_signal = np.zeros(2048/4, dtype=np.complex64)
+        s.rx_signal(rx_signal)
+        s.simulate_rx(stimulus, test_whitebox_rx_overrun, sample_rate=6.144e6)
 
 if __name__ == '__main__':
     unittest.main()

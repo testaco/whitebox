@@ -223,6 +223,37 @@ int test_blocking_write_underrun(void *data) {
     return ret;
 }
 
+int test_blocking_read_overrun(void *data) {
+    int fd;
+    int ret = 0;
+    uint32_t buf[512];
+    int i;
+    unsigned int status;
+    whitebox_args_t w;
+    assert(whitebox_parameter_set("check_plls", 0) == 0);
+    fd = open(WHITEBOX_DEV, O_RDWR);
+    assert(fd > 0);
+    ioctl(fd, WR_GET, &w);
+    w.flags.receiver.decim = 1;
+    ioctl(fd, WR_SET, &w);
+
+    ioctl(fd, WE_GET, &w);
+    w.flags.exciter.interp = 200;
+    ioctl(fd, WE_SET, &w);
+    assert(write(fd, buf, sizeof(uint32_t) * 512) ==
+            sizeof(uint32_t) * 512);
+    assert(fsync(fd) == 0);
+    assert(read(fd, buf, sizeof(uint32_t) * 32) ==
+            sizeof(uint32_t) * 32);
+
+    w.mock_command = WMC_CAUSE_OVERRUN;
+    ioctl(fd, WM_CMD, &w);
+    assert(read(fd, buf, sizeof(uint32_t) * 512) < 0);
+    close(fd);
+    assert(whitebox_parameter_set("check_plls", 1) == 0);
+    return ret;
+}
+
 int test_blocking_xfer(void *data) {
     int fd;
     int ret;
@@ -323,31 +354,31 @@ int test_blocking_xfer3(void *data) {
 int test_blocking_xfer4(void *data) {
     int fd;
     int ret;
-    uint32_t buf_in1[200], buf_in2[200];
-    uint32_t buf_out[400];
+    uint32_t buf_in1[10], buf_in2[10];
+    uint32_t buf_out[20];
     int i;
     whitebox_args_t w;
     assert(whitebox_parameter_set("check_plls", 0) == 0);
     fd = open(WHITEBOX_DEV, O_RDWR);
     assert(fd > 0);
 
-    for (i = 0; i < 200; ++i) {
+    for (i = 0; i < 10; ++i) {
         buf_in1[i] = rand();
         buf_in2[i] = rand();
     }
 
-    ret = write(fd, buf_in1, sizeof(uint32_t) * 200);
-    assert(ret == sizeof(uint32_t) * 200);
-    ret = write(fd, buf_in2, sizeof(uint32_t) * 200);
-    assert(ret == sizeof(uint32_t) * 200);
+    ret = write(fd, buf_in1, sizeof(uint32_t) * 10);
+    assert(ret == sizeof(uint32_t) * 10);
+    ret = write(fd, buf_in2, sizeof(uint32_t) * 10);
+    assert(ret == sizeof(uint32_t) * 10);
     assert(fsync(fd) == 0);
 
-    ret = read(fd, buf_out, sizeof(uint32_t) * 400);
-    assert(ret == sizeof(uint32_t) * 400);
+    ret = read(fd, buf_out, sizeof(uint32_t) * 20);
+    assert(ret == sizeof(uint32_t) * 20);
     assert(fsync(fd) == 0);
 
-    assert(memcmp(buf_in1, buf_out, sizeof(uint32_t) * 200) == 0);
-    assert(memcmp(buf_in2, buf_out + 200, sizeof(uint32_t) * 200) == 0);
+    assert(memcmp(buf_in1, buf_out, sizeof(uint32_t) * 10) == 0);
+    assert(memcmp(buf_in2, buf_out + 10, sizeof(uint32_t) * 10) == 0);
 
     close(fd);
     assert(whitebox_parameter_set("check_plls", 1) == 0);
@@ -560,6 +591,7 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_write),
         WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
+        WHITEBOX_TEST(test_blocking_read_overrun),
         WHITEBOX_TEST(test_blocking_xfer),
         WHITEBOX_TEST(test_blocking_xfer2),
         WHITEBOX_TEST(test_blocking_xfer3),
@@ -572,9 +604,9 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_ioctl_adf4351),
         WHITEBOX_TEST(test_mmap_success),
         WHITEBOX_TEST(test_mmap_write_success),
-#if 0
         //WHITEBOX_TEST(test_mmap_fail),
         WHITEBOX_TEST(test_blocking_xfer_huge),
+#if 0
         WHITEBOX_TEST(test_tx_fifo),
 #endif
         WHITEBOX_TEST(0),

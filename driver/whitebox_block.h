@@ -130,6 +130,7 @@ int whitebox_user_sink_produce(struct whitebox_user_sink *user_sink,
         size_t count);
 size_t whitebox_user_sink_data_available(struct whitebox_user_sink *user_sink,
         unsigned long *src);
+size_t whitebox_user_sink_data_total(struct whitebox_user_sink *user_sink);
 int whitebox_user_sink_consume(struct whitebox_user_sink *user_sink,
         size_t count);
 int whitebox_user_sink_work(struct whitebox_user_sink *user_sink,
@@ -145,10 +146,12 @@ struct whitebox_rf_source {
     loff_t off;
     /* the dma channel */
     int dma_ch;
-    /* the dma mapping */
-    dma_addr_t dma_mapping;
-    /* the dma mapped size */
-    size_t dma_count;
+    struct {
+        /* the dma mapping */
+        dma_addr_t mapping;
+        /* the dma mapped size */
+        size_t count;
+    } dma[2];
     /* driver callback to keep flow going */
     void (*dma_cb)(void*);
     /* callback data */
@@ -168,6 +171,6 @@ int whitebox_rf_source_consume(struct whitebox_rf_source *rf_source, size_t coun
 int whitebox_rf_source_work(struct whitebox_rf_source *rf_source,
         unsigned long src, size_t src_count,
         unsigned long dest, size_t dest_count);
-int whitebox_rf_source_work_done(struct whitebox_rf_source *rf_source);
+int whitebox_rf_source_work_done(struct whitebox_rf_source *rf_source, int buf);
 
 #endif /* __WHITEBOX_BLOCK_H */

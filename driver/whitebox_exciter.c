@@ -262,10 +262,10 @@ long _mock_exciter_space_available(struct whitebox_exciter *exciter,
     tail = ACCESS_ONCE(mock_exciter->buf->tail);
     space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size) & ~3;
     // Wrap around
-    /*if (space < 4) {
+    if (space < 4) {
         mock_exciter->buf->head = head = mock_exciter->buf->tail = tail = 0;
         space = CIRC_SPACE_TO_END(head, tail, mock_exciter->buf_size);
-    }*/
+    }
 
     *dest = (unsigned long)mock_exciter->buf->buf + head;
     return min(space, 1024L);
@@ -284,12 +284,12 @@ int _mock_exciter_produce(struct whitebox_exciter *exciter,
             (u32)*(mock_exciter->buf->buf + mock_exciter->buf->head + 8),
             (u32)*(mock_exciter->buf->buf + mock_exciter->buf->head + 12));
     mock_exciter->buf->head = (mock_exciter->buf->head + count) &
-        (mock_exciter->buf_size - 1);
+        (mock_exciter->buf_size - 4);
 
     state = exciter->ops->get_state(exciter);
     d_printk(1, "hi afull=%s txen=%s\n", state & WES_AFULL ? "true" : "false", state & WES_TXEN ? "true" : "false");
     if (exciter->auto_tx && (state & WES_AFULL) && !(state & WES_TXEN)) {
-        d_printk(0, "*************exciter transmit enable\n");
+        d_printk(1, "*************exciter transmit enable\n");
         exciter->ops->set_state(exciter, WES_TXEN);
     }
     return 0;

@@ -31,7 +31,7 @@ typedef struct whitebox_args {
         } exciter;
         struct {
             uint32_t state;
-            uint32_t interp;
+            uint32_t decim;
             uint32_t fcw;
             uint32_t runs;
             uint32_t threshold;

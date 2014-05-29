@@ -124,6 +124,10 @@ add_test(NAME test_whitebox_rx
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestRx
 )
 
+add_test(NAME test_whitebox_rx_overrun
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestRxOverrun
+)
+
 add_subdirectory(constraint)
 
 add_dependencies(hdl constraints)

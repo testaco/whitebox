@@ -969,8 +969,12 @@ def duc(clearn, dac_clock, dac2x_clock,
 
         if rxen and downsampled_valid:
             rx_fifo_wdata.next = concat(
-                intbv(downsampled_q.signed(), min=-2**15, max=2**15),
-                intbv(downsampled_i.signed(), min=-2**15, max=2**15))
+                downsampled_q[9], downsampled_q[9],
+                downsampled_q[9], downsampled_q[9], downsampled_q[9],
+                downsampled_q[9], downsampled_q[10:],
+                downsampled_i[9], downsampled_i[9],
+                downsampled_i[9], downsampled_i[9], downsampled_i[9],
+                downsampled_i[9], downsampled_i[10:])
         else:
             rx_fifo_wdata.next = 0
     
