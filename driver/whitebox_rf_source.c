@@ -59,22 +59,32 @@ int whitebox_rf_source_work(struct whitebox_rf_source *rf_source,
         unsigned long src, size_t src_count,
         unsigned long dest, size_t dest_count)
 {
+    // TODO: right now I'm not using the dma API here - it just hangs when
+    // you do so.
     size_t count = min(src_count, dest_count);
-    dma_addr_t mapping;
+    //dma_addr_t mapping;
     int buf;
+    
+    d_printk(3, "mapping %08lx %zd\n", src, count);
 
-    if (count >> 2 == 0)
+    if (count >> 2 == 0) {
+        d_printk(0, "nothign to get\n");
         return -1;
-
-    mapping = dma_map_single(NULL,
-            (void*)src, count, DMA_FROM_DEVICE);
-    if (dma_mapping_error(NULL, mapping)) {
-        d_printk(0, "failed to map dma\n");
-        return -EFAULT;
     }
+    d_printk(3, "mapping2 %08lx %zd\n", src, count);
+
+    //mapping = dma_map_single(NULL,
+    //        (void*)src, count, DMA_FROM_DEVICE);
+    //d_printk(3, "mapping3 %08lx %zd\n", src, count);
+    //if (dma_mapping_error(NULL, mapping)) {
+    //    d_printk(0, "failed to map dma\n");
+    //    return -EFAULT;
+    //}
+
+    d_printk(3, "starting\n");
 
     if ((buf = pdma_start(rf_source->dma_ch,
-            mapping,
+            src, //mapping,
             dest,
             count >> 2)) < 0) {
         d_printk(0, "failed to start dma\n");
@@ -82,15 +92,15 @@ int whitebox_rf_source_work(struct whitebox_rf_source *rf_source,
     }
     d_printk(1, "started buf=%d src=%08lx dest=%08lx count=%zd\n", buf, src, dest, count);
     rf_source->dma[buf].count = count;
-    rf_source->dma[buf].mapping = mapping;
+    //rf_source->dma[buf].mapping = mapping;
     d_printk(3, "work finish\n");
     return 0;
 }
 
 int whitebox_rf_source_work_done(struct whitebox_rf_source *rf_source, int buf)
 {
-    dma_unmap_single(NULL, rf_source->dma[buf].mapping,
-            rf_source->dma[buf].count, DMA_FROM_DEVICE);
+    //dma_unmap_single(NULL, rf_source->dma[buf].mapping,
+    //        rf_source->dma[buf].count, DMA_FROM_DEVICE);
     d_printk(1, "finished buf=%d count=%zd\n", buf, rf_source->dma[buf].count);
     return (int)rf_source->dma[buf].count;
 }

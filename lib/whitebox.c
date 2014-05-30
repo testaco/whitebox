@@ -99,6 +99,7 @@ int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
     whitebox_reset(wb);
 
     whitebox_tx_set_interp(wb, wb->interp);
+    whitebox_rx_set_decim(wb, wb->interp);
     //whitebox_tx_set_buffer_threshold(wb, rate/10, WE_FIFO_SIZE - rate/10);
 
     free(filename);
@@ -411,6 +412,13 @@ int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q)
     return 0;
 }
 
+int whitebox_rx_clear(whitebox_t* wb) {
+    if (wb->fd < 0) {
+        return -EBADF;
+    }
+    return ioctl(wb->fd, WR_CLEAR);
+}
+
 int whitebox_rx(whitebox_t* wb, float frequency) {
     float vco_frequency;
     whitebox_args_t w;
@@ -431,7 +439,7 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
         return 2;
     }
 
-    printf("%f %f\n", frequency, vco_frequency);
+    //printf("%f %f\n", frequency, vco_frequency);
     cmx991_rx_tune(&wb->cmx991, //vco_frequency,
         RX_RF_DIV_BY_4, MIX_OUT_MIXOUT1, IF_IN_IFIP1,
         IQ_FILTER_BW_1MHZ, VGA_N0DB);
@@ -459,6 +467,29 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+}
+
+int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim) {
+    whitebox_args_t w;
+    if (ioctl(wb->fd, WR_GET, &w) < 0)
+        return -1;
+    w.flags.receiver.decim = decim;
+    if (ioctl(wb->fd, WR_SET, &w) < 0)
+        return -1;
+    return 0;
+}
+
+void whitebox_rx_flags_enable(whitebox_t* wb, uint32_t flags) {
+    whitebox_args_t w;
+    ioctl(wb->fd, WR_GET, &w);
+    w.flags.receiver.state |= flags;
+    ioctl(wb->fd, WR_SET, &w);
+}
+
+void whitebox_rx_flags_disable(whitebox_t* wb, uint32_t flags) {
+    whitebox_args_t w;
+    w.flags.receiver.state = flags;
+    ioctl(wb->fd, WR_CLEAR_MASK, &w);
 }
 
 int whitebox_fir_load_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int32_t *coeffs)

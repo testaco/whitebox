@@ -28,6 +28,16 @@ int test_tx_clear(void* data) {
     assert(whitebox_close(&wb) == 0);
 }
 
+int test_rx_clear(void* data) {
+    whitebox_t wb;
+    whitebox_init(&wb);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_RDONLY, SAMPLE_RATE) > 0);
+    assert(whitebox_reset(&wb) == 0);
+    assert(whitebox_rx_clear(&wb) == 0);
+    assert(!whitebox_plls_locked(&wb));
+    assert(whitebox_close(&wb) == 0);
+}
+
 int test_tx_50_pll(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
@@ -127,6 +137,26 @@ int test_ioctl_exciter(void *data) {
     whitebox_tx_flags_disable(&wb, WS_FIREN);
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WS_FIREN));
+
+    assert(whitebox_close(&wb) == 0);
+    return 0;
+}
+
+int test_ioctl_receiver(void *data) {
+    int fd;
+    int16_t ic, qc;
+    int i;
+
+    whitebox_t wb;
+    whitebox_args_t w;
+    whitebox_init(&wb);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, SAMPLE_RATE)) > 0);
+    assert(fd > 0);
+    assert(ioctl(fd, WR_GET, &w) == 0);
+    w.flags.receiver.decim = 128;
+    assert(ioctl(fd, WR_SET, &w) == 0);
+    assert(ioctl(fd, WR_GET, &w) == 0);
+    assert(w.flags.receiver.decim == 128);
 
     assert(whitebox_close(&wb) == 0);
     return 0;
@@ -274,6 +304,31 @@ int test_tx_overrun_underrun(void *data) {
 
 }
 
+int test_rx_overrun(void *data) {
+    whitebox_t wb;
+    whitebox_args_t w;
+    int i = 200, j;
+    int ret;
+    int fd;
+    uint16_t o, u;
+    uint32_t q = 0;
+
+    whitebox_parameter_set("check_plls", 0);
+    whitebox_init(&wb);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox",
+            O_RDWR | O_NONBLOCK, SAMPLE_RATE)) > 0);
+    assert(whitebox_rx(&wb, 144.00e6) == 0);
+
+    assert(read(whitebox_fd(&wb), &q, sizeof(uint32_t)) > 0);
+
+    sleep(1);
+
+    assert(read(whitebox_fd(&wb), &q, sizeof(uint32_t)) < 0);
+
+    assert(whitebox_close(&wb) == 0);
+    whitebox_parameter_set("check_plls", 1);
+}
+
 #define COUNT 1024 
 int test_tx_halt(void* data) {
     whitebox_t wb;
@@ -297,8 +352,10 @@ int test_tx_halt(void* data) {
     assert(whitebox_tx_get_latency(&wb) == 20);
 
     for (k = 0; k < 10; ++k) {
-        assert(whitebox_tx(&wb, 54.00e6) == 0);
-        while (!whitebox_plls_locked(&wb)) continue;
+        assert(whitebox_tx(&wb, 145.00e6) == 0);
+        while (!whitebox_plls_locked(&wb)) {
+            continue;
+        }
         assert(whitebox_plls_locked(&wb));
         last_count = 0;
         for (j = 0; j < 10;) {
@@ -344,13 +401,16 @@ int main(int argc, char **argv) {
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_open_close),
         WHITEBOX_TEST(test_tx_clear),
+        WHITEBOX_TEST(test_rx_clear),
         WHITEBOX_TEST(test_ioctl_exciter),
+        WHITEBOX_TEST(test_ioctl_receiver),
         WHITEBOX_TEST(test_tx_50_pll),
         WHITEBOX_TEST(test_tx_144_pll),
         WHITEBOX_TEST(test_tx_222_pll),
         WHITEBOX_TEST(test_tx_420_pll),
         WHITEBOX_TEST(test_tx_902_pll),
         WHITEBOX_TEST(test_tx_overrun_underrun),
+        WHITEBOX_TEST(test_rx_overrun),
         WHITEBOX_TEST(test_tx_halt),
 #if 0
         WHITEBOX_TEST(test_tx_fifo),

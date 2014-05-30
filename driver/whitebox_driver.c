@@ -12,6 +12,7 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/poll.h>
+#include <linux/delay.h>
 
 #include <mach/fpga.h>
 
@@ -427,36 +428,42 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
         return 0;
     }
 
-    d_printk(1, "checking for error\n");
     if (rx_error(whitebox_device)) {
-        d_printk(1, "rx_error\n");
         up(&whitebox_device->sem);
         return -EIO;
     }
 
     d_printk_loop(1);
 
-    //up(&whitebox_device->sem);
 
     if (whitebox_device->state == WDS_RX_STREAMING) {
-        d_printk(1, "RX_EXEC streaming\n");
+        up(&whitebox_device->sem);
         rx_exec(whitebox_device);
     } else if (whitebox_rf_source_data_available(&whitebox_device->rf_source, &src) > 0) {
-        d_printk(1, "RX_ECEC starting to stream\n");
         whitebox_device->state = WDS_RX_STREAMING;
+        up(&whitebox_device->sem);
+        // Ping
         rx_exec(whitebox_device);
+        // Pong
+        rx_exec(whitebox_device);
+        // Wait for first DMA to finish
+        while ((src_count = whitebox_user_sink_data_available(user_sink, &src)) <= 0) {
+            cpu_relax();
+        }
     }
 
-    /*if (down_interruptible(&whitebox_device->sem)) {
+    d_printk(3, "going to wait for data\n");
+
+    if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
-    }*/
+    }
 
     while (((src_count = whitebox_user_sink_data_available(user_sink, &src)) < count) && !(err = rx_error(whitebox_device))) {
         up(&whitebox_device->sem);
         if (filp->f_flags & O_NONBLOCK)
             return -EAGAIN;
 
-        d_printk(1, "RX_EXEC waiting %d\n", count);
+        d_printk(3, "RX_EXEC waiting %d\n", count);
         rx_exec(whitebox_device);
         d_printk_loop(2);
 
@@ -466,7 +473,7 @@ static int whitebox_read(struct file* filp, char __user* buf, size_t count, loff
         if (down_interruptible(&whitebox_device->sem))
             return -ERESTARTSYS;
 
-        d_printk(1, "waiting done\n");
+        d_printk(3, "waiting done\n");
     }
 
     if (err) {
@@ -808,6 +815,16 @@ long whitebox_ioctl_receiver_set(unsigned long arg) {
     return 0;
 }
 
+long whitebox_ioctl_receiver_clear_mask(unsigned long arg) {
+    struct whitebox_receiver *receiver = whitebox_device->rf_source.receiver;
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    receiver->ops->clear_state(receiver, w.flags.receiver.state);
+    return 0;
+}
+
 long whitebox_ioctl_cmx991_get(unsigned long arg) {
     whitebox_args_t w;
     int i;
@@ -983,6 +1000,8 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_receiver_get(arg);
         case WR_SET:
             return whitebox_ioctl_receiver_set(arg);
+        case WR_CLEAR_MASK:
+            return whitebox_ioctl_receiver_clear_mask(arg);
         case WC_GET:
             return whitebox_ioctl_cmx991_get(arg);
         case WC_SET:

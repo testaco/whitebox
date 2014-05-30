@@ -370,7 +370,7 @@ int pdma_buffers_available(u8 ch) {
     if (channel->buf[PDMA_CHANNEL_BUFFER_B].status == PDMA_CHANNEL_BUFFER_STOPPED)
         result += 1;
 
-    pdma_snap_channel(channel);
+    //pdma_snap_channel(channel);
 
     // Resume the transfer
     PDMA(pdma_device)->chan[ch].control &= ~PDMA_CONTROL_PAUSE;

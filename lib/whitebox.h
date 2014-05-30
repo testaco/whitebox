@@ -64,7 +64,14 @@ int whitebox_tx_set_gain(whitebox_t *wb, float gain_i, float gain_q);
 int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q);
 
 
+int whitebox_rx_clear(whitebox_t* wb);
 int whitebox_rx(whitebox_t* wb, float frequency);
 int whitebox_rx_fine_tune(whitebox_t* wb, float frequency);
+//int whitebox_rx_standby(whitebox_t* wb);
+
+int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim);
+
+void whitebox_rx_flags_enable(whitebox_t* wb, uint32_t flags);
+void whitebox_rx_flags_disable(whitebox_t* wb, uint32_t flags);
 
 #endif /* __WHITEBOX_H__ */

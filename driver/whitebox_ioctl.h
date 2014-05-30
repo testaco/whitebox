@@ -53,7 +53,7 @@ typedef struct whitebox_args {
 
 // Location of the register files
 #define WHITEBOX_EXCITER_REGS          0x40050400
-#define WHITEBOX_RECEIVER_REGS         0x40050480
+#define WHITEBOX_RECEIVER_REGS         0x40050430
 
 /* Register File */
 #define WE_SAMPLE_ADDR          0x0
@@ -130,6 +130,7 @@ typedef struct whitebox_args {
 #define WR_CLEAR _IO('w', 6)
 #define WR_GET  _IOR('w', 7, whitebox_args_t*)
 #define WR_SET _IOW('w', 8, whitebox_args_t*)
+#define WR_CLEAR_MASK _IOW('w', 21, whitebox_args_t*)
 
 #define WR_FIFO_SIZE    1024
 
