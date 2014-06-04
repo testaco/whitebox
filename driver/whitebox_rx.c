@@ -1,4 +1,5 @@
 #include <linux/sched.h>
+#include <linux/delay.h>
 #include "whitebox.h"
 #include "whitebox_gpio.h"
 #include "pdma.h"
@@ -13,13 +14,15 @@ extern int *STCVR;
 int rx_start(struct whitebox_device *wb)
 {
     struct whitebox_receiver *receiver = wb->rf_source.receiver;
-    receiver->ops->get_runs(receiver, &wb->cur_overruns, &wb->cur_underruns);
     pdma_clear(wb->platform_data->rx_dma_ch);
     // Reset the SysTick interface
     *STRVR = 0xFFFFFF;
     *STCVR = 0;
     *STCSR = 5;
 
+    receiver->ops->set_state(receiver, WS_CLEAR);
+    udelay(100); // Wait for the clear to finish
+    receiver->ops->get_runs(receiver, &wb->cur_overruns, &wb->cur_underruns);
     receiver->ops->set_state(receiver, WRS_RXEN);
     return 0;
 }
@@ -37,28 +40,26 @@ int rx_exec(struct whitebox_device* wb)
     int result;
     unsigned long flags;
 
-    stats->exec_calls++;
-
     d_printk_loop(4);
+
+    stats->exec_calls++;
 
     if (!spin_trylock_irqsave(&rf_source->lock, flags)) {
         stats->exec_busy++;
         return -EBUSY;
     }
-    d_printk_loop(4);
 
     stats_detail = &stats->exec_detail[stats->exec_detail_index];
     stats_detail->time = *STCVR; // Get the current SysTick count
 
     src_count = whitebox_rf_source_data_available(rf_source, &src);
-    d_printk_loop(4);
     dest_count = whitebox_user_sink_space_available(user_sink, &dest);
-    d_printk_loop(4);
+    d_printk_loop(1);
     if (src_count >> 2 == 0) {
         stats->exec_nop_src++;
         spin_unlock_irqrestore(&rf_source->lock, flags);
         return 0;
-    } else if (dest_count >> 2 == 0) {
+    } else if (dest_count >> 2 <= 1) {
         stats->exec_nop_dest++;
         spin_unlock_irqrestore(&rf_source->lock, flags);
         return 0;
@@ -66,7 +67,6 @@ int rx_exec(struct whitebox_device* wb)
     count = min(src_count, dest_count);
 
     result = whitebox_rf_source_work(rf_source, src, src_count, dest, dest_count);
-    d_printk_loop(4);
     stats_detail->src = src_count;
     stats_detail->dest = dest_count;
     stats_detail->bytes = count;
@@ -78,11 +78,9 @@ int rx_exec(struct whitebox_device* wb)
         spin_unlock_irqrestore(&rf_source->lock, flags);
         return result;
     }
-    d_printk_loop(4);
 
     //whitebox_user_sink_produce(user_sink, count);
     whitebox_rf_source_consume(rf_source, count);
-    d_printk_loop(4);
 
     if (result > 0) {
         stats->exec_success_slow++;
@@ -100,7 +98,6 @@ int rx_exec(struct whitebox_device* wb)
         stats->exec_dma_start++;
         spin_unlock_irqrestore(&rf_source->lock, flags);
     }
-    d_printk_loop(4);
 
     return result;
 }
@@ -126,6 +123,7 @@ void rx_dma_cb(void *data, int buf)
     spin_unlock_irqrestore(&rf_source->lock, flags);
 
     rx_exec(wb);
+    d_printk_loop(4);
 
     wake_up_interruptible(&wb->read_wait_queue);
     if (whitebox_loopen) {
@@ -134,15 +132,35 @@ void rx_dma_cb(void *data, int buf)
     }
 }
 
+int rx_crank(struct whitebox_device *wb, int block)
+{
+    long src_count;
+
+    rx_start(wb);
+    // Ping
+    rx_exec(wb);
+    // Pong
+    rx_exec(wb);
+    // Wait for first DMA to finish
+    if (block) {
+        while ((src_count = whitebox_user_sink_data_total(&wb->user_sink)) <= 0) {
+            cpu_relax();
+        }
+    }
+    d_printk_loop(1);
+
+    return 0;
+}
+
 int rx_stop(struct whitebox_device *wb)
 {
     struct whitebox_stats *stats = &wb->rx_stats;
     stats->stop++;
 
-    wb->rf_source.receiver->ops->set_state(wb->rf_source.receiver, WRS_RXSTOP);
+    //wb->rf_source.receiver->ops->set_state(wb->rf_source.receiver, WRS_RXSTOP);
+    wb->rf_source.receiver->ops->set_state(wb->rf_source.receiver, WS_CLEAR);
 
-    if (pdma_buffers_available(wb->platform_data->rx_dma_ch) < 2)
-        return -1;
+    pdma_clear(wb->platform_data->rx_dma_ch);
 
     return 0;
 }
@@ -187,7 +205,6 @@ int rx_error(struct whitebox_device *wb)
             return W_ERROR_RX_OVERRUN;
         }
     }
-    d_printk_loop(4);
     return 0;
 }
 

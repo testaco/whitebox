@@ -43,7 +43,7 @@ size_t whitebox_user_source_space_available(struct whitebox_user_source *user_so
     tail = ACCESS_ONCE(user_source->buf.tail);
     space = CIRC_SPACE_TO_END(head, tail, user_source->buf_size) & ~3;
     *dest = (unsigned long)user_source->buf.buf + head;
-    d_printk(3, "%ld\n", space);
+    d_printk(7, "%ld\n", space);
     return space;
 }
 
@@ -64,7 +64,7 @@ size_t whitebox_user_source_data_available(struct whitebox_user_source *user_sou
     head = ACCESS_ONCE(user_source->buf.head);
     tail = user_source->buf.tail;
     data = CIRC_CNT_TO_END(head, tail, user_source->buf_size);
-    d_printk(3, "%ld\n", data);
+    d_printk(7, "%ld\n", data);
     *src = (long)user_source->buf.buf + tail;
     return data;
 }

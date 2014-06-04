@@ -21,11 +21,13 @@ u32 _receiver_get_state(struct whitebox_receiver *receiver)
 
 void _receiver_set_state(struct whitebox_receiver *receiver, u32 state_mask)
 {
+    //d_printk(0, "set state %08x\n", state_mask);
     WHITEBOX_RECEIVER(receiver)->state |= state_mask;
 }
 
 void _receiver_clear_state(struct whitebox_receiver *receiver, u32 state_mask)
 {
+    //d_printk(0, "clear state %08x\n", state_mask);
     WHITEBOX_RECEIVER(receiver)->state &= ~state_mask;
 }
 
@@ -129,7 +131,7 @@ int whitebox_receiver_create(struct whitebox_receiver *receiver,
         return -EINVAL;
     }
     receiver->pdma_config =
-            PDMA_CONTROL_PER_SEL_FPGA0 |
+            PDMA_CONTROL_PER_SEL_FPGA1 |
             //PDMA_CONTROL_HIGH_PRIORITY |
             PDMA_CONTROL_XFER_SIZE_4B |
             PDMA_CONTROL_DST_ADDR_INC_4 |
@@ -178,13 +180,9 @@ u32 _mock_receiver_get_state(struct whitebox_receiver *receiver)
 
 void _mock_receiver_set_state(struct whitebox_receiver *receiver, u32 state_mask)
 {
-    struct whitebox_mock_receiver *mock_receiver = 
-        container_of(receiver, struct whitebox_mock_receiver, receiver);
     u32 state;
     if (state_mask & WS_CLEAR) {
         WHITEBOX_RECEIVER(receiver)->state = 0;
-        mock_receiver->buf->head = 0;
-        mock_receiver->buf->tail = 0;
         return;
     }
     if (state_mask & WRS_RXSTOP) {
@@ -209,7 +207,6 @@ long _mock_receiver_data_available(struct whitebox_receiver *receiver,
     struct whitebox_mock_receiver *mock_receiver = 
         container_of(receiver, struct whitebox_mock_receiver, receiver);
     long head, tail, data;
-    d_printk(1, "\n");
     head = ACCESS_ONCE(mock_receiver->buf->head);
     tail = mock_receiver->buf->tail;
     data = CIRC_CNT_TO_END(head, tail, mock_receiver->buf_size) & ~3;
@@ -217,6 +214,7 @@ long _mock_receiver_data_available(struct whitebox_receiver *receiver,
         mock_receiver->buf->head = head = mock_receiver->buf->tail = tail = 0;
         data = CIRC_CNT_TO_END(head, tail, mock_receiver->buf_size);
     }*/
+    d_printk(1, "data %ld\n", data);
     *src = (unsigned long)mock_receiver->buf->buf + tail;
     return min(data, 1024L);
 }

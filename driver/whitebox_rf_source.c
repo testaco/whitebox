@@ -44,7 +44,7 @@ size_t whitebox_rf_source_data_available(struct whitebox_rf_source *rf_source,
         count = rf_source->receiver->ops->data_available(rf_source->receiver, dest);
     else
         count = 0;
-    d_printk(3, "%d\n", count);
+    d_printk(7, "%d\n", count);
     return count;
 }
 

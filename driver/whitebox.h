@@ -171,5 +171,7 @@ extern int whitebox_loopen;
 extern int whitebox_debug;
 extern int whitebox_flow_control;
 extern int whitebox_frame_size;
+extern int whitebox_user_source_buffer_threshold;
+extern int whitebox_user_sink_buffer_threshold;
 
 #endif /* __WHITEBOX_H */

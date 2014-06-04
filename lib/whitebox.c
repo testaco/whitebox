@@ -469,6 +469,18 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
     ioctl(wb->fd, WA_SET, &w);
 }
 
+int whitebox_rx_standby(whitebox_t *wb)
+{
+    whitebox_args_t w;
+
+    ioctl(wb->fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    cmx991_suspend(&wb->cmx991);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+    return 0;
+}
+
 int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim) {
     whitebox_args_t w;
     if (ioctl(wb->fd, WR_GET, &w) < 0)
@@ -477,6 +489,21 @@ int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim) {
     if (ioctl(wb->fd, WR_SET, &w) < 0)
         return -1;
     return 0;
+}
+
+int whitebox_rx_set_latency(whitebox_t *wb, int ms)
+{
+    int threshold = 4 * wb->rate * ((float)ms * 1e-3);
+    return whitebox_parameter_set("user_sink_buffer_threshold", threshold);
+}
+
+int whitebox_rx_get_latency(whitebox_t *wb)
+{
+    int threshold = whitebox_parameter_get("user_sink_buffer_threshold");
+    if (threshold <= 0)
+        return threshold;
+    int latency_ms = (int)(threshold / (wb->rate * 4 * 1e-3));
+    return latency_ms;
 }
 
 void whitebox_rx_flags_enable(whitebox_t* wb, uint32_t flags) {

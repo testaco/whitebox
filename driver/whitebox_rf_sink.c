@@ -43,7 +43,7 @@ size_t whitebox_rf_sink_space_available(struct whitebox_rf_sink *rf_sink,
     if (pdma_buffers_available(rf_sink->dma_ch) > 0)
         count = rf_sink->exciter->ops->space_available(rf_sink->exciter, dest);
     else {
-        d_printk(1, "txen %d buffs-avail %d\n",
+        d_printk(7, "txen %d buffs-avail %d\n",
                 rf_sink->exciter->ops->get_state(rf_sink->exciter) & WES_TXEN,
                 pdma_buffers_available(rf_sink->dma_ch));
         count = 0;

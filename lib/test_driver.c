@@ -238,7 +238,7 @@ int test_blocking_read_overrun(void *data) {
     ioctl(fd, WR_SET, &w);
 
     ioctl(fd, WE_GET, &w);
-    w.flags.exciter.interp = 200;
+    w.flags.exciter.interp = 1;
     ioctl(fd, WE_SET, &w);
     assert(write(fd, buf, sizeof(uint32_t) * 512) ==
             sizeof(uint32_t) * 512);
@@ -529,7 +529,7 @@ int test_mmap_write_success(void *data) {
     return 0;
 }
 
-#define HUGE 2048
+#define HUGE 256
 int test_blocking_xfer_huge(void *data) {
     int fd;
     int ret;

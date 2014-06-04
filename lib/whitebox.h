@@ -67,9 +67,11 @@ int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q);
 int whitebox_rx_clear(whitebox_t* wb);
 int whitebox_rx(whitebox_t* wb, float frequency);
 int whitebox_rx_fine_tune(whitebox_t* wb, float frequency);
-//int whitebox_rx_standby(whitebox_t* wb);
+int whitebox_rx_standby(whitebox_t* wb);
 
 int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim);
+int whitebox_rx_set_latency(whitebox_t *wb, int ms);
+int whitebox_rx_get_latency(whitebox_t *wb);
 
 void whitebox_rx_flags_enable(whitebox_t* wb, uint32_t flags);
 void whitebox_rx_flags_disable(whitebox_t* wb, uint32_t flags);

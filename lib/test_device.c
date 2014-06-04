@@ -314,14 +314,15 @@ int test_rx_overrun(void *data) {
     uint32_t q = 0;
 
     whitebox_parameter_set("check_plls", 0);
+    whitebox_parameter_set("flow_control", 1);
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox",
-            O_RDWR | O_NONBLOCK, SAMPLE_RATE)) > 0);
+            O_RDWR, SAMPLE_RATE)) > 0);
     assert(whitebox_rx(&wb, 144.00e6) == 0);
 
     assert(read(whitebox_fd(&wb), &q, sizeof(uint32_t)) > 0);
 
-    sleep(1);
+    sleep(2);
 
     assert(read(whitebox_fd(&wb), &q, sizeof(uint32_t)) < 0);
 
@@ -396,6 +397,76 @@ int test_tx_halt(void* data) {
     assert(whitebox_close(&wb) == 0);
 }
 
+int test_rx_halt(void* data) {
+    whitebox_t wb;
+    whitebox_args_t w;
+    int j, k;
+    int ret;
+    int fd;
+    int last_count = 0;
+    float sample_rate = SAMPLE_RATE;
+    uint32_t fcw = freq_to_fcw(1.7e3, sample_rate);
+    uint32_t phase = 0;
+    void *wbptr;
+    static uint32_t buf[COUNT];
+    int buffer_size = sysconf(_SC_PAGE_SIZE) << whitebox_parameter_get("user_order");
+    whitebox_init(&wb);
+    whitebox_parameter_set("flow_control", 1);
+    assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
+    wbptr = mmap(0, buffer_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    assert(wbptr != MAP_FAILED && wbptr);
+
+    assert(whitebox_rx_set_latency(&wb, 20) == 0);
+    assert(whitebox_rx_get_latency(&wb) == 20);
+
+    for (k = 0; k < 8; ++k) {
+        assert(whitebox_rx(&wb, 145.00e6) == 0);
+        while (!whitebox_plls_locked(&wb)) {
+            continue;
+        }
+        assert(whitebox_plls_locked(&wb));
+        last_count = 0;
+        for (j = 0; j < 10;) {
+            unsigned long dest;
+            long count;
+            count = ioctl(fd, W_MMAP_READ, &dest);// >> 2;
+            assert(count >= 0);
+            count >>= 2;
+            if (count == 0) {
+                continue;
+            } else {
+                count = count < COUNT ? count : COUNT;
+                if (rand() & 1)
+                    count -= 16;
+                //phase = sincos16c(count, fcw, phase, (uint32_t*)dest);
+                assert(whitebox_plls_locked(&wb));
+                ret = read(whitebox_fd(&wb), (void*)&buf, count << 2);
+                if (ret != count << 2) {
+                    whitebox_debug_to_file(&wb, stdout);
+                    printf("locked: CMX991 %c     ADF4351 %c\n",
+                        ioctl(wb.fd, WC_LOCKED) ? 'Y' : 'N',
+                        ioctl(wb.fd, WA_LOCKED) ? 'Y' : 'N');
+                    perror("read: ");
+                }
+                assert(ret == count << 2);
+                last_count += count;
+                //whitebox_debug_to_file(&wb, stdout);
+                j++;
+            }
+        }
+        assert(fsync(fd) == 0);
+        whitebox_rx_standby(&wb);
+        //ioctl(wb.fd, WR_GET, &w);
+        //assert(last_count == w.flags.receiver.debug);
+    }
+    whitebox_parameter_set("flow_control", 1);
+
+    assert(ioctl(fd, WR_GET, &w) == 0);
+    assert(!(w.flags.receiver.state & WRS_RXEN));
+    assert(munmap(wbptr, buffer_size) == 0);
+    assert(whitebox_close(&wb) == 0);
+}
+
 int main(int argc, char **argv) {
     whitebox_parameter_set("mock_en", 0);
     whitebox_test_t tests[] = {
@@ -404,13 +475,14 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_rx_clear),
         WHITEBOX_TEST(test_ioctl_exciter),
         WHITEBOX_TEST(test_ioctl_receiver),
+        WHITEBOX_TEST(test_rx_overrun),
+        WHITEBOX_TEST(test_rx_halt),
         WHITEBOX_TEST(test_tx_50_pll),
         WHITEBOX_TEST(test_tx_144_pll),
         WHITEBOX_TEST(test_tx_222_pll),
         WHITEBOX_TEST(test_tx_420_pll),
         WHITEBOX_TEST(test_tx_902_pll),
         WHITEBOX_TEST(test_tx_overrun_underrun),
-        WHITEBOX_TEST(test_rx_overrun),
         WHITEBOX_TEST(test_tx_halt),
 #if 0
         WHITEBOX_TEST(test_tx_fifo),
