@@ -130,6 +130,7 @@ void snipe()
     assert(wbptr != MAP_FAILED && wbptr);
 
     assert(whitebox_rx(&wb, CARRIER_FREQ) == 0);
+    //assert(whitebox_rx_cal_enable(&wb) == 0);
 
     while (ch != 10) {
         ch = getch();
@@ -155,6 +156,7 @@ void snipe()
         if (count <= 0) {
             continue;
         } else {
+            int k;
             count = count < COUNT ? count : COUNT;
             // DSP
             ret = read(whitebox_fd(&wb), 0, count << 2);
@@ -162,6 +164,14 @@ void snipe()
                 whitebox_debug_to_file(&wb, stdout);
                 perror("read: ");
             }
+            for (k = 0; k < count; ++k) {
+                int16_t re, im;
+                uint32_t a = *(uint32_t*)src;
+                QUAD_UNPACK(a, re, im);
+                src += 4;
+                //printf("%d,", re);
+            }
+
             assert(ret == count << 2);
             last_count += count;
         }

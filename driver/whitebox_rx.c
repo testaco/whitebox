@@ -14,6 +14,7 @@ extern int *STCVR;
 int rx_start(struct whitebox_device *wb)
 {
     struct whitebox_receiver *receiver = wb->rf_source.receiver;
+    whitebox_gpio_adc_enable(wb->platform_data);
     pdma_clear(wb->platform_data->rx_dma_ch);
     // Reset the SysTick interface
     *STRVR = 0xFFFFFF;
@@ -161,6 +162,8 @@ int rx_stop(struct whitebox_device *wb)
     wb->rf_source.receiver->ops->set_state(wb->rf_source.receiver, WS_CLEAR);
 
     pdma_clear(wb->platform_data->rx_dma_ch);
+
+    whitebox_gpio_adc_disable(wb->platform_data);
 
     return 0;
 }

@@ -391,10 +391,14 @@ static unsigned int whitebox_poll(struct file *filp, poll_table *wait)
     if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0)
         mask |= POLLOUT | POLLRDNORM;
 
-    if (whitebox_device->state == WDS_RX) {
+    if (whitebox_device->state == WDS_RX || whitebox_device->state == WDS_RX_STREAMING) {
         poll_wait(filp, &whitebox_device->read_wait_queue, wait);
         if (whitebox_user_sink_data_available(&whitebox_device->user_sink, &src) > 0)
             mask |= POLLIN | POLLWRNORM;
+    }
+
+    if (whitebox_device->state == WDS_IDLE) {
+        mask |= POLLOUT | POLLRDNORM | POLLIN | POLLWRNORM;
     }
 
     up(&whitebox_device->sem);
@@ -666,6 +670,9 @@ long whitebox_ioctl_reset(void) {
     for (i = 0; i < WA_REGS_COUNT; ++i) {
         whitebox_device->adf4351_regs[i] = 0;
     }
+    for (i = 0; i < WC_REGS_COUNT; ++i) {
+        whitebox_device->cmx991_regs[i] = -1;
+    }
     exciter->ops->set_state(exciter, WS_CLEAR);
     receiver->ops->set_state(receiver, WS_CLEAR);
     return 0;
@@ -805,10 +812,15 @@ long whitebox_ioctl_cmx991_set(unsigned long arg) {
             sizeof(whitebox_args_t)))
         return -EACCES;
 
-    for (i = 0; i < WC_REGS_COUNT; ++i)
-        whitebox_gpio_cmx991_write(whitebox_device->platform_data, 
-                whitebox_cmx991_regs_write_lut[i],
-                w.flags.cmx991[i]);
+    for (i = 0; i < WC_REGS_COUNT; ++i) {
+        if (whitebox_device->cmx991_regs[i] != w.flags.cmx991[i]) {
+            d_printk(3, "setting %d to %08x\n", whitebox_cmx991_regs_write_lut[i], w.flags.cmx991[i]);
+            whitebox_device->cmx991_regs[i] = w.flags.cmx991[i];
+            whitebox_gpio_cmx991_write(whitebox_device->platform_data, 
+                    whitebox_cmx991_regs_write_lut[i],
+                    w.flags.cmx991[i]);
+        }
+    }
 
     return 0;
 }

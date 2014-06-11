@@ -122,6 +122,20 @@ void whitebox_gpio_dac_disable(struct whitebox_platform_data_t* platform_data) {
 }
 EXPORT_SYMBOL(whitebox_gpio_dac_disable);
 
+void whitebox_gpio_adc_enable(struct whitebox_platform_data_t *platform_data)
+{
+    gpio_set_value(platform_data->adc_s1_pin, 1);
+    gpio_set_value(platform_data->adc_s2_pin, 1);
+}
+//EXPORT_SYMBOL(whitebox_gpio_adc_enable);
+
+void whitebox_gpio_adc_disable(struct whitebox_platform_data_t *platform_data)
+{
+    gpio_set_value(platform_data->adc_s1_pin, 0);
+    gpio_set_value(platform_data->adc_s2_pin, 0);
+}
+//EXPORT_SYMBOL(whitebox_gpio_adc_enable);
+
 void whitebox_gpio_cmx991_reset(struct whitebox_platform_data_t* platform_data) {
     d_printk(2, "\n");
     gpio_set_value(platform_data->radio_resetn_pin, 0);

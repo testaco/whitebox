@@ -55,6 +55,7 @@ function command(v, val) {
 }
 
 var global_ptt = 0;
+var global_ptl = 0;
 
 function ptt(state) {
     function debounce() {
@@ -69,6 +70,11 @@ function ptt(state) {
     global_ptt = state;
     if (global_ptt)
         window.setTimeout(debounce, 10);
+}
+
+function ptl(state) {
+    command("ptl", state ? "1" : "0");
+    global_ptl = !!state;
 }
 
 function update_radio_buttons(name, value) {
@@ -104,6 +110,11 @@ function update_display() {
             document.getElementById('ptt_indicator').className = 'ptt-on';
         else
             document.getElementById('ptt_indicator').className = 'ptt-off';
+        update_if_not_focused('ptl', config['ptl']);
+        if (config['ptl'])
+            document.getElementById('ptl_indicator').className = 'ptt-on';
+        else
+            document.getElementById('ptl_indicator').className = 'ptt-off';
         update_radio_buttons('modulation', config['modulation']);
         update_radio_buttons('audio_source', config['audio_source']);
         update_radio_buttons('iq_source', config['iq_source']);
@@ -159,6 +170,33 @@ function start() {
         function (e) {
             var p = document.getElementById("ptt_sticky").checked;
             ptt(p);
+            e.preventDefault();
+        });
+
+    document.getElementById("ptl").addEventListener("mousedown",
+        function (e) {
+            ptl(true);
+            e.preventDefault();
+        });
+    document.getElementById("ptl").addEventListener("mouseup",
+        function (e) {
+            ptl(false);
+            e.preventDefault();
+        });
+    document.getElementById("ptl").addEventListener("click",
+        function (e) {
+            e.preventDefault();
+        });
+    document.getElementById("ptl_sticky").addEventListener("change",
+        function (e) {
+            var p = document.getElementById("ptl_sticky").checked;
+            ptl(p);
+            e.preventDefault();
+        });
+    document.getElementById("rx_cal").addEventListener("change",
+        function (e) {
+            var p = document.getElementById("rx_cal").checked ? 1 : 0;
+            command("rx_cal", p);
             e.preventDefault();
         });
 
@@ -235,6 +273,7 @@ document.addEventListener("DOMContentLoaded", start);
 <h1>Whitebox Control Port</h1>
 <br />
 <div id="ptt_indicator" class="ptt-off">PTT</div>
+<div id="ptl_indicator" class="ptl-off">PTL</div>
 
 <form>
 
@@ -254,7 +293,18 @@ document.addEventListener("DOMContentLoaded", start);
 </fieldset>
 
 <fieldset>
-<legend>Transmit</legend>
+<legend>Receiver</legend>
+<button name="ptl" id="ptl" value="1">PTL</button>
+<br />
+<label for="ptl_sticky">PTL Sticky</label>
+<input type="checkbox" name="ptl_sticky" id="ptl_sticky" value="false" />
+<br />
+<label for="rx_cal">Calibrate</label>
+<input type="checkbox" name="rx_cal" id="rx_cal" value="false" />
+</fieldset>
+
+<fieldset>
+<legend>Transmitter</legend>
 <label for="modulation">Modulation</label>
 <input type="radio" id="modulation_iq" name="modulation" value="iq"
     onclick="command('modulation', 'iq');" />

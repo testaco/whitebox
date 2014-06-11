@@ -12,6 +12,11 @@ void whitebox_gpio_dac_enable(
 void whitebox_gpio_dac_disable(
         struct whitebox_platform_data_t* platform_data);
 
+void whitebox_gpio_adc_enable(
+        struct whitebox_platform_data_t* platform_data);
+void whitebox_gpio_adc_disable(
+        struct whitebox_platform_data_t* platform_data);
+
 void whitebox_gpio_cmx991_reset(
         struct whitebox_platform_data_t* platform_data);
 void whitebox_gpio_cmx991_write(

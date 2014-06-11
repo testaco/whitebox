@@ -68,6 +68,8 @@ int whitebox_rx_clear(whitebox_t* wb);
 int whitebox_rx(whitebox_t* wb, float frequency);
 int whitebox_rx_fine_tune(whitebox_t* wb, float frequency);
 int whitebox_rx_standby(whitebox_t* wb);
+int whitebox_rx_cal_enable(whitebox_t *wb);
+int whitebox_rx_cal_disable(whitebox_t *wb);
 
 int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim);
 int whitebox_rx_set_latency(whitebox_t *wb, int ms);

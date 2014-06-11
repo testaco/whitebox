@@ -481,6 +481,30 @@ int whitebox_rx_standby(whitebox_t *wb)
     return 0;
 }
 
+int whitebox_rx_cal_enable(whitebox_t *wb)
+{
+    whitebox_args_t w;
+
+    ioctl(wb->fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    cmx991_rx_calibrate_enable(&wb->cmx991);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+    return 0;
+}
+
+int whitebox_rx_cal_disable(whitebox_t *wb)
+{
+    whitebox_args_t w;
+
+    ioctl(wb->fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    cmx991_rx_calibrate_disable(&wb->cmx991);
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+    return 0;
+}
+
 int whitebox_rx_set_decim(whitebox_t* wb, uint32_t decim) {
     whitebox_args_t w;
     if (ioctl(wb->fd, WR_GET, &w) < 0)

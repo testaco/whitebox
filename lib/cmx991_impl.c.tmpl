@@ -41,6 +41,7 @@ void cmx991_ioctl_get(cmx991_t* rf, whitebox_args_t* w) {
 }
 
 void cmx991_ioctl_set(cmx991_t* rf, whitebox_args_t* w) {
+    rf->ld_synth = 0;
     #set $addr_lut = [17, 18, 19, 20, 21, 22, 32, 33, 34, 35]
     #for $i in range(10)
     w->flags.cmx991[$i] = cmx991_pack(rf, $addr_lut[i]);
@@ -234,6 +235,12 @@ void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div, mix_out_t mix_out,
     rf->vga = vga;
 }
 
-void cmx991_rx_calibrate(cmx991_t* rf) {
+void cmx991_rx_calibrate_enable(cmx991_t* rf)
+{
     rf->cal_en = CAL_EN_ENABLE;
+}
+
+void cmx991_rx_calibrate_disable(cmx991_t* rf)
+{
+    rf->cal_en = CAL_EN_DISABLE;
 }

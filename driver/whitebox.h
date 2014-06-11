@@ -118,6 +118,7 @@ struct whitebox_device {
     atomic_t mapped;
 
     u32 adf4351_regs[WA_REGS_COUNT];
+    u8 cmx991_regs[WC_REGS_COUNT];
     u16 cur_overruns, cur_underruns;
 
     struct circ_buf mock_buf;
