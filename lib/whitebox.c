@@ -543,6 +543,25 @@ void whitebox_rx_flags_disable(whitebox_t* wb, uint32_t flags) {
     ioctl(wb->fd, WR_CLEAR_MASK, &w);
 }
 
+void whitebox_rx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t correct_q)
+{
+    whitebox_args_t w;
+    ioctl(wb->fd, WR_GET, &w);
+    w.flags.receiver.correction = (uint32_t)(((int32_t)correct_i & WEC_I_MASK) |
+                        (((int32_t)correct_q << WEC_Q_OFFSET) & WEC_Q_MASK));
+    ioctl(wb->fd, WR_SET, &w);
+}
+
+void whitebox_rx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q)
+{
+    whitebox_args_t w;
+    ioctl(wb->fd, WR_GET, &w);
+    *correct_i = ((int16_t)(w.flags.receiver.correction & WEC_I_MASK)) << 6;
+    *correct_i >>= 6;
+    *correct_q = (int16_t)(((w.flags.receiver.correction & WEC_Q_MASK)) >> WEC_Q_OFFSET) << 6;
+    *correct_q >>= 6;
+}
+
 int whitebox_fir_load_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int32_t *coeffs)
 {
     int i;

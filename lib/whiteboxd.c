@@ -676,6 +676,18 @@ int config_change(whitebox_t *wb, struct whitebox_config *config,
             printf("L");
             fflush(stdout);
         }*/
+    } else if (strncmp(var, "rx_offset_correct_i", strlen("rx_offset_correct_i")) == 0) {
+        int16_t correct_i, correct_q;
+        whitebox_rx_get_correction(wb, &correct_i, &correct_q);
+        correct_i = atoi(val);
+        printf("rx_correct_i=%d\n", correct_i);
+        whitebox_rx_set_correction(wb, correct_i, correct_q);
+    } else if (strncmp(var, "rx_offset_correct_q", strlen("rx_offset_correct_q")) == 0) {
+        int16_t correct_i, correct_q;
+        whitebox_rx_get_correction(wb, &correct_i, &correct_q);
+        correct_q = atoi(val);
+        printf("rx_correct_q=%d\n", correct_q);
+        whitebox_rx_set_correction(wb, correct_i, correct_q);
     } else if (strncmp(var, "mode", strlen("mode")) == 0) {
         printf("mode=%s\n", val);
         if (strcmp(val, "cw") == 0)
@@ -752,9 +764,11 @@ int http_ctl(whitebox_t *wb, struct whitebox_config *config,
     } else if (strcmp(r->method, "GET") == 0 && strcmp(r->url, "/config") == 0) {
         int16_t correct_i, correct_q;
         float gain_i, gain_q;
+        int16_t rx_correct_i, rx_correct_q;
         
         whitebox_tx_get_correction(wb, &correct_i, &correct_q);
         whitebox_tx_get_gain(wb, &gain_i, &gain_q);
+        whitebox_rx_get_correction(wb, &rx_correct_i, &rx_correct_q);
 
         result = http_respond_string(rt->ctl_fd, r,
                 "application/json",
@@ -768,6 +782,8 @@ int http_ctl(whitebox_t *wb, struct whitebox_config *config,
                 "\"ptt\": %d,"
                 "\"ptl\": %d,"
                 "\"rx_cal\": %d,"
+                "\"rx_offset_correct_i\": %d,"
+                "\"rx_offset_correct_q\": %d,"
                 "\"mode\": \"%s\","
                 "\"latency\": \"%d\","
                 "\"modulation\": \"%s\","
@@ -780,6 +796,7 @@ int http_ctl(whitebox_t *wb, struct whitebox_config *config,
                 config->carrier_freq,
                 rt->ptt, rt->ptl,
                 rt->rx_cal,
+                rx_correct_i, rx_correct_q,
                 whitebox_mode_to_string(config->mode),
                 rt->latency_ms,
                 config->modulation,

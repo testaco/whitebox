@@ -98,6 +98,8 @@ function update_display() {
         //console.log(config['mode']);
         update_if_not_focused('offset_correct_i', config['offset_correct_i']);
         update_if_not_focused('offset_correct_q', config['offset_correct_q']);
+        update_if_not_focused('rx_offset_correct_i', config['rx_offset_correct_i']);
+        update_if_not_focused('rx_offset_correct_q', config['rx_offset_correct_q']);
         update_if_not_focused('gain_i', config['gain_i']);
         update_if_not_focused('gain_q', config['gain_q']);
         update_if_not_focused('mode', config['mode']);
@@ -262,6 +264,20 @@ function start() {
 
             e.preventDefault();
         });
+    document.getElementById("rx_offset_correct_i").addEventListener("change",
+        function (e) {
+            var offset_correct_i = document.getElementById("rx_offset_correct_i").value;
+            command("rx_offset_correct_i", offset_correct_i);
+
+            e.preventDefault();
+        });
+    document.getElementById("rx_offset_correct_q").addEventListener("change",
+        function (e) {
+            var offset_correct_q = document.getElementById("rx_offset_correct_q").value;
+            command("rx_offset_correct_q", offset_correct_q);
+
+            e.preventDefault();
+        });
 }
 
 document.addEventListener("DOMContentLoaded", start);
@@ -298,9 +314,18 @@ document.addEventListener("DOMContentLoaded", start);
 <br />
 <label for="ptl_sticky">PTL Sticky</label>
 <input type="checkbox" name="ptl_sticky" id="ptl_sticky" value="false" />
-<br />
+</fieldset>
+
+<fieldset>
+<legend>Analog Qudrature Demodulator Correction</legend>
 <label for="rx_cal">Calibrate</label>
 <input type="checkbox" name="rx_cal" id="rx_cal" value="false" />
+<br />
+<label for="rx_offset_correct_i">Offset Real</label>
+<input name="rx_offset_correct_i" id="rx_offset_correct_i" type="number" value="0" min="-512" max="512" />
+<br />
+<label for="rx_offset_correct_q">Offset Imag</label>
+<input name="rx_offset_correct_q" id="rx_offset_correct_q" type="number" value="0" min="-512" max="512" />
 </fieldset>
 
 <fieldset>

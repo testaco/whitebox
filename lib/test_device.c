@@ -158,6 +158,10 @@ int test_ioctl_receiver(void *data) {
     assert(ioctl(fd, WR_GET, &w) == 0);
     assert(w.flags.receiver.decim == 128);
 
+    whitebox_rx_set_correction(&wb, -1, 1);
+    whitebox_rx_get_correction(&wb, &ic, &qc);
+    assert(ic == -1 && qc == 1);
+
     assert(whitebox_close(&wb) == 0);
     return 0;
 }

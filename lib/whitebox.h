@@ -78,4 +78,7 @@ int whitebox_rx_get_latency(whitebox_t *wb);
 void whitebox_rx_flags_enable(whitebox_t* wb, uint32_t flags);
 void whitebox_rx_flags_disable(whitebox_t* wb, uint32_t flags);
 
+void whitebox_rx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t correct_q);
+void whitebox_rx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q);
+
 #endif /* __WHITEBOX_H__ */

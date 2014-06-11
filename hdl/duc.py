@@ -653,7 +653,7 @@ def duc(clearn, dac_clock, dac2x_clock,
 
         rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
         rxen, rxstop, rxfilteren,
-        decim, rx_correct_i, rx_correct_q,
+        decim, system_rx_correct_i, system_rx_correct_q,
         rx_overrun, rx_sample,
         adc_idata, adc_qdata, adc_last,
 
@@ -741,6 +741,10 @@ def duc(clearn, dac_clock, dac2x_clock,
     gain_i = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
     sync_gain_q = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
     gain_q = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    sync_rx_correct_i = Signal(intbv(0)[len(system_rx_correct_i):])
+    rx_correct_i = Signal(intbv(0)[len(system_rx_correct_i):])
+    sync_rx_correct_q = Signal(intbv(0)[len(system_rx_correct_q):])
+    rx_correct_q = Signal(intbv(0)[len(system_rx_correct_q):])
 
     sample_valid = sample.valid
     sample_last = sample.last
@@ -858,13 +862,19 @@ def duc(clearn, dac_clock, dac2x_clock,
     duc_chain = duc_chain + (interleaver_0, )
 
     # DIGITAL DOWN CONVERTER
+    rx_offset_corrected = Signature("rx_offset_corrected", True, bits=10)
+    rx_offset_corrector = offset_corrector(clearn, dac_clock,
+                rx_correct_i, rx_correct_q,
+                adc_sample, rx_offset_corrected)
+    ddc_chain = (rx_offset_corrector, )
+
     downsampled = Signature("downsampled", True, bits=10)
     downsampled_i = downsampled.i
     downsampled_q = downsampled.q
     downsampled_valid = downsampled.valid
-    downsampler_0 = downsampler(clearn, dac_clock, adc_sample,
+    downsampler_0 = downsampler(clearn, dac_clock, rx_offset_corrected,
             downsampled, decim)
-    ddc_chain = (downsampler_0, )
+    ddc_chain = ddc_chain + (downsampler_0, )
 
     @always_seq(dac_clock.posedge, reset=clearn)
     def synchronizer():
@@ -898,6 +908,10 @@ def duc(clearn, dac_clock, dac2x_clock,
         gain_i.next = sync_gain_i
         sync_gain_q.next = system_gain_q
         gain_q.next = sync_gain_q
+        sync_rx_correct_i.next = system_rx_correct_i
+        rx_correct_i.next = sync_rx_correct_i
+        sync_rx_correct_q.next = system_rx_correct_q
+        rx_correct_q.next = sync_rx_correct_q
 
     interp_counter = Signal(intbv(0)[32:])
     done = Signal(bool(0))

@@ -102,6 +102,15 @@ static int whitebox_tx_q_gain = (int)(1. * WEG_COEFF + 0.5);
 module_param(whitebox_tx_q_gain, int, S_IRUSR | S_IWUSR);
 
 /*
+ * Offset to add to I & Q coming into of the DDC - for AQM calibration
+ */
+static int whitebox_rx_i_correction = 0;
+module_param(whitebox_rx_i_correction, int, S_IRUSR | S_IWUSR);
+static int whitebox_rx_q_correction = 0;
+module_param(whitebox_rx_q_correction, int, S_IRUSR | S_IWUSR);
+
+
+/*
  * Enable the loopback (for testing)
  */
 int whitebox_loopen = 0;
@@ -218,10 +227,13 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
     exciter->ops->set_correction(exciter,
             (u32)(((s32)whitebox_tx_i_correction & WEC_I_MASK) |
                 (((s32)whitebox_tx_q_correction << WEC_Q_OFFSET) & WEC_Q_MASK)));
-
     exciter->ops->set_gain(exciter,
             (u32)(((u32)whitebox_tx_i_gain & WEG_I_MASK) |
                 (((u32)whitebox_tx_q_gain << WEG_Q_OFFSET) & WEG_Q_MASK)));
+
+    receiver->ops->set_correction(receiver,
+            (u32)(((s32)whitebox_rx_i_correction & WEC_I_MASK) |
+                (((s32)whitebox_rx_q_correction << WEC_Q_OFFSET) & WEC_Q_MASK)));
 
     ret = whitebox_rf_sink_alloc(rf_sink);
     if (ret < 0) {
@@ -761,6 +773,7 @@ long whitebox_ioctl_receiver_get(unsigned long arg) {
     w.flags.receiver.fcw = receiver->ops->get_fcw(receiver);
     // TODO w.flags.receiver.runs = receiver->ops->get_runs(receiver);
     w.flags.receiver.threshold = receiver->ops->get_threshold(receiver);
+    w.flags.receiver.correction = receiver->ops->get_correction(receiver);
     w.flags.receiver.available = receiver->ops->data_available(receiver, &dest);
     if (copy_to_user((whitebox_args_t*)arg, &w,
             sizeof(whitebox_args_t)))
@@ -778,6 +791,7 @@ long whitebox_ioctl_receiver_set(unsigned long arg) {
     receiver->ops->set_decim(receiver, w.flags.receiver.decim);
     receiver->ops->set_fcw(receiver, w.flags.receiver.fcw);
     receiver->ops->set_threshold(receiver, w.flags.receiver.threshold);
+    receiver->ops->set_correction(receiver, w.flags.receiver.correction);
     return 0;
 }
 
