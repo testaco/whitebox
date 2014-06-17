@@ -75,6 +75,14 @@ add_test(NAME test_duc_cic_interpolate_20
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicInterpolate20
 )
 
+add_test(NAME test_cic_decim_math
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicDecimMath
+)
+
+add_test(NAME test_cic_decim_impulse
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestCicDecimImpulse
+)
+
 add_test(NAME test_fir_impulse
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_fir.py TestFirImpulse
 )

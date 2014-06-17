@@ -10,7 +10,6 @@ from myhdl import \
 from fir import fir as FIR
 from dsp import Signature
 from duc import duc as DUC
-from ddc import ddc as DDC
 from rfe import rfe as RFE
 from rfe import print_rfe_ioctl
 from ram import Ram, Ram2

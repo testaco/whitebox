@@ -9,6 +9,7 @@ from myhdl import \
         delay, now, Simulation, StopSimulation, traceSignals
 
 from duc import *
+from ddc import cic_decim
 from test_dsp import load_quadrature_short_samples
 from test_dsp import figure_continuous_complex
 from test_dsp import figure_discrete_quadrature
@@ -168,6 +169,73 @@ class TestCicInterpolate20(unittest.TestCase):
 
         plt.savefig("cic_interp_20.png")
 
+class TestCicDecimMath(unittest.TestCase):
+    def test_cic_decim_math(self):
+        from ddc import cic_decim_max_bits, cic_decim_bit_truncation
+        # Test from Hogenauer's paper.
+        N = 4; M = 1; R = 25; Bin = 16; Bout = 16
+        Bmax = cic_decim_max_bits(Bin, R, N, M)
+        assert(Bmax == 34)
+        expected = [1, 6, 9, 13, 14, 15, 16, 17]
+        actual = [cic_decim_bit_truncation(Bin, Bout, R, N, M, j) for j in range(1, 2*N + 1)]
+        assert expected == actual
+
+class TestCicDecimImpulse(unittest.TestCase):
+    def test_cic_decim_impulse(self):
+        cic_order = 4
+        cic_delay = 1
+        decim = Signal(intbv(8, min=0, max=2**10))
+        #shift = Signal(intbv(0, min=0, max=21))
+
+        in_sign = Signature("in", True, bits=16)
+
+        out_sign = Signature("out", True, bits=16)
+
+        s = DSPSim(
+                in_sign=in_sign,
+                out_sign=out_sign,
+        )
+        cic_0_signals = None
+        def test_cic_decim_impulse():
+            cic_0 = cic_decim(s.clearn, s.clock, s.input, s.output,
+                    decim, #shift,
+                    cic_order=cic_order, cic_delay=cic_delay,
+                    sim=s)
+
+            return cic_0
+
+        ## t is the range of 0 to 2*pi
+        in_t = np.arange(0, cic_order * decim * cic_delay * 100)
+
+        ## Input is impulse
+        in_c = 0*in_t + 1j * 0*in_t
+        in_c[0] = .01 + 0j
+
+        # t is the range of 0 to 2*pi
+        in_t = np.arange(0, 2*np.pi, 2*np.pi/(decim * 10))
+        # Input is complex from range [-1 - 1j] to [1 + 1j]
+        in_c = .1 * (np.cos(in_t) + 1j * np.sin(in_t))
+
+        print in_c
+
+        out_c = s.simulate(in_c, test_cic_decim_impulse, decim=decim)
+        print out_c
+        out_t = np.arange(0, out_c.shape[0])
+
+        new_shape = tuple([in_t.shape[i] / decim - 1 for i in range(len(in_t.shape))])
+
+        print out_t.shape, new_shape
+        #assert out_t.shape == new_shape
+
+
+        f_cic_impulse = plt.figure("cic_decim_impulse")
+        plt.title("cic_decim_impulse")
+
+        f_in = figure_continuous_complex("in", 211, f_cic_impulse, in_t, in_c)
+        f_out = figure_continuous_complex("out", 212, f_cic_impulse, out_t, out_c/int(decim))
+        s.plot_chain("cic_decim_impulse_debug")
+
+        plt.savefig("cic_decim_impulse.png")
 
 if __name__ == '__main__':
     unittest.main()

@@ -405,3 +405,167 @@ def iqdemux(clearn, clock,
 
     return demux
 
+def accumulator(clearn, clock, in_sign, out_sign, n=0):
+    """A simple accumulator.
+
+    :param clearn: The reset the accumulator.
+    :param clock: The clock.
+    :param in_sign: The input signature.
+    :param out_sign: The output signature.
+    :returns: A synthesizable MyHDL instance.
+    """
+    in_valid = in_sign.valid
+    in_i = in_sign.i
+    in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    @always_seq(clock.posedge, reset=clearn)
+    def accumulate():
+        if in_valid:
+            out_valid.next = True
+            out_last.next = in_last
+            print 'accum%d in=%d out=%d next=%d' % (n, in_i, out_i, in_i + out_i)
+            out_i.next = out_i + in_i
+            out_q.next = out_q + in_q
+        else:
+            out_valid.next = False
+            out_last.next = False
+            out_i.next = 0
+            out_q.next = 0
+
+    return accumulate
+
+def delay_1(clearn, clock, sign, x, y):
+    valid = sign.valid
+    @always_seq(clock.posedge, reset=clearn)
+    def delay():
+        if valid:
+            y.next = x
+    return delay
+
+def delay_2(clearn, clock, sign, x, y):
+    element = Signal(sign.myhdl(0))
+
+    @always_seq(clock.posedge, reset=clearn)
+    def delay():
+        if sign.valid:
+            element.next = x
+            y.next = element
+    return delay
+
+def delay_n(n, clearn, clock, sign, x, y):
+    """Delay a signal ``n`` cycles.
+
+    :param n: A constant, how many cycles to delay.
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param sign: The signature.
+    :param x: Input.
+    :param y: Delayed outpt.
+    :returns: A synthesizable MyHDL instance.
+    """
+    if n == 1:
+        return delay_1(clearn, clock, sign, x, y)
+    elif n == 2:
+        return delay_2(clearn, clock, sign, x, y)
+
+    elements = [Signal(sign.myhdl(0)) for i in range(n - 1)]
+    
+    @always_seq(clock.posedge, reset=clearn)
+    def delay():
+        if sign.valid:
+            elements[0].next = x
+            for i in range(1, n - 1):
+                elements[i].next = elements[i - 1]
+            y.next = elements[n - 2]
+
+    return delay
+
+def comb(clearn, clock, delay, in_sign, out_sign):
+    """A comber with ``delay``.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param delay: A constant, how many cycles to delay.
+    :param in_sign: The input signature.
+    :param out_sign: The output signature.
+    :returns: A synthesizable MyHDL instance.
+    """
+    in_valid = in_sign.valid
+    in_i = in_sign.i
+    in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    delayed_i = Signal(in_sign.myhdl(0))
+    delayed_q = Signal(in_sign.myhdl(0))
+
+    delay_i = delay_n(delay, clearn, clock, in_sign, in_i, delayed_i)
+    delay_q = delay_n(delay, clearn, clock, in_sign, in_q, delayed_q)
+
+    @always_seq(clock.posedge, reset=clearn)
+    def comber():
+        if in_valid:
+            out_valid.next = True
+            out_last.next = in_last
+            out_i.next = in_i - delayed_i
+            out_q.next = in_q - delayed_q
+        else:
+            out_valid.next = False
+            out_last.next = False
+            out_i.next = 0
+            out_q.next = 0
+
+    return comber, delay_i, delay_q
+
+def truncator(clearn, in_clock, in_sign, out_sign, **kwargs):
+    """Truncates ``in_sign`` to ``out_sign``.
+
+    :param clearn: The reset signal.
+    :param clock: The clock.
+    :param in_sign: The incomming signature.
+    :param out_sign: The outgoing signature.
+    :returns: A synthesizable MyHDL instance.
+    """
+    in_valid = in_sign.valid
+    in_i = in_sign.i
+    in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+
+    i_msb = len(in_i)
+    i_lsb = len(in_i) - len(out_i)
+    q_msb = len(in_q)
+    q_lsb = len(in_q) - len(out_q)
+
+    assert i_lsb >= 0 and q_lsb >= 0
+
+    print 'truncator from', in_sign.bits, 'bits to', out_sign.bits, 'bits; so [%d:%d]' % (i_msb, i_lsb), 'which is', i_msb - i_lsb, 'bits long'
+    debug = kwargs.get('debug', False)
+
+    @always_seq(in_clock.posedge, reset=clearn)
+    def truncate():
+        if in_valid:
+            out_valid.next = True
+            out_i.next = in_i[i_msb:i_lsb].signed()
+            out_q.next = in_q[q_msb:q_lsb].signed()
+            out_last.next = in_last
+            if debug:
+                print in_i, out_i
+        else:
+            out_valid.next = False
+            out_last.next = False 
+            out_i.next = 0
+            out_q.next = 0
+
+    return truncate

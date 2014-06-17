@@ -1,8 +1,11 @@
+import math
 from myhdl import Signal, always, always_comb, always_seq, \
                   intbv, enum, concat, modbv, ResetSignal
+from scipy.special import binom
 
 from dsp import Signature, offset_corrector, binary_offseter
 from dsp import iqmux
+from dsp import accumulator, comb, truncator
 
 def downsampler(clearn, clock, in_sign, out_sign, decim):
     """Takes every ``decim`` samples.
@@ -30,12 +33,14 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
             if cnt == 0:
                 out_i.next = in_i
                 out_q.next = in_q
+                out_last.next = in_last
                 out_valid.next = True
                 cnt.next = decim - 1
             else:
                 out_i.next = 0
                 out_q.next = 0
                 out_valid.next = False
+                out_last.next = False
                 cnt.next = cnt - 1
         else:
             out_i.next = 0
@@ -46,132 +51,134 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
 
     return downsample
 
-def ddc_fake(clearn, dac_clock,
-            fifo_full, fifo_we, fifo_wdata,
-            rxen, rxstop, filteren, decim, correct_i, correct_q,
-            overrun, sample,
-            adc_idata, adc_qdata, adc_last, **kwargs):
+def cic_decim_max_bits(in_len, decim, cic_order, cic_delay):
+    return int(math.ceil(cic_order * math.log(decim * cic_delay, 2) + in_len) - 1)
 
-    sample_valid = sample.valid
-    sample_last = sample.last
-    sample_i = sample.i
-    sample_q = sample.q
+def cic_decim_bit_truncation(in_len, out_len, decim, cic_order, cic_delay, stage):
+    """Returns how many bits to truncate from a stage in a CIC decmiator."""
+    # Use the nomenclature from Hogenauer
+    N = cic_order
+    M = cic_delay
+    R = decim
+    Bin = in_len
+    Bout = out_len
 
-    @always_seq(dac_clock.posedge, reset=clearn)
-    def pass_through():
-        overrun.next = 0
-        fifo_we.next = 0
+    # First define the CIC impulse response function
+    ha = lambda j, k: sum([( (-1)**l * binom(N, l) * binom(N - j + k - R * M * l, k - R * M * l)) for l in range(0, int(math.floor(k / (R * M)) + 1))])
+    hb = lambda j, k: (-1)**k * binom(2 * N + 1 - j, k)
+    def h(j, k):
+        if j in range(1, N + 1):
+            return ha(j, k)
+        else:
+            return hb(j, k)
 
-    return pass_through
+    # This is the variance error gain at stage j
+    def F(j):
+        if j in range(1, 2 * N + 1):
+            return math.sqrt(sum([h(j, k) ** 2 for k in range(0, (R * M - 1) * N + j - 1)]))
+        else:
+            return 1.0
+    
+    # Find the maximum number of bits that would be truncated
+    Bmax = cic_decim_max_bits(in_len, decim, cic_order, cic_delay)
+    B2N1 = Bmax - Bout + 1
+    # And find it's variance
+    sigma2N1 = math.sqrt((1/12.) * ((2 ** B2N1) ** 2))
+    sigmaT2N1 = math.sqrt((sigma2N1 ** 2) * (F(2 * N + 1) ** 2))
 
-def ddc(clearn, dac_clock,
-        loopen, loopback,
-        fifo_full, fifo_we, fifo_wdata,
-        system_rxen, system_rxstop, system_filteren, 
-        system_decim, system_correct_i, system_correct_q,
-        overrun,
-        adc_idata, adc_qdata, adc_last, **kwargs):
-    """Direct Down Converter.
+    # Finally, compute how many bits to discard in this stage to keep the
+    # overall error below the final stage's truncation
+    return int(math.floor(-math.log(F(stage), 2) + math.log(sigmaT2N1, 2) + .5 * math.log(6./N, 2)))
 
-    :param clearn: The reset signal.
-    :param dac_clock: The sampling clock.
-    :param loopen: Loopback enable.
-    :param loopback: Loopback signature.
-    :param fifo_full: Is the receive FIFO full.
-    :param fifo_we: Output to signal to FIFO to write.
-    :param fifo_wdata: The sample to write to the FIFO.
-    :param system_rxen: Enable the receiver.
-    :param system_rxstop: Stop the receiver.
-    :param system_filteren: Enable the receiver decimation filter.
-    :param system_decim: Decimation factor.
-    :param system_correct_i: i channel DC offset correction for the AQM.
-    :param system_correct_q: q channel DC offset correction for the AQM.
-    :param overrun: How many overruns have happened, signal to RFE.
-    :param adc_idata: The input I data from the ADC.
-    :param adc_qdata: The input Q data from the ADC.
-    :param adc_last: Signifies that this is the last sample from the ADC.
+def cic_decim_gain(decim, cic_order, cic_delay):
+    """Maximum gain in a CIC decimator."""
+    return (decim * cic_delay) ** cic_order
+
+def cic_decim_register_width(Bin, Bout, R, N, M, j):
+    """Get the register width at stage j."""
+    Bmax = cic_decim_max_bits(Bin, R, N, M)+3  # TODO: huh?
+    #return Bmax - cic_decim_bit_truncation(Bin, Bout, R, N, M, j)
+    return Bmax
+
+def cic_decim(clearn, clock,
+        in_sign,
+        out_sign,
+        decim,
+        #shift,
+        cic_order=4, cic_delay=2, **kwargs):
+    """A cic decimating filter with given order and delay.
+
+    :param clearn: Reset the filter.
+    :param clock: The clock.
+    :param in_sign: The input signature.
+    :param out_sign: The output signature.
+    :param decim: The decimation of the cic filter.
+    :param shift: How much to shift the result.
+    :param cic_order: The order of the CIC filter.
+    :param cic_delay: The delay of the CIC comb elements.
     :returns: A synthesizable MyHDL instance.
     """
-    dspsim = kwargs.get('dspsim', None)
-    decim_default = kwargs.get('decim', 1)
+    in_valid = in_sign.valid
+    in_i = in_sign.i
+    in_q = in_sign.q
+    in_last = in_sign.last
+    out_last = out_sign.last
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+    rates = kwargs.get('rates', [decim])
+    max_rate = max(rates)
 
-    chain = []
+    accumed = [Signature('accumed_%d' % i, True, bits=cic_decim_register_width(
+            len(in_i), len(out_i), max_rate, cic_order, cic_delay,
+            i)) for i in range(1, cic_order + 1)]
+    print 'accumed', accumed
+    combed = [Signature('combed_%d' % i, True, bits=cic_decim_register_width(
+            len(in_i), len(out_i), max_rate, cic_order, cic_delay,
+            cic_order + i)) for i in range(1, cic_order + 1)]
+    print 'combed', combed
 
-    sync_rxen = Signal(bool(0))
-    rxen = Signal(bool(0))
-    sync_rxstop = Signal(bool(0))
-    rxstop = Signal(bool(0))
-    sync_decim = Signal(intbv(decim_default)[len(system_decim):])
-    decim = Signal(intbv(decim_default)[len(system_decim):])
-    sync_correct_i = Signal(intbv(0)[len(system_correct_i):])
-    correct_i = Signal(intbv(0)[len(system_correct_i):])
-    sync_correct_q = Signal(intbv(0)[len(system_correct_q):])
-    correct_q = Signal(intbv(0)[len(system_correct_q):])
-    we = Signal(bool(0))
+    accums = []
+    for n in range(cic_order):
+        if n == 0:
+            i = in_sign
+        else:
+            i = accumed[n - 1]
 
-    #if kwargs.get('conditioning_enable', True):
-    #    offset = Signature("offset", True, bits=10)
-    #    offseter = binary_offseter(clearn, dac_clock,
-    #            sample, offset)
-    #    chain.append(offseter)
+        o = accumed[n]
 
-    #    corrected = Signature("corrected", True, bits=10)
-    #    corrector = offset_corrector(clearn, dac_clock,
-    #            correct_i, correct_q,
-    #            rf_out, corrected)
-    #    chain.append(corrector)
-    #else:
-    adc = Signature("adc", True, bits=10, valid=rxen,
-            i=adc_idata, q=adc_qdata)
+        print 'accum in=%d, out=%d' % (len(i.q), len(o.q))
+        accums.append(accumulator(clearn, clock, i, o, n))  # TODO truncate
 
-    conditioned = Signature("conditioned", True, bits=10)
-    loopback_0 = iqmux(clearn, dac_clock, loopen, adc, loopback,
-            conditioned)
-    chain.append(loopback_0)
+    decimated = accumed[cic_order - 1].copy('decimated')
+    decimator_0 = downsampler(clearn, clock,
+        accumed[cic_order - 1], decimated,
+        decim)
 
-    downsampled = Signature("downsampled", True, bits=10)
-    downsampler_0 = downsampler(clearn, dac_clock, conditioned,
-            downsampled, decim)
-    chain.append(downsampler_0)
+    combs = []
+    for n in range(cic_order):
+        if n == 0:
+            i = decimated
+        else:
+            i = combed[n - 1]
 
-    rx = downsampled
-    rx_i = rx.i
-    rx_q = rx.q
-    rx_valid = rx.valid
-    rx_last = rx.last
-    adc_last = rx_last
+        o = combed[n]
 
-    @always_seq(dac_clock.posedge, reset=clearn)
-    def synchronizer():
-        sync_rxen.next = system_rxen
-        rxen.next = sync_rxen
-        sync_rxstop.next = system_rxstop
-        rxstop.next = sync_rxstop
-        sync_decim.next = system_decim
-        decim.next = sync_decim
-        sync_correct_i.next = system_correct_i
-        correct_i.next = sync_correct_i
-        sync_correct_q.next = system_correct_q
-        correct_q.next = sync_correct_q
+        print 'comb in=%d, out=%d' % (len(i.q), len(o.q))
+        combs.append(comb(clearn, clock, cic_delay, i, o))  # TODO truncate
+    
+    # TODO: does this need a shifter?  yeah.
+    truncator_0 = truncator(clearn, clock,
+        combed[cic_order - 1], out_sign)
 
-    @always_seq(dac_clock.posedge, reset=clearn)
-    def producer():
-        if rxen and rx_valid:
-            # Sign extension
-            fifo_wdata.next = concat(
-                rx_q[10], rx_q[10], rx_q[10],
-                rx_q[10], rx_q[10], rx_q[10],
-                rx_q[10:],
-                rx_i[10], rx_i[10], rx_i[10],
-                rx_i[10], rx_i[10], rx_i[10],
-                rx_i[10:])
-            fifo_we.next = True
-            we.next = True
+    instances = accums, decimator_0, combs, truncator_0
 
-            if we:
-                fifo_we.next = False
-                we.next = False
-                if fifo_full and not rxstop:
-                    overrun.next = overrun + 1
+    if kwargs.get('sim', None):
+        sim = kwargs['sim']
+        sim.record(in_sign)
+        [sim.record(a) for a in accumed]
+        sim.record(decimated)
+        [sim.record(c) for c in combed]
+        sim.record(out_sign)
 
-    return synchronizer, producer, chain
+    return instances
