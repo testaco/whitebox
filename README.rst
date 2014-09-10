@@ -1,4 +1,4 @@
-.. image:: https://raw.github.com/testaco/whitebox/master/docs/img/whitebox-logo.jpg
+.. image:: https://raw.github.com/testaco/whitebox/master/docs/_images/whitebox-logo.jpg
     :alt: Whitebox Logo
     :align: center
 
@@ -8,7 +8,7 @@ The Smart Software Radio Device
 Welcome to the Whitebox Software Radio Project, a cross between a smartphone
 and a software defined radio with an open hardware and software license.
 
-.. image:: https://raw.github.com/testaco/whitebox/master/docs/img/bravotop-mid.jpg
+.. image:: https://raw.github.com/testaco/whitebox/master/docs/_images/bravotop-mid.jpg
     :alt: Whitebox Bravo
     :align: center
 
