@@ -2,13 +2,14 @@
 # This file contains common make rules for all projects.
 #
 
-PATH := $(TOOLS_PATH)/bin:$(CROSS_PATH):$(PATH)
-
 MAKE		:= make
 
 KERNEL_CONFIG	:= kernel$(if $(MCU),.$(MCU))
+KERNEL_LD	:= lds$(if $(MCU),.$(MCU))
 RAMFS_CONFIG	:= initramfs
 KERNEL_IMAGE	:= uImage
+KERNEL_VIMAGE	:= vImage
+ENVM_LOG	:= .envm_log
 
 # Path to the kernel modules directory in context of which
 # these loadable modules are built
@@ -50,10 +51,11 @@ _prepare_modules:
 linux		: $(SAMPLE).$(KERNEL_IMAGE)
 
 $(CUSTOM_APPS)	:
-	make -C $@ all CFLAGS=${CFLAGS} LDFLAGS=${LDFLAGS}
+	 CFLAGS=${CFLAGS} LDFLAGS=${LDFLAGS} make -C $@ all
 
 clean		: kclean bclean aclean
-	rm -rf $(SAMPLE).$(KERNEL_IMAGE) busybox
+	rm -rf $(SAMPLE).$(KERNEL_IMAGE) $(SAMPLE).$(KERNEL_VIMAGE) \
+		$(ENVM_LOG) busybox
 
 kclean		:
 	$(MAKE) -C $(INSTALL_ROOT)/linux clean
@@ -82,23 +84,30 @@ bmenuconfig	:
 busybox		: $(SAMPLE).busybox
 	cp -f $(SAMPLE).busybox $(INSTALL_ROOT)/A2F/busybox/.config
 	$(MAKE) -C $(INSTALL_ROOT)/A2F/busybox
-	cp -f $(INSTALL_ROOT)/A2F/busybox/busybox $@
+#	cp -f $(INSTALL_ROOT)/A2F/busybox/busybox $@
 
 %.$(KERNEL_IMAGE) : %.$(KERNEL_CONFIG) %.$(RAMFS_CONFIG) $(CUSTOM_APPS) busybox
 	cp -f $(SAMPLE).$(RAMFS_CONFIG) $(INSTALL_ROOT)/linux/initramfs-list-min
 	rm -f $(INSTALL_ROOT)/linux/usr/initramfs_data.cpio \
 		$(INSTALL_ROOT)/linux/usr/initramfs_data.cpio.gz
 	cp -f $(SAMPLE).$(KERNEL_CONFIG) $(INSTALL_ROOT)/linux/.config
+	cp -f $(INSTALL_ROOT)/linux/arch/arm/kernel/vmlinux.lds.S.good \
+		$(INSTALL_ROOT)/linux/arch/arm/kernel/vmlinux.lds.S
+	([ -e $(SAMPLE).$(KERNEL_LD) ] && \
+		cp -f $(SAMPLE).$(KERNEL_LD) \
+		$(INSTALL_ROOT)/linux/arch/arm/kernel/vmlinux.lds.S) || \
+	true;
 	$(MAKE) -C $(INSTALL_ROOT)/linux $(KERNEL_IMAGE) SAMPLE=${SAMPLE}
 	cp -f $(INSTALL_ROOT)/linux/arch/arm/boot/$(KERNEL_IMAGE) $@
-
-whitebox.uImage: whitebox.kernel.A2F whitebox.initramfs busybox
-	cp -f $(SAMPLE).$(RAMFS_CONFIG) $(INSTALL_ROOT)/linux/initramfs-list-min
-	rm -f $(INSTALL_ROOT)/linux/usr/initramfs_data.cpio \
-		$(INSTALL_ROOT)/linux/usr/initramfs_data.cpio.gz
-	cp -f $(SAMPLE).$(KERNEL_CONFIG) $(INSTALL_ROOT)/linux/.config
-	$(MAKE) -C $(INSTALL_ROOT)/linux $(KERNEL_IMAGE) SAMPLE=${SAMPLE}
-	cp -f $(INSTALL_ROOT)/linux/arch/arm/boot/$(KERNEL_IMAGE) $@
+	rm -f $(ENVM_LOG)
+	(grep "CONFIG_KERNEL_IN_ENVM=y" $(SAMPLE).$(KERNEL_CONFIG) > \
+		$(ENVM_LOG) || true)
+	([ -s $(ENVM_LOG) ] && \
+	($(MAKE) -C $(INSTALL_ROOT)/linux $(KERNEL_VIMAGE) SAMPLE=${SAMPLE}; \
+	cp -f $(INSTALL_ROOT)/linux/arch/arm/boot/$(KERNEL_VIMAGE) \
+		$(SAMPLE).$(KERNEL_VIMAGE))) || \
+	true;
+	rm -f $(ENVM_LOG)
 
 clone		:
 	@[ ! -z ${new} ] || \

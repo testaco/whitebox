@@ -45,11 +45,16 @@ target_link_libraries(test_adf4351 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_cmx991 test_cmx991.c)
 target_link_libraries(test_cmx991 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(test_rf test_rf.c)
+target_link_libraries(test_rf ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 add_executable(test_driver test_driver.c)
 target_link_libraries(test_driver ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_executable(test_device test_device.c)
 target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
+add_executable(test_slave test_slave.c)
 
 #add_executable(cw cw.c)
 #target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
@@ -73,7 +78,7 @@ add_executable(whiteboxd whiteboxd.c modulators.c sources.c)
 target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_custom_target(apps
-    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx qa_rx qa_lo whiteboxd)
+    DEPENDS test_slave test_adf4351 test_cmx991 test_driver test_device test_rf gnuradio_peripheral qa_tx qa_rx qa_lo whiteboxd)
 
 add_test(NAME target_netboot
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot

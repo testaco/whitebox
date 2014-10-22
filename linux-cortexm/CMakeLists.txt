@@ -1,4 +1,4 @@
-set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
+set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0)
 
 if(NOT DEFINED KERNELDIR)
     set(KERNELDIR ${INSTALL_ROOT}/linux)
@@ -12,7 +12,7 @@ configure_file(Emcraft.make Emcraft.make
     COPYONLY
 )
 
-configure_file(whitebox.kernel.A2F whitebox.kernel.A2F
+configure_file(whitebox.kernel.M2S whitebox.kernel.M2S
     COPYONLY
 )
 

@@ -190,7 +190,7 @@ int whitebox_reset(whitebox_t* wb) {
 int whitebox_plls_locked(whitebox_t* wb) {
     int i;
     // We wait for a little bit incase tuning just changed
-    for (i = 0; i < 10; ++i) {
+    for (i = 0; i < 1000; ++i) {
         if (ioctl(wb->fd, W_LOCKED))
             return 1;
     }

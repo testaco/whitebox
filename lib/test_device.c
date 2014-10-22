@@ -1,4 +1,5 @@
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
@@ -35,62 +36,6 @@ int test_rx_clear(void* data) {
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_rx_clear(&wb) == 0);
     assert(!whitebox_plls_locked(&wb));
-    assert(whitebox_close(&wb) == 0);
-}
-
-int test_tx_50_pll(void* data) {
-    whitebox_t wb;
-    whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 50.00e6) == 0);
-    assert(whitebox_plls_locked(&wb));
-    assert(whitebox_close(&wb) == 0);
-}
-
-int test_tx_144_pll(void* data) {
-    whitebox_t wb;
-    whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 144.00e6) == 0);
-    whitebox_plls_locked(&wb);
-    assert(whitebox_plls_locked(&wb));
-    assert(whitebox_close(&wb) == 0);
-}
-
-int test_tx_222_pll(void* data) {
-    whitebox_t wb;
-    whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 222.00e6) == 0);
-    assert(whitebox_plls_locked(&wb));
-    assert(whitebox_close(&wb) == 0);
-}
-
-int test_tx_420_pll(void* data) {
-    whitebox_t wb;
-    whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 420.00e6) == 0);
-    assert(whitebox_plls_locked(&wb));
-    assert(whitebox_close(&wb) == 0);
-}
-
-int test_tx_902_pll(void* data) {
-    whitebox_t wb;
-    whitebox_init(&wb);
-    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
-    assert(whitebox_reset(&wb) == 0);
-    assert(whitebox_tx_clear(&wb) == 0);
-    assert(whitebox_tx(&wb, 902.00e6) == 0);
-    assert(whitebox_plls_locked(&wb));
     assert(whitebox_close(&wb) == 0);
 }
 
@@ -472,23 +417,18 @@ int test_rx_halt(void* data) {
 }
 
 int main(int argc, char **argv) {
-    whitebox_parameter_set("mock_en", 0);
+    whitebox_parameter_set("mock_en", 1);
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_open_close),
         WHITEBOX_TEST(test_tx_clear),
         WHITEBOX_TEST(test_rx_clear),
         WHITEBOX_TEST(test_ioctl_exciter),
         WHITEBOX_TEST(test_ioctl_receiver),
-        WHITEBOX_TEST(test_rx_overrun),
-        WHITEBOX_TEST(test_rx_halt),
-        WHITEBOX_TEST(test_tx_50_pll),
-        WHITEBOX_TEST(test_tx_144_pll),
-        WHITEBOX_TEST(test_tx_222_pll),
-        WHITEBOX_TEST(test_tx_420_pll),
-        WHITEBOX_TEST(test_tx_902_pll),
+#if 0
         WHITEBOX_TEST(test_tx_overrun_underrun),
         WHITEBOX_TEST(test_tx_halt),
-#if 0
+        WHITEBOX_TEST(test_rx_overrun),
+        WHITEBOX_TEST(test_rx_halt),
         WHITEBOX_TEST(test_tx_fifo),
         WHITEBOX_TEST(test_tx_fifo_dma),
 #endif
