@@ -1,6 +1,6 @@
 # Actel Physical design constraints file
 
-# Family: SmartFusion , Die: A2F500M3G , Package: 484 FBGA
+# Family: SmartFusion , Die: M2S010 , Package: 484 FBGA
 
 # 
 # IO banks setting
@@ -10,259 +10,30 @@
 # I/O constraints
 # 
 
-set_io {FPGA_GPIO75}  \
-    -pinname M2       \
-    -fixed yes					
-    
-
-set_io {FPGA_GPIO77}  \
-    -pinname M1       \
-    -fixed yes        \
-	-res_pull up
-
-set_io {FPGA_GPIO79}  \
-    -pinname H5       \
-    -fixed yes        \
-    -res_pull up  
-
-set_io {psram_address[0]}  \
-    -pinname A8            \
-    -fixed yes             \
-    -REGISTER No          
-
-set_io {psram_address[1]}  \
-    -pinname A9            \
-    -fixed yes             \
-    -REGISTER No               
-
-set_io {psram_address[2]}  \
-    -pinname B10           \
-    -fixed yes             \
-    -REGISTER No           \
-    
-set_io {psram_address[3]}  \
-    -pinname B11           \
-    -fixed yes             \
-    -REGISTER No           
-
-set_io {psram_address[4]}  \
-    -pinname E11           \
-    -fixed yes             \
-    -REGISTER No           
-
-set_io {psram_address[5]}  \
-    -pinname E12           \
-    -fixed yes             \
-    -REGISTER No           
-
-set_io {psram_address[6]}  \
-    -pinname B12           \
-    -fixed yes             \
-    -REGISTER No           
-
-set_io {psram_address[7]}  \
-    -pinname A12           \
-    -fixed yes             \
-    -REGISTER No           \
-    
-set_io {psram_address[8]}  \
-    -pinname C13           \
-    -fixed yes             \
-    -REGISTER No           
-
-set_io {psram_address[9]}  \
-    -pinname D13           \
-    -fixed yes             \
-    -REGISTER No           
-
-set_io {psram_address[10]}  \
-    -pinname D11            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[11]}  \
-    -pinname D12            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[12]}  \
-    -pinname A14            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[13]}  \
-    -pinname A15            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[14]}  \
-    -pinname B13            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[15]}  \
-    -pinname B14            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[16]}  \
-    -pinname C14            \
-    -fixed yes              \
-    -REGISTER No           
-
-set_io {psram_address[17]}  \
-    -pinname C15            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[18]}  \
-    -pinname B16            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[19]}  \
-    -pinname B17            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[20]}  \
-    -pinname F13            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[21]}  \
-    -pinname F14            \
-    -fixed yes              \
-    -REGISTER No           
-
-set_io {psram_address[22]}  \
-    -pinname C17            \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_address[23]}  \
-    -pinname C18            \
-    -fixed yes              
-
-set_io {psram_address[24]}  \
-    -pinname C16            \
-    -fixed yes              
-
-set_io {psram_data[0]}  \
-    -pinname K2         \
-    -fixed yes          
-
-set_io {psram_data[1]}  \
-    -pinname K3         \
-    -fixed yes          
-
-set_io {psram_data[2]}  \
-    -pinname K5         \
-    -fixed yes          
-
-set_io {psram_data[3]}  \
-    -pinname J4         \
-    -fixed yes          
-
-set_io {psram_data[4]}  \
-    -pinname J3         \
-    -fixed yes          
-
-set_io {psram_data[5]}  \
-    -pinname J2         \
-    -fixed yes          
-
-set_io {psram_data[6]}  \
-    -pinname J1         \
-    -fixed yes          
-
-set_io {psram_data[7]}  \
-    -pinname H1         \
-    -fixed yes          
-
-set_io {psram_data[8]}  \
-    -pinname H3         \
-    -fixed yes          
-
-set_io {psram_data[9]}  \
-    -pinname G3         \
-    -fixed yes          
-
-set_io {psram_data[10]}  \
-    -pinname F4          \
-    -fixed yes           
-
-set_io {psram_data[11]}  \
-    -pinname G5          \
-    -fixed yes           
-
-set_io {psram_data[12]}  \
-    -pinname D2          \
-    -fixed yes           
-
-set_io {psram_data[13]}  \
-    -pinname D3          \
-    -fixed yes           
-
-set_io {psram_data[14]}  \
-    -pinname C1          \
-    -fixed yes           
-
-set_io {psram_data[15]}  \
-    -pinname B1          \
-    -fixed yes           
-
-set_io {psram_nbyte_en[0]}  \
-    -pinname B9             \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io {psram_nbyte_en[1]}  \
-    -pinname C9             \
-    -fixed yes              \
-    -REGISTER No            
-
-set_io psram_ncs0      \
-    -pinname A5        \
-    -fixed yes         \
-    -REGISTER No       
-
-set_io psram_ncs1      \
-    -pinname A6        \
-    -fixed yes         \
-    -REGISTER No       
-
-set_io psram_noe0      \
-    -pinname D10       \
-    -fixed yes         \
-    -REGISTER No       
-
-set_io psram_noe1      \
-    -pinname C10       \
-    -fixed yes         \
-    -REGISTER No       
-
-set_io psram_nwe       \
-    -pinname B6        \
-    -fixed yes         \
-    -REGISTER No
-
-
-
-#
-# FOR RADIO
-#
 #for $pin_name in $pin_names
 
 set_io {$pin_name} \
     -pinname $pin_mapping[$pin_name].current_pointer() \
-    -fixed yes
+    -fixed yes \
+    -iostd LVTTL \
+    -FF_IO_AVAIL No \
+    -FF_IO_STATE TRISTATE \
+#if $pin_mapping[$pin_name].direction == 'input'
+    -IN_DELAY Off \
+    -LPE Off \
+    -RES_PULL None \
+    -SCHMITT_TRIGGER Off \
+    -DIRECTION INPUT
+#elif $pin_mapping[$pin_name].direction == 'output'
+    -OUT_DRIVE 4 \
+    -OUT_LOAD 5 \
+    -RES_PULL None \
+    -DIRECTION OUTPUT
+#end if
+
 #end for
 
 #
 # Non IO constraints
 #
-
-#assign_global_clock -net M2F_RESET_N 
-
 

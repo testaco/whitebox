@@ -14,8 +14,6 @@
 #include <linux/poll.h>
 #include <linux/delay.h>
 
-#include <mach/fpga.h>
-
 #include "pdma.h"
 #include "whitebox.h"
 #include "whitebox_gpio.h"
@@ -58,7 +56,7 @@ module_param(whitebox_user_order, int, S_IRUSR | S_IWUSR);
 /*
  * Whether or not to use the mock.
  */
-static int whitebox_mock_en = 0;
+static int whitebox_mock_en = 1;
 module_param(whitebox_mock_en, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -210,7 +208,6 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
     }
 
     atomic_set(&whitebox_device->mapped, 0);
-
     whitebox_user_source_init(&whitebox_device->user_source,
             whitebox_user_order - 1, &whitebox_device->mapped);
 
@@ -306,7 +303,6 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
         d_printk(0, "Device not in use");
         return -ENOENT;
     }
-
     if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
         while (tx_stop(whitebox_device) < 0)
             cpu_relax();
@@ -328,7 +324,6 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
     whitebox_user_source_free(user_source);
     whitebox_rf_source_free(rf_source);
     whitebox_user_sink_free(user_sink);
-
     atomic_dec(&use_count);
     return 0;
 }
@@ -1130,7 +1125,7 @@ static const struct file_operations rx_stats_fops = {
 static int whitebox_probe(struct platform_device* pdev) {
     struct resource* whitebox_exciter_regs;
     struct resource* whitebox_receiver_regs;
-    int irq;
+    //int irq;
     struct device* dev;
     int ret = 0;
 
@@ -1150,12 +1145,12 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_release_nothing;
     }
 
-    irq = platform_get_irq(pdev, 0);
+    /*irq = platform_get_irq(pdev, 0);
     if (irq < 0) {
         d_printk(0, "invalid IRQ%d\n", irq);
         ret = -ENXIO;
         goto fail_release_nothing;
-    }
+    }*/
 
     whitebox_device = kzalloc(sizeof(struct whitebox_device), GFP_KERNEL);
 
@@ -1210,7 +1205,7 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_create_mock_receiver;
     }
 
-    whitebox_device->irq = irq;
+    //whitebox_device->irq = irq;
     /*ret = request_irq(irq, tx_irq_cb, 0,
             dev_name(&pdev->dev), whitebox_device);
     if (ret) {
@@ -1363,9 +1358,6 @@ static struct resource whitebox_platform_device_resources[] = {
         .start = WHITEBOX_RECEIVER_REGS,
         .end = WHITEBOX_RECEIVER_REGS + WHITEBOX_RECEIVER_REGS_COUNT,
         .flags = IORESOURCE_MEM,
-    }, {
-        .start = WHITEBOX_EXCITER_IRQ,
-        .flags = IORESOURCE_IRQ,
     },
 };
 

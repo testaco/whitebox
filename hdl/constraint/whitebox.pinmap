@@ -1,56 +1,56 @@
 # Derived from the Whitebox Schematic, p.1
-ADC_AD[0]       P14[19]
-ADC_AD[1]       P14[17]
-ADC_AD[2]       P14[15]
-ADC_AD[3]       P14[13]
-ADC_AD[4]       P14[11]
-ADC_AD[5]       P14[9]
-ADC_AD[6]       P14[7]
-ADC_AD[7]       P14[5]
-ADC_AD[8]       P14[3]
-ADC_AD[9]       P13[12]
+ADC_AD[0]       P14[19] input
+ADC_AD[1]       P14[17] input
+ADC_AD[2]       P14[15] input
+ADC_AD[3]       P14[13] input
+ADC_AD[4]       P14[11] input
+ADC_AD[5]       P14[9]  input
+ADC_AD[6]       P14[7]  input
+ADC_AD[7]       P14[5]  input
+ADC_AD[8]       P14[3]  input
+ADC_AD[9]       P13[12] input
 
-ADC_BD[0]       P13[14]
-ADC_BD[1]       P14[4]
-ADC_BD[2]       P14[6]
-ADC_BD[3]       P14[8]
-ADC_BD[4]       P14[10]
-ADC_BD[5]       P14[12]
-ADC_BD[6]       P14[14]
-ADC_BD[7]       P14[16]
-ADC_BD[8]       P14[18]
-ADC_BD[9]       P13[20]
+ADC_BD[0]       P13[14] input
+ADC_BD[1]       P14[4]  input
+ADC_BD[2]       P14[6]  input
+ADC_BD[3]       P14[8]  input
+ADC_BD[4]       P14[10] input
+ADC_BD[5]       P14[12] input
+ADC_BD[6]       P14[14] input
+ADC_BD[7]       P14[16] input
+ADC_BD[8]       P14[18] input
+ADC_BD[9]       P13[20] input
 
-ADC_CLK         P13[4]
-ADC_S2          P13[6]
-ADC_S1          P13[8]
-ADC_DFS         P13[10]
+ADC_CLK         P13[4]  output
+ADC_S2          P13[6]  output
+ADC_S1          P13[8]  output
+ADC_DFS         P13[10] output
 
-DAC_D[0]        P11[3]
-DAC_D[1]        P11[5]
-DAC_D[2]        P11[7]
-DAC_D[3]        P11[9]
-DAC_D[4]        P11[11]
-DAC_D[5]        P11[13]
-DAC_D[6]        P11[15]
-DAC_D[7]        P11[17]
-DAC_D[8]        P11[19]
-DAC_D[9]        P13[7]
+DAC_D[0]        P11[3]  output
+DAC_D[1]        P11[5]  output
+DAC_D[2]        P11[7]  output
+DAC_D[3]        P11[9]  output
+DAC_D[4]        P11[11] output
+DAC_D[5]        P11[13] output
+DAC_D[6]        P11[15] output
+DAC_D[7]        P11[17] output
+DAC_D[8]        P11[19] output
+DAC_D[9]        P13[7]  output
 
-DAC_EN          P12[3]
-DAC_PD          P12[5]
-DAC_CS          P12[7]
-DAC_CLK         P12[9]
+DAC_EN          P12[3]  output
+DAC_PD          P12[5]  output
+DAC_CS          P12[7]  output
+DAC_CLK         P12[9]  output
 
-RADIO_RESETN    P12[4]
-RADIO_CDATA     P12[6]
-RADIO_SCLK      P12[8]
-RADIO_RDATA     P12[10]
-RADIO_CSN       P12[12]
+RADIO_RESETN    P12[4]  output
+RADIO_CDATA     P12[6]  output
+RADIO_SCLK      P12[8]  output
+RADIO_RDATA     P12[10] input
+RADIO_CSN       P12[12] output
 
-VCO_CLK         P12[14]
-VCO_DATA        P12[16]
-VCO_LE          P12[18]
-VCO_CE          P12[20]
-VCO_PDB         P13[3]
-VCO_LD          P13[5]
+VCO_CLK         P12[14] output
+VCO_DATA        P12[16] output
+VCO_LE          P12[18] output
+VCO_CE          P12[20] output
+VCO_PDB         P13[3]  output
+VCO_LD          P13[5]  input

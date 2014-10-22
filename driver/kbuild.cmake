@@ -9,7 +9,7 @@ set(ENV{PATH} "${TOOLS_PATH}/bin:${CROSS_PATH}:$ENV{PATH}")
 set(ENV{CROSS_COMPILE} arm-uclinuxeabi-)
 set(ENV{CORSS_COMPILE_APPS} arm-uclinuxeabi-)
 
-set(ENV{MCU} A2F)
+set(ENV{MCU} M2S)
 
 set(ENV{SAMPLE} ${PROJECT_NAME})
 
