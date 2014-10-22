@@ -293,6 +293,29 @@ def pass_through_with_enable(clearn, clock, in_sign, out_sign, enable):
 
     return p
 
+def cic_interp_coefficients(interp, cic_order, cic_delay):
+    """Returns the cic interpolator impulse response coefficients."""
+    from scipy.special import binom
+    # Use the nomenclature from Hogenauer
+    N = cic_order
+    M = cic_delay
+    R = interp
+
+    # First define the CIC impulse response function
+    ha = lambda j, k: sum([( (-1)**l * binom(N, l) *
+        binom(N - j + k - R * M * l, k - R * M * l)) \
+        for l in range(0, int(math.floor(k / (R * M)) + 1))])
+    hb = lambda j, k: (-1)**k * binom(2 * N + 1 - j, k)
+    def h(j, k):
+        if j in range(1, N + 1):
+            return ha(j, k)
+        else:
+            return hb(j, k)
+
+    # This is the impulse response at the final stage.
+    j = 2*N
+    return [h(j, k) for k in range(0, (R * M - 1) * N + j - 1)]
+
 def cic_filter_response(interp, cic_order, cic_delay):
     import numpy as np
     import matplotlib.pyplot as plt
@@ -300,7 +323,7 @@ def cic_filter_response(interp, cic_order, cic_delay):
     # Hogenauer, eqn. 5
     h_mag = (np.sin(np.pi * cic_delay * f) / np.sin(np.pi * f / interp))**(2 * cic_order)
     # dB w.r.t. DC, since it's a lowpass filter
-    h_db = -5 * log(h_mag / h_mag[0])
+    h_db = -5 * np.log(h_mag / h_mag[0])
     plt.plot(f, h_db)
     fcutoff = f[np.argmax(h_db >= 3)]
     plt.vlines(fcutoff, 0, 120, color='r', linestyles='dashed', label='fc')
@@ -454,8 +477,6 @@ def interleaver(clearn, clock, clock2x,
             q.next = in_q
             valid.next = True
             last.next = in_last
-        elif not phase:
-            valid.next = False
         else:
             i.next = 0
             q.next = 0
@@ -465,10 +486,9 @@ def interleaver(clearn, clock, clock2x,
     @always_seq(clock2x.posedge, reset=clearn)
     def consumer():
         if valid:
-            phase.next = not phase
             out_valid.next = True
             out_last.next = last
-            out_data.next = q if phase else i
+            out_data.next = q if clock else i
         else:
             out_valid.next = False
             out_last.next = False
@@ -603,9 +623,17 @@ def duc(clearn, dac_clock, dac2x_clock,
     truncator_1 = truncator(clearn, dac_clock, sample, truncated_1)
     duc_chain = (truncator_1, )
 
+    if kwargs.get('dds_enable', True):
+        if_out = Signature("if_out", True, bits=9)
+        dds_args = clearn, dac_clock, ddsen, truncated_1, if_out, fcw
+        dds = DDS(*dds_args, num_samples=DDS_NUM_SAMPLES)
+        duc_chain = duc_chain + (dds, )
+    else:
+        if_out = truncated_1
+
     if kwargs.get('fir_enable', True):
         filtered = Signature("filtered", True, bits=9)
-        fir_0 = FIR(clearn, dac_clock, truncated_1, filtered,
+        fir_0 = FIR(clearn, dac_clock, if_out, filtered,
                     fir_coeff_ram_addr,
                     fir_coeff_ram_din0,
                     fir_coeff_ram_din1,
@@ -626,7 +654,7 @@ def duc(clearn, dac_clock, dac2x_clock,
                     firen, fir_bank1, fir_bank0, fir_N)
         duc_chain = duc_chain + (fir_0, )
     else:
-        filtered = truncated_1
+        filtered = if_out
 
     upsampled = Signature("upsampled", True, bits=9)
     upsampler_0 = upsampler(clearn, dac_clock, filtered, upsampled, interp)
@@ -637,7 +665,8 @@ def duc(clearn, dac_clock, dac2x_clock,
         cic_0 = cic(clearn, dac_clock, filtered, rate_changed,
                 interp,
                 shift,
-                cic_order=4, cic_delay=1,
+                cic_order=kwargs.get('cic_order', 4),
+                cic_delay=kwargs.get('cic_delay', 1),
                 sim=dspsim)
         duc_chain = duc_chain + (cic_0, )
 
@@ -649,24 +678,7 @@ def duc(clearn, dac_clock, dac2x_clock,
     else:
         processed = upsampled
 
-    if kwargs.get('dds_enable', True):
-        dds_out = Signature("dds_out", True, bits=10)
-        dds_args = clearn, dac_clock, ddsen, dds_out, fcw
-        dds = DDS(*dds_args, num_samples=DDS_NUM_SAMPLES)
-        duc_chain = duc_chain + (dds, )
-
-        rf_out = Signal(bool(0))
-        rf_out_i = Signal(intbv(0, min=-2**9, max=2**9))
-        rf_out_q = Signal(intbv(0, min=-2**9, max=2**9))
-        rf_out = Signature("rf_out", True, bits=10)
-        dds_mux = iqmux(clearn, dac_clock,
-                ddsen,
-                processed,
-                dds_out,
-                rf_out)
-        duc_chain = duc_chain + (dds_mux, )
-    else:
-        rf_out = processed
+    rf_out = processed
 
     tx_loopback = pass_through_with_enable(clearn, dac_clock,
         rf_out, loopback, loopen)
@@ -688,7 +700,7 @@ def duc(clearn, dac_clock, dac2x_clock,
     else:
         corrected = rf_out
 
-    offset = Signature("binary_offset", True, bits=10)
+    offset = Signature("binary_offset", False, bits=10)
     offseter = binary_offseter(clearn, dac_clock,
             corrected, offset)
     duc_chain = duc_chain + (offseter, )

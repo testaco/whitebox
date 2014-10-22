@@ -19,10 +19,11 @@ from myhdl import \
 
 from apb3_utils import Apb3Bus
 from fifo import fifo
-from whitebox import whitebox
+from whitebox import whitebox, whitebox_config
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
 from test_dsp import figure_discrete_quadrature, figure_fft_power, figure_fft_phase
 from dds import freq_to_fcw
+from duc import cic_shift, cic_filter_response
 from ram import Ram, Ram2
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
@@ -115,13 +116,24 @@ class WhiteboxSim(object):
         s = Simulation(ss)
         s.run()
 
-    def fft_tx(self, decim=1):
+    def fft_tx(self, decim=1, interp=10):
         """Compute the FFT of the transmitted signal."""
         #y = [i + 1j * q for i, q in zip (self.tx_i, self.tx_q)]
         y = self.tx(decim=decim)
+        y = (y / np.max(y))# + np.random.normal(scale=10e-2, size=len(y))
+        #y = signal.resample(y, len(y)*interp) + np.random.normal(scale=10e-3, size=len(y)*interp)
+        y2 = np.zeros(len(y)*interp, dtype=np.complex128)
+        for i in range(len(y)):
+            y2[i*interp] = y[i]
+        sample_rate = self.sample_rate / decim * interp
+        fir_coeff = signal.firwin(512,
+                (1e6) / (sample_rate / 2))
+        y = signal.lfilter(fir_coeff, 1.0, y2)
+        y += np.random.normal(scale=10e-4, size=len(y))
+        print 'LENGTH OF Y', len(y)
         #y = signal.decimate(y, decim)
         n = len(y)
-        frq = np.fft.fftfreq(n, 1/(self.sample_rate/decim))
+        frq = np.fft.fftfreq(n, 1/sample_rate)
         Y = np.fft.fft(y)#/n
         #return np.concatenate((frq[0:1+64], frq[n-64:])), \
         #       np.concatenate((Y[0:1+64], Y[n-64:]))
@@ -158,6 +170,28 @@ class WhiteboxSim(object):
 
         f3 = figure_fft_phase("Phase", (3, 1, 3), f_parent,
                 frq, Y)
+
+    def spectral_mask_tx(self, band, atten, decim=1):
+        spurs = []
+        frq, Y = self.fft_tx(decim)
+        power_Y = np.abs(Y)**2
+        power_db = -10 * np.log10(power_Y / np.max(power_Y))
+        band_start, band_stop = band
+        for f, p in zip(frq[0:len(frq/2)], power_db[0:len(power_db)/2]):
+            if f > band_start and f < band_stop:
+                continue
+            else:
+                if p < atten:
+                    spurs.append((f, p))
+        for f, p in zip(frq[len(frq/2):], power_db[len(power_db)/2+1:]):
+            if f > band_start and f < band_stop:
+                continue
+            else:
+                if p < atten:
+                    spurs.append((f, p))
+        if spurs:
+            print 'had spurs', spurs
+        assert len(spurs) == 0
 
     def rx_signal(self, sig):
         self.rx_n = len(sig)
@@ -671,6 +705,10 @@ class WhiteboxImpulseResponseTestCase(unittest.TestCase):
         self.fifo_args = { 'width': 32, 'depth': self.fifo_depth }
         self.whitebox_args = { 'interp': self.interp }
 
+        if not hasattr(self, 'i_gain'):
+            self.i_gain = 1.0
+            self.q_gain = 1.0
+
     def simulate(self, dut):
         @instance
         def stimulus():
@@ -691,6 +729,9 @@ class WhiteboxImpulseResponseTestCase(unittest.TestCase):
             yield bus.transmit(WE_STATUS_ADDR, bus.rdata & ~WS_FIREN)
             yield bus.receive(WE_STATUS_ADDR)
             assert not bus.rdata & WS_FIREN
+
+            gain_word = lambda i: intbv(((intbv(int(i[1]*2.**9))[32:] << 16) & 0x03ff0000) | (intbv(int(i[0]*2.**9))[32:] & 0x3ff))[32:]
+            yield bus.transmit(WE_GAIN_ADDR, gain_word((self.i_gain, self.q_gain)))
 
             # Set the threshold
             afval = intbv(self.fifo_depth - self.bulk_size)[16:]
@@ -736,6 +777,14 @@ class WhiteboxImpulseResponseTestCase(unittest.TestCase):
                 yield bus.transmit(WE_SAMPLE_ADDR, concat(q, i))
                 N.next = N + 1
                 yield delay(1)
+            
+            ## Set the FCW
+            fcw = intbv(freq_to_fcw(self.freq,
+                    sample_rate=48e3))[32:]
+            yield bus.transmit(WE_FCW_ADDR, fcw)
+            yield bus.receive(WE_FCW_ADDR)
+            print 'FCW', fcw, 'bus.rdata', bus.rdata
+            assert bus.rdata == fcw
 
             ## Now start transmitting
             yield bus.transmit(WE_STATUS_ADDR, self.status | WES_TXEN)
@@ -896,6 +945,12 @@ class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.freq = 1.7e3 
         self.status = WES_FILTEREN
 
+        self.cic_order = whitebox_config.get('cic_order', 4)
+        self.cic_delay = whitebox_config.get('cic_delay', 1)
+        self.shift = cic_shift(9, 10, self.interp,
+                self.cic_order, self.cic_delay)
+        print 'shift', self.shift
+
         self.cnt = 128
         self.n = np.arange(0, self.cnt)
         self.x = np.zeros(self.cnt, dtype=np.complex128)
@@ -914,11 +969,13 @@ class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
 
         self.s.plot_tx("whitebox_cic_impulse_response", decim=self.interp)
         plt.savefig("test_whitebox_cic_impulse_response.png")
-        assert (self.s.tx() == self.y).all()
+        print 'this is it'
+        print [t / 2 for t in self.s.tx()]
+        print cic_filter_response(self.interp, self.cic_order, self.cic_delay)
+        #assert (self.s.tx() == self.y).all()
 
 class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
     def setUp(self):
-        from duc import cic_shift
         self.apb3_duration = APB3_DURATION
         self.fifo_depth = 64
         self.bulk_size = 16
@@ -929,9 +986,9 @@ class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.coeffs = [1, 4, 10, 16, 19, 16, 10, 4, 1]
 
         self.interp = 3
-        cic_delay = 1
-        cic_order = 4
-        self.shift = cic_shift(9, 10, self.interp, 4, 1)
+        cic_order = whitebox_config.get('cic_order', 4)
+        cic_delay = whitebox_config.get('cic_delay', 1)
+        self.shift = cic_shift(9, 10, self.interp, cic_order, cic_delay)
         print 'shift', self.shift
         self.cnt = self.record_tx = 32 #ceil(self.sample_rate * self.duration)
         self.n = np.arange(0, self.cnt)
@@ -955,6 +1012,41 @@ class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
         print self.s.tx()
         print self.y
         assert (self.s.tx() == self.y).all()
+
+class WhiteboxSpectrumMaskTestCase(WhiteboxImpulseResponseTestCase):
+    def setUp(self):
+        WhiteboxImpulseResponseTestCase.setUp(self)
+
+class TestDdsSpectrumMask(WhiteboxSpectrumMaskTestCase):
+    def setUp(self):
+        self.apb3_duration = APB3_DURATION
+        self.fifo_depth = 64
+        self.bulk_size = 16
+        self.sample_rate = 6.144e6
+        self.freq = 1.7e3 
+        self.interp = 1
+        self.status = WES_DDSEN | WES_FILTEREN
+
+        cic_order = whitebox_config.get('cic_order', 4)
+        cic_delay = whitebox_config.get('cic_delay', 1)
+        self.shift = cic_shift(9, 10, self.interp, cic_order, cic_delay)
+
+        self.cnt = 512
+        self.n = np.arange(0, self.cnt)
+        self.x = np.array([((1 << 15)-1) + 1j * ((1 << 15)-1) \
+                for i in range(self.cnt)], dtype=np.complex128)
+        WhiteboxSpectrumMaskTestCase.setUp(self)
+        
+    def test_whitebox_dds_spectrum_mask(self):
+        def test_whitebox_dds_spectrum_mask():
+            return self.s.cosim_dut("cosim_whitebox_dds_spectrum_mask",
+                    self.fifo_args, self.whitebox_args)
+
+        self.simulate(test_whitebox_dds_spectrum_mask)
+
+        self.s.plot_tx("whitebox_dds_spectrum_mask", decim=self.interp)
+        plt.savefig("test_whitebox_dds_spectrum_mask.png")
+        self.s.spectral_mask_tx([-25e3, 0], 35)
 
 class TestRx(unittest.TestCase):
     def test_rx(self):

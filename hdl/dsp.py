@@ -428,7 +428,7 @@ def accumulator(clearn, clock, in_sign, out_sign, n=0):
         if in_valid:
             out_valid.next = True
             out_last.next = in_last
-            print 'accum%d in=%d out=%d next=%d' % (n, in_i, out_i, in_i + out_i)
+            #print 'accum%d in=%d out=%d next=%d' % (n, in_i, out_i, in_i + out_i)
             out_i.next = out_i + in_i
             out_q.next = out_q + in_q
         else:
@@ -449,10 +449,11 @@ def delay_1(clearn, clock, sign, x, y):
 
 def delay_2(clearn, clock, sign, x, y):
     element = Signal(sign.myhdl(0))
+    valid = sign.valid
 
     @always_seq(clock.posedge, reset=clearn)
     def delay():
-        if sign.valid:
+        if valid:
             element.next = x
             y.next = element
     return delay

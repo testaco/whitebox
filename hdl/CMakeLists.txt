@@ -120,6 +120,10 @@ add_test(NAME test_whitebox_fir_impulse_response
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestFirImpulseResponse
 )
 
+add_test(NAME test_whitebox_dds_spectrum_mask
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestDdsSpectrumMask
+)
+
 add_test(NAME test_whitebox_cic_impulse_response
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestCicImpulseResponse
 )
