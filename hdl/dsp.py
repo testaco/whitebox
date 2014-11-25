@@ -449,10 +449,11 @@ def delay_1(clearn, clock, sign, x, y):
 
 def delay_2(clearn, clock, sign, x, y):
     element = Signal(sign.myhdl(0))
+    valid = sign.valid
 
     @always_seq(clock.posedge, reset=clearn)
     def delay():
-        if sign.valid:
+        if valid:
             element.next = x
             y.next = element
     return delay

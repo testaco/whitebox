@@ -14,6 +14,18 @@ from rfe import rfe as RFE
 from rfe import print_rfe_ioctl
 from ram import Ram, Ram2
 
+whitebox_config = dict(
+        interp=128,
+        rfe_enable=True,
+        duc_enable=True,
+        fir_enable=True,
+        cic_enable=True,
+        cic_order=4,
+        cic_delay=1,
+        dds_enable=True,
+        conditioning_enable=True,
+        ddc_enable=True)
+
 class OverrunError(Exception):
     """Thrown when the system experiences an overflow on a FIFO buffer."""
     pass
@@ -251,6 +263,8 @@ def whitebox(
     duc_kwargs = dict(dspsim=dspsim,
                     interp=interp_default,
                     cic_enable=kwargs.get('cic_enable', True),
+                    cic_order=kwargs.get('cic_order', 4),
+                    cic_delay=kwargs.get('cic_delay', 1),
                     fir_enable=kwargs.get('fir_enable', True),
                     dds_enable=kwargs.get('dds_enable', True),
                     conditioning_enable=kwargs.get('conditioning_enable', True))
@@ -309,7 +323,6 @@ if __name__ == '__main__':
     from fifo import fifo as FIFO
     fifo_depth = 1024
     fifo_width = 32
-    interp = 128
     duc_enable = True
     rfe_enable = True
 
@@ -483,16 +496,8 @@ if __name__ == '__main__':
                 rx_fifo_wrcnt,
     )
 
-    toVerilog(whitebox, *signals,
-            interp=interp,
-            rfe_enable=True,
-            duc_enable=True,
-            fir_enable=True,
-            cic_enable=True,
-            dds_enable=True,
-            conditioning_enable=True,
-            ddc_enable=True)
-    
+    toVerilog(whitebox, *signals, **whitebox_config)
+
     toVerilog(whitebox_reset, bus_presetn,
             dac_clock, clear_enable, clearn)
 

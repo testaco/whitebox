@@ -67,7 +67,8 @@ def fir(clearn, clock, in_sign, out_sign,
             delay_line_i_ram_addr.next = concat(bank1, bank0, modbv(n - k, min=0, max=2**7-1))
             delay_line_i_ram_blk.next = False
             delay_line_i_ram_wen.next = True
-            delay_line_q_ram_addr.next = concat(bank1, bank0, modbv(n - k, min=0, max=2**7-1))
+            delay_line_q_ram_addr.next = concat(bank1, bank0,
+                    modbv(n - k, min=0, max=2**7-1))
             delay_line_q_ram_blk.next = False
             delay_line_q_ram_wen.next = True
             coeff_ram_addr.next = concat(bank1, bank0, k)
@@ -121,3 +122,142 @@ def fir(clearn, clock, in_sign, out_sign,
                 state.next = state_t.DONE
 
     return accessor, operator
+
+def poly_fir_decim(
+        clearn, clock, in_sign, out_sign,
+        coeff_ram_addr,
+        coeff_ram_din0,
+        coeff_ram_din1,
+        coeff_ram_blk,
+        coeff_ram_wen,
+        coeff_ram_dout0,
+        coeff_ram_dout1,
+        delay_line_i_ram_addr,
+        delay_line_i_ram_din,
+        delay_line_i_ram_blk,
+        delay_line_i_ram_wen,
+        delay_line_i_ram_dout,
+        delay_line_q_ram_addr,
+        delay_line_q_ram_din,
+        delay_line_q_ram_blk,
+        delay_line_q_ram_wen,
+        delay_line_q_ram_dout,
+        enable, L, D, **kwargs):
+    pass
+
+def poly_fir_interp(
+        clearn, clock, in_sign, out_sign,
+        coeff_ram_addr,
+        coeff_ram_din0,
+        coeff_ram_din1,
+        coeff_ram_blk,
+        coeff_ram_wen,
+        coeff_ram_dout0,
+        coeff_ram_dout1,
+        delay_line_i_ram_addr,
+        delay_line_i_ram_din,
+        delay_line_i_ram_blk,
+        delay_line_i_ram_wen,
+        delay_line_i_ram_dout,
+        delay_line_q_ram_addr,
+        delay_line_q_ram_din,
+        delay_line_q_ram_blk,
+        delay_line_q_ram_wen,
+        delay_line_q_ram_dout,
+        enable, L, M, **kwargs):
+
+    m = Signal(modbv(0, min=0, max=M.max))
+    in_valid = in_sign.valid
+    in_i = in_sign.i
+    in_q = in_sign.q
+    in_last = in_sign.last
+    out_valid = out_sign.valid
+    out_i = out_sign.i
+    out_q = out_sign.q
+    out_last = out_sign.last
+    fir_latch = out_sign.copy('fir_latch')
+    fir_latch_valid = fir_latch.valid
+    fir_latch_i = fir_latch.i
+    fir_latch_q = fir_latch.q
+    fir_latch_last = fir_latch.last
+
+    fir_ = fir(clearn, clock, in_sign, fir_latch,
+        coeff_ram_addr,
+        coeff_ram_din0,
+        coeff_ram_din1,
+        coeff_ram_blk,
+        coeff_ram_wen,
+        coeff_ram_dout0,
+        coeff_ram_dout1,
+        delay_line_i_ram_addr,
+        delay_line_i_ram_din,
+        delay_line_i_ram_blk,
+        delay_line_i_ram_wen,
+        delay_line_i_ram_dout,
+        delay_line_q_ram_addr,
+        delay_line_q_ram_din,
+        delay_line_q_ram_blk,
+        delay_line_q_ram_wen,
+        delay_line_q_ram_dout,
+        enable, m[1], m[0], L, **kwags)
+
+    state_t = enum('IDLE', 'RUNNING')
+    state = Signal(state_t.IDLE)
+
+    @always_comb
+    def assignments():
+        out_valid.next = fir_latch_valid
+        out_i.next = fir_latch_i
+        out_q.next = fir_latch_q
+        out_last.next = fir_latch_last
+
+    @always_seq(clock.posedge, reset=clearn)
+    def commutator():
+        if state == state_t.IDLE:
+            m.next = 0
+            if in_valid:
+                state.next = state_t.RUNNING
+            else:
+                state.next = state_t.IDLE
+        else:
+            if fir_latch_valid:
+                if m == M - 1:
+                    state.next = state_t.IDLE
+                else:
+                    state.next = state_t.RUNNING
+                    m.next = m + 1
+            else:
+                state.next = state_t.RUNNING
+
+    return fir_, assignments, commutator
+
+def rational_resampling_fir(
+        clearn, clock, in_sign, out_sign,
+        coeff_ram_addr,
+        coeff_ram_din0,
+        coeff_ram_din1,
+        coeff_ram_blk,
+        coeff_ram_wen,
+        coeff_ram_dout0,
+        coeff_ram_dout1,
+        delay_line_i_ram_addr,
+        delay_line_i_ram_din,
+        delay_line_i_ram_blk,
+        delay_line_i_ram_wen,
+        delay_line_i_ram_dout,
+        delay_line_q_ram_addr,
+        delay_line_q_ram_din,
+        delay_line_q_ram_blk,
+        delay_line_q_ram_wen,
+        delay_line_q_ram_dout,
+        enable, L, M, D, **kwargs):
+    d = Signal(intbv(0, min=0, max=D.max))
+    @always_seq(clock.posedge, reset=clearn)
+    def decimator():
+        if decim_latch_valid:
+            if d.next == 0:
+                output_valid.next = True
+            else:
+                output_valid.next = False
+
+    return in_, fir_, assignments, commutator, decimator

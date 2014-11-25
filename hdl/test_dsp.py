@@ -85,8 +85,8 @@ def figure_fft_power(title, axes, f_parent, frq, Y):
     f = f_parent.add_subplot(*axes, title=title)
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,3))
     ax1 = plt.gca()
-    ax1.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: ('%.1f')%(x/1e6)))
-    plt.xlabel('Freq (Radians)')
+    ax1.xaxis.set_major_formatter(FuncFormatter(lambda x, pos: ('%.1f')%(x/1e3)))
+    plt.xlabel('Freq (kHz)')
     plt.ylabel('Attenuation (dB)')
     #amplitude_Y = 20*np.log10(np.abs(Y))
     power_Y = np.abs(Y)**2
