@@ -145,7 +145,7 @@ void _cmx991_wr_byte(struct whitebox_platform_data_t* platform_data, u8 byte) {
 }
 
 void whitebox_gpio_cmx991_write(struct whitebox_platform_data_t* platform_data, u8 address, u8 data) {
-    d_printk(2, "write %x=%x\n", address, data);
+    d_printk(4, "write %x=%x\n", address, data);
     gpio_set_value(platform_data->radio_csn_pin, 0);
     _cmx991_wr_byte(platform_data, address);
     udelay(10);
@@ -171,21 +171,21 @@ u8 _cmx991_rd_byte(struct whitebox_platform_data_t* platform_data) {
 
 u8 whitebox_gpio_cmx991_read(struct whitebox_platform_data_t* platform_data, u8 address) {
     u8 value;
-    d_printk(2, "read %x=xx\n", address);
+    d_printk(4, "read %x=xx\n", address);
     gpio_set_value(platform_data->radio_csn_pin, 0);
     _cmx991_wr_byte(platform_data, address);
     udelay(10);
     value = _cmx991_rd_byte(platform_data);
     gpio_set_value(platform_data->radio_csn_pin, 1);
     gpio_set_value(platform_data->radio_sclk_pin, 0);
-    d_printk(2, "read %x=%x\n", address, value);
+    d_printk(4, "read %x=%x\n", address, value);
     return value;
 }
 EXPORT_SYMBOL(whitebox_gpio_cmx991_read);
 
 void whitebox_gpio_adf4351_write(struct whitebox_platform_data_t* platform_data, u32 data) {
     int i;
-    d_printk(2, "write %x\n", data);
+    d_printk(4, "write %x\n", data);
 
     // Setup
     gpio_set_value(platform_data->vco_le_pin, 1);

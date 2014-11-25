@@ -70,6 +70,7 @@ int _test_rx_pll(float freq) {
     assert(whitebox_rx(&wb, freq) == 0);
     whitebox_plls_locked(&wb);
     assert(whitebox_plls_locked(&wb));
+    //assert(ioctl(wb.fd, W_LOCKED));
     assert(whitebox_close(&wb) == 0);
 }
 

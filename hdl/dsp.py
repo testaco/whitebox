@@ -428,7 +428,7 @@ def accumulator(clearn, clock, in_sign, out_sign, n=0):
         if in_valid:
             out_valid.next = True
             out_last.next = in_last
-            print 'accum%d in=%d out=%d next=%d' % (n, in_i, out_i, in_i + out_i)
+            #print 'accum%d in=%d out=%d next=%d' % (n, in_i, out_i, in_i + out_i)
             out_i.next = out_i + in_i
             out_q.next = out_q + in_q
         else:
@@ -550,8 +550,9 @@ def truncator(clearn, in_clock, in_sign, out_sign, **kwargs):
 
     assert i_lsb >= 0 and q_lsb >= 0
 
-    print 'truncator from', in_sign.bits, 'bits to', out_sign.bits, 'bits; so [%d:%d]' % (i_msb, i_lsb), 'which is', i_msb - i_lsb, 'bits long'
     debug = kwargs.get('debug', False)
+    if debug:
+        print 'truncator from', in_sign.bits, 'bits to', out_sign.bits, 'bits; so [%d:%d]' % (i_msb, i_lsb), 'which is', i_msb - i_lsb, 'bits long'
 
     @always_seq(in_clock.posedge, reset=clearn)
     def truncate():

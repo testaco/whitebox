@@ -8,6 +8,22 @@
 
 #include "whitebox.h"
 
+long whitebox_tx_bytes_total() {
+    char bytes_str[512];
+    int fd;
+    fd = open("/sys/kernel/debug/whitebox/tx_bytes", O_RDONLY);
+    if (fd < 0) {
+        perror("open");
+        return fd;
+    }
+    if (read(fd, bytes_str, 511) < 0) {
+        perror("read");
+        close(fd);
+        return -1;
+    }
+    return atol(bytes_str);
+}
+
 int whitebox_parameter_set(const char *param, int value)
 {
     char name[512];
@@ -323,6 +339,7 @@ int whitebox_tx_get_buffer_runs(whitebox_t* wb,
 int whitebox_tx_set_latency(whitebox_t *wb, int ms)
 {
     int threshold = 4 * wb->rate * ((float)ms * 1e-3);
+    printf("%dms threshold is %d\n", ms, threshold);
     return whitebox_parameter_set("user_source_buffer_threshold", threshold);
 }
 

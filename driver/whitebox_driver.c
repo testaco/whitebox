@@ -56,7 +56,7 @@ module_param(whitebox_user_order, int, S_IRUSR | S_IWUSR);
 /*
  * Whether or not to use the mock.
  */
-static int whitebox_mock_en = 1;
+static int whitebox_mock_en = 0;
 module_param(whitebox_mock_en, int, S_IRUSR | S_IWUSR);
 
 /*
@@ -325,6 +325,7 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
     whitebox_rf_source_free(rf_source);
     whitebox_user_sink_free(user_sink);
     atomic_dec(&use_count);
+    d_printk(2, "whitebox release done\n");
     return 0;
 }
 
@@ -387,25 +388,38 @@ static unsigned int whitebox_poll(struct file *filp, poll_table *wait)
     unsigned int mask = 0;
     unsigned long src, dest;
 
+    d_printk(3, "poll %d\n", whitebox_device->state);
+
     down(&whitebox_device->sem);
 
+    if (whitebox_device->state == WDS_IDLE) {
+        mask |= POLLOUT | POLLRDNORM | POLLIN | POLLWRNORM;
+        up(&whitebox_device->sem);
+        return mask;
+    }
+
     if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
-        if (tx_error(whitebox_device))
+        if (tx_error(whitebox_device)) {
+            up(&whitebox_device->sem);
             mask |= POLLERR;
+            return mask;
+        }
+        if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0) {
+            up(&whitebox_device->sem);
+            mask |= POLLOUT | POLLWRNORM;
+            return mask;
+        }
     }
 
     poll_wait(filp, &whitebox_device->write_wait_queue, wait);
+
     if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0)
-        mask |= POLLOUT | POLLRDNORM;
+        mask |= POLLOUT | POLLWRNORM;
 
     if (whitebox_device->state == WDS_RX || whitebox_device->state == WDS_RX_STREAMING) {
         poll_wait(filp, &whitebox_device->read_wait_queue, wait);
         if (whitebox_user_sink_data_available(&whitebox_device->user_sink, &src) > 0)
-            mask |= POLLIN | POLLWRNORM;
-    }
-
-    if (whitebox_device->state == WDS_IDLE) {
-        mask |= POLLOUT | POLLRDNORM | POLLIN | POLLWRNORM;
+            mask |= POLLIN | POLLRDNORM;
     }
 
     up(&whitebox_device->sem);
@@ -501,7 +515,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     int ret = 0, err = 0;
     struct whitebox_user_source *user_source = &whitebox_device->user_source;
     
-    d_printk(2, "whitebox write\n");
+    d_printk(2, "whitebox write %d\n", count);
 
     if (down_interruptible(&whitebox_device->sem)) {
         return -ERESTARTSYS;
@@ -678,7 +692,7 @@ long whitebox_ioctl_reset(void) {
         whitebox_device->adf4351_regs[i] = 0;
     }
     for (i = 0; i < WC_REGS_COUNT; ++i) {
-        whitebox_device->cmx991_regs[i] = -1;
+        whitebox_device->cmx991_regs[i] = 0;
     }
     exciter->ops->set_state(exciter, WS_CLEAR);
     receiver->ops->set_state(receiver, WS_CLEAR);
@@ -692,7 +706,7 @@ long whitebox_ioctl_locked(void) {
     c = whitebox_gpio_cmx991_read(whitebox_device->platform_data,
         WHITEBOX_CMX991_LD_REG);
 #else
-    c = WHITEBOX_CMX991_LD_REG;
+    c = WHITEBOX_CMX991_LD_MASK;
 #endif
     locked = whitebox_gpio_adf4351_locked(whitebox_device->platform_data)
             && (c & WHITEBOX_CMX991_LD_MASK);
@@ -1050,6 +1064,16 @@ static struct file_operations whitebox_fops = {
     .poll = whitebox_poll,
 };
 
+char *string_for_last_error(int e) {
+    switch (e) {
+        case 0: return "none";
+        case W_ERROR_PLL_LOCK_LOST: return "pll lock lost";
+        case W_ERROR_TX_OVERRUN: return "overrun";
+        case W_ERROR_TX_UNDERRUN: return "underrun";
+        default: return "unknown";
+    }
+}
+
 void stats_show(struct seq_file *m, struct whitebox_stats *stats) {
     int i;
     seq_printf(m, "bytes=%ld\n", stats->bytes);
@@ -1073,7 +1097,7 @@ void stats_show(struct seq_file *m, struct whitebox_stats *stats) {
     seq_printf(m, "exec_dma_finished=%ld\n", stats->exec_dma_finished);
     seq_printf(m, "stop=%ld\n", stats->stop);
     seq_printf(m, "error=%ld\n", stats->error);
-    seq_printf(m, "last_error=%d\n", stats->last_error);
+    seq_printf(m, "last_error=%s\n", string_for_last_error(stats->last_error));
 }
 
 static int tx_stats_show(struct seq_file *m, void *private)
@@ -1094,6 +1118,28 @@ static int tx_stats_open(struct inode *inode, struct file *file)
 static const struct file_operations tx_stats_fops = {
     .owner = THIS_MODULE,
     .open = tx_stats_open,
+    .read = seq_read,
+    .llseek = seq_lseek,
+    .release = single_release,
+};
+
+static int tx_bytes_show(struct seq_file *m, void *private)
+{
+    struct whitebox_device *wb = (struct whitebox_device*)m->private;
+    struct whitebox_stats *stats = &wb->tx_stats;
+
+    seq_printf(m, "%ld", stats->bytes);
+    return 0;
+}
+
+static int tx_bytes_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, tx_bytes_show, inode->i_private);
+}
+
+static const struct file_operations tx_bytes_fops = {
+    .owner = THIS_MODULE,
+    .open = tx_bytes_open,
     .read = seq_read,
     .llseek = seq_lseek,
     .release = single_release,
@@ -1165,6 +1211,8 @@ static int whitebox_probe(struct platform_device* pdev) {
 
     debugfs_create_file("tx_stats", S_IRUGO, whitebox_device->debugfs_root,
                         whitebox_device, &tx_stats_fops);
+    debugfs_create_file("tx_bytes", S_IRUGO, whitebox_device->debugfs_root,
+                        whitebox_device, &tx_bytes_fops);
     debugfs_create_file("rx_stats", S_IRUGO, whitebox_device->debugfs_root,
                         whitebox_device, &rx_stats_fops);
 

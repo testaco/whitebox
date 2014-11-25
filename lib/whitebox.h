@@ -11,7 +11,7 @@
 #include "adf4351.h"
 #include "dsp.h"
 
-typedef struct whitebox {
+struct whitebox {
     int fd;
     cmx991_t cmx991;
     adf4351_t adf4351;
@@ -22,8 +22,11 @@ typedef struct whitebox {
 
     void *user_buffer;
     unsigned long user_buffer_size;
-} whitebox_t;
+};
 
+typedef struct whitebox whitebox_t;
+
+long whitebox_tx_bytes_total();
 int whitebox_parameter_set(const char *param, int value);
 int whitebox_parameter_get(const char *param);
 

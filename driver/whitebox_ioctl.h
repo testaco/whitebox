@@ -1,7 +1,7 @@
 #include <linux/ioctl.h>
 
 // DAC Rate
-#define W_DAC_RATE_HZ   6144000UL
+#define W_DAC_RATE_HZ   10000000UL
 
 // DDS Constants
 #define W_DDS_PA_BITWIDTH 25
@@ -52,8 +52,8 @@ typedef struct whitebox_args {
 } whitebox_args_t;
 
 // Location of the register files
-#define WHITEBOX_EXCITER_REGS          0x40050400
-#define WHITEBOX_RECEIVER_REGS         0x40050430
+#define WHITEBOX_EXCITER_REGS          0x31000000
+#define WHITEBOX_RECEIVER_REGS         0x31000030
 
 /* Register File */
 #define WE_SAMPLE_ADDR          0x0

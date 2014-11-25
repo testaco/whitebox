@@ -110,30 +110,6 @@ def whitebox(
         rx_fifo_underflow,
         rx_fifo_rdcnt,
         rx_fifo_wrcnt,
-        fir_coeff_ram_addr,
-        fir_coeff_ram_din0,
-        fir_coeff_ram_din1,
-        fir_coeff_ram_blk,
-        fir_coeff_ram_wen,
-        fir_coeff_ram_dout0,
-        fir_coeff_ram_dout1,
-        fir_load_coeff_ram_addr,
-        fir_load_coeff_ram_din0,
-        fir_load_coeff_ram_din1,
-        fir_load_coeff_ram_blk,
-        fir_load_coeff_ram_wen,
-        fir_load_coeff_ram_dout0,
-        fir_load_coeff_ram_dout1,
-        fir_delay_line_i_ram_addr,
-        fir_delay_line_i_ram_din,
-        fir_delay_line_i_ram_blk,
-        fir_delay_line_i_ram_wen,
-        fir_delay_line_i_ram_dout,
-        fir_delay_line_q_ram_addr,
-        fir_delay_line_q_ram_din,
-        fir_delay_line_q_ram_blk,
-        fir_delay_line_q_ram_wen,
-        fir_delay_line_q_ram_dout,
         **kwargs):
     """The whitebox.
 
@@ -190,6 +166,32 @@ def whitebox(
     rxstop = Signal(bool(0))
     rxfilteren = Signal(bool(0))
 
+    # The RAMs
+    fir_coeff_ram = Ram(clearn, dac_clock, bus.pclk, width=18, depth=512)
+    fir_delay_line_i_ram = Ram(clearn, dac_clock, dac_clock, width=9, depth=512)
+    fir_delay_line_q_ram = Ram(clearn, dac_clock, dac_clock, width=9, depth=512)
+
+    fir_coeff_ram_addr = fir_coeff_ram.port['a'].addr
+    fir_coeff_ram_din = fir_coeff_ram.port['a'].din
+    fir_coeff_ram_blk = fir_coeff_ram.port['a'].blk
+    fir_coeff_ram_wen = fir_coeff_ram.port['a'].wen
+    fir_coeff_ram_dout = fir_coeff_ram.port['a'].dout
+    fir_load_coeff_ram_addr = fir_coeff_ram.port['b'].addr
+    fir_load_coeff_ram_din = fir_coeff_ram.port['b'].din
+    fir_load_coeff_ram_blk = fir_coeff_ram.port['b'].blk
+    fir_load_coeff_ram_wen = fir_coeff_ram.port['b'].wen
+    fir_load_coeff_ram_dout = fir_coeff_ram.port['b'].dout
+    fir_delay_line_i_ram_addr = fir_delay_line_i_ram.port['a'].addr
+    fir_delay_line_i_ram_din = fir_delay_line_i_ram.port['a'].din
+    fir_delay_line_i_ram_blk = fir_delay_line_i_ram.port['a'].blk
+    fir_delay_line_i_ram_wen = fir_delay_line_i_ram.port['a'].wen
+    fir_delay_line_i_ram_dout = fir_delay_line_i_ram.port['a'].dout
+    fir_delay_line_q_ram_addr = fir_delay_line_q_ram.port['a'].addr
+    fir_delay_line_q_ram_din = fir_delay_line_q_ram.port['a'].din
+    fir_delay_line_q_ram_blk = fir_delay_line_q_ram.port['a'].blk
+    fir_delay_line_q_ram_wen = fir_delay_line_q_ram.port['a'].wen
+    fir_delay_line_q_ram_dout = fir_delay_line_q_ram.port['a'].dout
+
     ########### DIGITAL SIGNAL PROCESSING #######
     loopback = Signature("loopback", False, bits=10)
     duc_underrun = Signal(modbv(0, min=0, max=2**16))
@@ -230,12 +232,10 @@ def whitebox(
             adc_idata, adc_qdata, adc_last,
 
             fir_coeff_ram_addr,
-            fir_coeff_ram_din0,
-            fir_coeff_ram_din1,
+            fir_coeff_ram_din,
             fir_coeff_ram_blk,
             fir_coeff_ram_wen,
-            fir_coeff_ram_dout0,
-            fir_coeff_ram_dout1,
+            fir_coeff_ram_dout,
             fir_delay_line_i_ram_addr,
             fir_delay_line_i_ram_din,
             fir_delay_line_i_ram_blk,
@@ -281,12 +281,10 @@ def whitebox(
         rx_fifo_rdcnt, rx_fifo_wrcnt,
 
         fir_load_coeff_ram_addr,
-        fir_load_coeff_ram_din0,
-        fir_load_coeff_ram_din1,
+        fir_load_coeff_ram_din,
         fir_load_coeff_ram_blk,
         fir_load_coeff_ram_wen,
-        fir_load_coeff_ram_dout0,
-        fir_load_coeff_ram_dout1,
+        fir_load_coeff_ram_dout,
 
         firen, fir_bank1, fir_bank0, fir_N,
 
@@ -300,7 +298,11 @@ def whitebox(
 
     rfe = RFE(*rfe_args)
 
-    return rfe, duc
+    fir_coeff_ram_inst = fir_coeff_ram.instance_type()(**fir_coeff_ram.instance_signals())
+    fir_delay_line_i_ram_inst = fir_delay_line_i_ram.instance_type()(**fir_delay_line_i_ram.instance_signals())
+    fir_delay_line_q_ram_inst = fir_delay_line_q_ram.instance_type()(**fir_delay_line_q_ram.instance_signals())
+
+    return rfe, duc, fir_coeff_ram_inst, fir_delay_line_i_ram_inst, fir_delay_line_q_ram_inst
 
 if __name__ == '__main__':
     from apb3_utils import Apb3Bus
@@ -335,10 +337,6 @@ if __name__ == '__main__':
     bus_pslverr = bus.pslverr
     bus_pready = bus.pready
     bus_prdata = bus.prdata
-
-    fir_coeff_ram = Ram2(clearn, dac_clock, bus.pclk)
-    fir_delay_line_i_ram = Ram(clearn, dac_clock, dac_clock)
-    fir_delay_line_q_ram = Ram(clearn, dac_clock, dac_clock)
 
     tx_fifo_re = Signal(bool(False))
     tx_fifo_rclk = Signal(bool(False))
@@ -483,30 +481,6 @@ if __name__ == '__main__':
                 rx_fifo_underflow,
                 rx_fifo_rdcnt,
                 rx_fifo_wrcnt,
-                fir_coeff_ram.port['a'].addr,
-                fir_coeff_ram.port['a'].din[0],
-                fir_coeff_ram.port['a'].din[1],
-                fir_coeff_ram.port['a'].blk,
-                fir_coeff_ram.port['a'].wen,
-                fir_coeff_ram.port['a'].dout[0],
-                fir_coeff_ram.port['a'].dout[1],
-                fir_coeff_ram.port['b'].addr,
-                fir_coeff_ram.port['b'].din[0],
-                fir_coeff_ram.port['b'].din[1],
-                fir_coeff_ram.port['b'].blk,
-                fir_coeff_ram.port['b'].wen,
-                fir_coeff_ram.port['b'].dout[0],
-                fir_coeff_ram.port['b'].dout[1],
-                fir_delay_line_i_ram.port['a'].addr,
-                fir_delay_line_i_ram.port['a'].din,
-                fir_delay_line_i_ram.port['a'].blk,
-                fir_delay_line_i_ram.port['a'].wen,
-                fir_delay_line_i_ram.port['a'].dout,
-                fir_delay_line_q_ram.port['a'].addr,
-                fir_delay_line_q_ram.port['a'].din,
-                fir_delay_line_q_ram.port['a'].blk,
-                fir_delay_line_q_ram.port['a'].wen,
-                fir_delay_line_q_ram.port['a'].dout,
     )
 
     toVerilog(whitebox, *signals,
@@ -515,10 +489,10 @@ if __name__ == '__main__':
             duc_enable=True,
             fir_enable=True,
             cic_enable=True,
-            dds_enable=False,
+            dds_enable=True,
             conditioning_enable=True,
             ddc_enable=True)
-
+    
     toVerilog(whitebox_reset, bus_presetn,
             dac_clock, clear_enable, clearn)
 

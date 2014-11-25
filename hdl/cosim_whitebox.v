@@ -60,54 +60,6 @@ reg [10:0] rx_fifo_wrcnt;
 reg rx_fifo_wclk;
 reg rx_fifo_rclk;
 
-wire [8:0] fir_coeff_ram_addr;
-wire [8:0] fir_coeff_ram_din0;
-wire [8:0] fir_coeff_ram_din1;
-wire fir_coeff_ram_width0 = 1;
-wire fir_coeff_ram_width1 = 1;
-wire fir_coeff_ram_pipe = 1;
-wire fir_coeff_ram_wmode = 0;
-wire fir_coeff_ram_blk;
-wire fir_coeff_ram_wen;
-reg fir_coeff_ram_clk;
-reg [8:0] fir_coeff_ram_dout0;
-reg [8:0] fir_coeff_ram_dout1;
-
-wire [8:0] fir_load_coeff_ram_addr;
-wire [8:0] fir_load_coeff_ram_din0;
-wire [8:0] fir_load_coeff_ram_din1;
-wire fir_load_coeff_ram_width0 = 1;
-wire fir_load_coeff_ram_width1 = 1;
-wire fir_load_coeff_ram_pipe = 1;
-wire fir_load_coeff_ram_wmode = 0;
-wire fir_load_coeff_ram_blk;
-wire fir_load_coeff_ram_wen;
-reg fir_load_coeff_ram_clk;
-reg [8:0] fir_load_coeff_ram_dout0;
-reg [8:0] fir_load_coeff_ram_dout1;
-
-wire [8:0] fir_delay_line_i_ram_addr;
-wire [8:0] fir_delay_line_i_ram_din;
-wire fir_delay_line_i_ram_width0 = 1;
-wire fir_delay_line_i_ram_width1 = 1;
-wire fir_delay_line_i_ram_pipe = 1;
-wire fir_delay_line_i_ram_wmode = 0;
-wire fir_delay_line_i_ram_blk;
-wire fir_delay_line_i_ram_wen;
-reg fir_delay_line_i_ram_clk;
-reg [8:0] fir_delay_line_i_ram_dout;
-
-wire [8:0] fir_delay_line_q_ram_addr;
-wire [8:0] fir_delay_line_q_ram_din;
-wire fir_delay_line_q_ram_width0 = 1;
-wire fir_delay_line_q_ram_width1 = 1;
-wire fir_delay_line_q_ram_pipe = 1;
-wire fir_delay_line_q_ram_wmode = 0;
-wire fir_delay_line_q_ram_blk;
-wire fir_delay_line_q_ram_wen;
-reg fir_delay_line_q_ram_clk;
-reg [8:0] fir_delay_line_q_ram_dout;
-
 initial begin
     $dumpfile({`COSIM_NAME, ".vcd"});
     $dumpvars;
@@ -122,13 +74,7 @@ initial begin
             rx_fifo_wack, rx_fifo_dvld, rx_fifo_overflow, rx_fifo_underflow,
             rx_fifo_rdcnt, rx_fifo_wrcnt,
             rx_fifo_rclk, rx_fifo_wclk,
-            adc_idata, adc_qdata,
-            fir_coeff_ram_clk,
-            fir_coeff_ram_dout0, fir_coeff_ram_dout1,
-            fir_load_coeff_ram_clk,
-            fir_load_coeff_ram_dout0, fir_load_coeff_ram_dout1,
-            fir_delay_line_i_ram_clk, fir_delay_line_i_ram_dout,
-            fir_delay_line_q_ram_clk, fir_delay_line_q_ram_dout);
+            adc_idata, adc_qdata);
     $to_myhdl(pready, prdata, //pslverr,
             dac_data, dac_en,
             tx_status_led, tx_dmaready,
@@ -137,12 +83,7 @@ initial begin
             tx_fifo_re, tx_fifo_we, tx_fifo_wdata,
             tx_fifo_afval, tx_fifo_aeval,
             rx_fifo_re, rx_fifo_we, rx_fifo_wdata,
-            rx_fifo_afval, rx_fifo_aeval,
-            fir_coeff_ram_addr, fir_coeff_ram_din0, fir_coeff_ram_din1, fir_coeff_ram_width0, fir_coeff_ram_width1, fir_coeff_ram_pipe, fir_coeff_ram_wmode, fir_coeff_ram_blk, fir_coeff_ram_wen,
-            fir_load_coeff_ram_addr, fir_load_coeff_ram_din0, fir_load_coeff_ram_din1, fir_load_coeff_ram_width0, fir_load_coeff_ram_width1, fir_load_coeff_ram_pipe, fir_load_coeff_ram_wmode, fir_load_coeff_ram_blk, fir_load_coeff_ram_wen,
-            fir_delay_line_i_ram_addr, fir_delay_line_i_ram_din, fir_delay_line_i_ram_width0, fir_delay_line_i_ram_width1, fir_delay_line_i_ram_pipe, fir_delay_line_i_ram_wmode, fir_delay_line_i_ram_blk, fir_delay_line_i_ram_wen,
-            fir_delay_line_q_ram_addr, fir_delay_line_q_ram_din, fir_delay_line_q_ram_width0, fir_delay_line_q_ram_width1, fir_delay_line_q_ram_pipe, fir_delay_line_q_ram_wmode, fir_delay_line_q_ram_blk, fir_delay_line_q_ram_wen
-            );
+            rx_fifo_afval, rx_fifo_aeval);
 end
 
 whitebox_reset whitebox_reset_0 (
@@ -209,32 +150,7 @@ whitebox whitebox_0 (
     .rx_fifo_overflow(rx_fifo_overflow),
     .rx_fifo_underflow(rx_fifo_underflow),
     .rx_fifo_rdcnt(rx_fifo_rdcnt),
-    .rx_fifo_wrcnt(rx_fifo_wrcnt),
-
-    .fir_coeff_ram_addr(fir_coeff_ram_addr),
-    .fir_coeff_ram_din0(fir_coeff_ram_din0),
-    .fir_coeff_ram_din1(fir_coeff_ram_din1),
-    .fir_coeff_ram_blk(fir_coeff_ram_blk),
-    .fir_coeff_ram_wen(fir_coeff_ram_wen),
-    .fir_coeff_ram_dout0(fir_coeff_ram_dout0),
-    .fir_coeff_ram_dout1(fir_coeff_ram_dout1),
-    .fir_load_coeff_ram_addr(fir_load_coeff_ram_addr),
-    .fir_load_coeff_ram_din0(fir_load_coeff_ram_din0),
-    .fir_load_coeff_ram_din1(fir_load_coeff_ram_din1),
-    .fir_load_coeff_ram_blk(fir_load_coeff_ram_blk),
-    .fir_load_coeff_ram_wen(fir_load_coeff_ram_wen),
-    .fir_load_coeff_ram_dout0(fir_load_coeff_ram_dout0),
-    .fir_load_coeff_ram_dout1(fir_load_coeff_ram_dout1),
-    .fir_delay_line_i_ram_addr(fir_delay_line_i_ram_addr),
-    .fir_delay_line_i_ram_din(fir_delay_line_i_ram_din),
-    .fir_delay_line_i_ram_blk(fir_delay_line_i_ram_blk),
-    .fir_delay_line_i_ram_wen(fir_delay_line_i_ram_wen),
-    .fir_delay_line_i_ram_dout(fir_delay_line_i_ram_dout),
-    .fir_delay_line_q_ram_addr(fir_delay_line_q_ram_addr),
-    .fir_delay_line_q_ram_din(fir_delay_line_q_ram_din),
-    .fir_delay_line_q_ram_blk(fir_delay_line_q_ram_blk),
-    .fir_delay_line_q_ram_wen(fir_delay_line_q_ram_wen),
-    .fir_delay_line_q_ram_dout(fir_delay_line_q_ram_dout)
+    .rx_fifo_wrcnt(rx_fifo_wrcnt)
 );
 
 endmodule

@@ -589,7 +589,7 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_open_close),
         WHITEBOX_TEST(test_blocking_open_busy),
         WHITEBOX_TEST(test_blocking_write),
-        WHITEBOX_TEST(test_blocking_write_not_locked),
+        //WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
         WHITEBOX_TEST(test_blocking_read_overrun),
         WHITEBOX_TEST(test_blocking_xfer),

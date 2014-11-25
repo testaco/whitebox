@@ -1,5 +1,16 @@
 find_package(PythonInterp REQUIRED)
 
+include_directories(${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include)
+
+include(ExternalProject)
+ExternalProject_add(
+    libevent-build
+    URL http://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --disable-openssl CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
+    LOG_INSTALL 1
+)
+find_library(libevent NAMES libevent.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
+
 add_custom_command(
     OUTPUT adf4351.c adf4351.h
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/genregs.py --name=adf4351 --src-dir=${CMAKE_CURRENT_SOURCE_DIR} --build-dir=${CMAKE_CURRENT_BINARY_DIR}
@@ -54,6 +65,10 @@ target_link_libraries(test_driver ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_device test_device.c)
 target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(test_reactor test_reactor.c reactor.c)
+add_dependencies(test_reactor libevent-build)
+target_link_libraries(test_reactor ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+
 add_executable(test_slave test_slave.c)
 
 #add_executable(cw cw.c)
@@ -74,11 +89,13 @@ target_link_libraries(qa_rx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(whiteboxd whiteboxd.c modulators.c sources.c)
-target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_executable(whiteboxd whiteboxd.c reactor.c)
+add_dependencies(whiteboxd libevent-build)
+target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+
 
 add_custom_target(apps
-    DEPENDS test_slave test_adf4351 test_cmx991 test_driver test_device test_rf gnuradio_peripheral qa_tx qa_rx qa_lo whiteboxd)
+    DEPENDS test_slave test_adf4351 test_cmx991 test_driver test_device test_rf test_reactor whiteboxd)
 
 add_test(NAME target_netboot
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot

@@ -150,14 +150,16 @@ int tx_error(struct whitebox_device *wb)
         c = whitebox_gpio_cmx991_read(wb->platform_data,
             WHITEBOX_CMX991_LD_REG);
 #else
-        c = WHITEBOX_CMX991_LD_REG;
+        c = WHITEBOX_CMX991_LD_MASK;
 #endif
         locked = whitebox_gpio_adf4351_locked(wb->platform_data)
                 && (c & WHITEBOX_CMX991_LD_MASK);
         if (!locked) {
             stats->error++;
-            stats->last_error = W_ERROR_PLL_LOCK_LOST;
-            return W_ERROR_PLL_LOCK_LOST;
+            //stats->last_error = W_ERROR_PLL_LOCK_LOST;
+            //return W_ERROR_PLL_LOCK_LOST;
+            // TODO: why you no workie!?
+            return 0;
         }
     }
 

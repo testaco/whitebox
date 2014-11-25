@@ -45,7 +45,7 @@ MODULE_PARM_DESC(pdma_debug, "pdma debugging level, >0 is verbose");
 /*
  * Use ping pong mode
  */
-static int pdma_ping_pong = 1;
+static int pdma_ping_pong = 0;
 module_param(pdma_ping_pong, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(pdma_ping_pong, "pdma ping pong mode, 0 to disable, 1 to enable");
 

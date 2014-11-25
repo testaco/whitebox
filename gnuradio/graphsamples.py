@@ -34,3 +34,7 @@ def plot_gnuradio_samples(*args, **options):
     t = arange(len(si))
     plot(t, si)
     plot(t, sq)
+
+if __name__ == '__main__':
+    plot_gnuradio_samples(filename=sys.argv[1])
+    show()

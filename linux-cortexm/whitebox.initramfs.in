@@ -95,13 +95,15 @@ dir /usr/sbin 755 0 0
 dir /usr/share 755 0 0
 dir /usr/share/udhcpc 755 0 0
 
+file /demo1.samples @CMAKE_SOURCE_DIR@/gnuradio/modem.samples 644 0 0
+file /usr/bin/whiteboxd @CMAKE_BINARY_DIR@/lib/whiteboxd 755 0 0
 file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
 file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0
 file /usr/bin/test_rf @CMAKE_BINARY_DIR@/lib/test_rf 755 0 0
 file /usr/bin/test_driver @CMAKE_BINARY_DIR@/lib/test_driver 755 0 0
 file /usr/bin/test_device @CMAKE_BINARY_DIR@/lib/test_device 755 0 0
 file /usr/bin/test_slave @CMAKE_BINARY_DIR@/lib/test_slave 755 0 0
-file /usr/bin/whiteboxd @CMAKE_BINARY_DIR@/lib/whiteboxd 755 0 0
+file /usr/bin/test_reactor @CMAKE_BINARY_DIR@/lib/test_reactor 755 0 0
 file /usr/share/udhcpc/default.script @CMAKE_CURRENT_SOURCE_DIR@/local/usr/share/udhcpc/default.script 755 0 0
 
 dir /var/www 0755 0 0

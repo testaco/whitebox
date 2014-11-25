@@ -185,12 +185,12 @@ class DSPSim(object):
         def stimulus():
             self.t = 0
 
-            if loader:
-                yield loader()
-
             self.clearn.next = self.clearn.active
             yield self.delay(1)
             self.clearn.next = not self.clearn.active
+
+            if loader:
+                yield loader()
 
             while self.t < len(in_i):
                 yield self.produce(self.input.myhdl(in_i[self.t]),

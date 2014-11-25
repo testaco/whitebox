@@ -1,10 +1,75 @@
+import math
 import unittest
 
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
         instance, always, always_comb, always_seq, \
-        traceSignals, Simulation, delay, StopSimulation
+        traceSignals, Simulation, delay, StopSimulation, toVerilog
 import numpy as np
+
+def inferred_ram(reset,
+        addra, dina, pipea, wmodea, blka, wena, clka, douta,
+        addrb, dinb, pipeb, wmodeb, blkb, wenb, clkb, doutb,
+        width, depth, **kwargs):
+    """A ram block."""
+    delay = kwargs.get('delay', 3)
+    data = kwargs.get('data', None) or []
+    mem = []
+    for i in xrange(depth):
+        d = 0
+        if 'data' in kwargs and len(data) > i:
+            d = data[i]
+        mem.append(Signal(intbv(d, min=0, max=2**width)))
+
+    ba = len(douta)
+    bb = len(doutb)
+    
+    if pipea:
+        da = Signal(intbv(0, min=0, max=2**ba))
+    else:
+        da = douta
+
+    if pipeb:
+        db = Signal(intbv(0, min=0, max=2**bb))
+    else:
+        db = doutb
+
+    print 'mem', type(mem), 'addra', type(addra), 'dina', type(dina)
+
+    instances = ()
+    @always_comb
+    def read():
+        da.next = mem[addra]
+        db.next = mem[addrb]
+
+    @always(clka.posedge)
+    def writea():
+        if not reset:
+            for i in range(depth):
+                mem[i].next = 0
+        elif not blka and not wena:
+            mem[addra].next = dina
+
+    @always(clkb.posedge)
+    def writeb():
+        if not blkb and not wenb:
+            mem[addrb].next = dinb
+
+    instances = (read, writea, writeb)
+
+    if pipea:
+        @always_seq(clka.posedge, reset=reset)
+        def porta_pipe():
+            douta.next = da
+        instances = instances + (porta_pipe, )
+
+    if pipeb:
+        @always_seq(clkb.posedge, reset=reset)
+        def portb_pipe():
+            doutb.next = db
+        instances = instances + (portb_pipe, )
+
+    return instances
 
 def ram4k9(reset,
            addra,
@@ -147,9 +212,16 @@ class RamPort(object):
 
 class Ram(object):
     def __init__(self, resetn, clka, clkb, **kwargs):
+        self.width = kwargs.pop('width', 18)
+        self.depth = kwargs.pop('depth', 512)
+        self.data = kwargs.pop('data', None)
+        addrbits = int(math.ceil(math.log(self.depth, 2)))
+        databits = self.width
+        #print 'ram%sx%s' % (self.width, self.depth), 'addrbits', addrbits, 'databits', databits
         self.resetn = resetn
-        self.addra = Signal(intbv(0, min=0, max=2**9))
-        self.dina = Signal(intbv(0, min=0, max=2**9))
+        self.addra = Signal(intbv(0, min=0, max=2**addrbits))
+        self.dina = Signal(intbv(0, min=0, max=2**databits))
+        self.douta = Signal(intbv(0, min=0, max=2**databits))
         self.widtha1 = Signal(bool(1))
         self.widtha0 = Signal(bool(1))
         self.pipea = Signal(bool(1))
@@ -157,9 +229,8 @@ class Ram(object):
         self.blka = Signal(bool(1))
         self.wena = Signal(bool(1))
         self.clka = clka
-        self.douta = Signal(intbv(0, min=0, max=2**9))
-        self.addrb = Signal(intbv(0, min=0, max=2**9))
-        self.dinb = Signal(intbv(0, min=0, max=2**9))
+        self.addrb = Signal(intbv(0, min=0, max=2**addrbits))
+        self.dinb = Signal(intbv(0, min=0, max=2**databits))
         self.widthb1 = Signal(bool(1))
         self.widthb0 = Signal(bool(1))
         self.pipeb = Signal(bool(1))
@@ -167,29 +238,7 @@ class Ram(object):
         self.blkb = Signal(bool(1))
         self.wenb = Signal(bool(1))
         self.clkb = clkb
-        self.doutb = Signal(intbv(0, min=0, max=2**9))
-        self.ram = ram4k9(reset=self.resetn,
-                addra=self.addra,
-                dina=self.dina,
-                widtha0=self.widtha0,
-                widtha1=self.widtha1,
-                pipea=self.pipea,
-                wmodea=self.wmodea,
-                blka=self.blka,
-                wena=self.wena,
-                clka=self.clka,
-                douta=self.douta,
-                addrb=self.addrb,
-                dinb=self.dinb,
-                widthb0=self.widthb0,
-                widthb1=self.widthb1,
-                pipeb=self.pipeb,
-                wmodeb=self.wmodeb,
-                blkb=self.blkb,
-                wenb=self.wenb,
-                clkb=self.clkb,
-                doutb=self.doutb,
-                **kwargs)
+        self.doutb = Signal(intbv(0, min=0, max=2**databits))
         self.port = { 'a': RamPort(
                 self.addra,
                 self.dina,
@@ -212,6 +261,34 @@ class Ram(object):
                 self.wenb,
                 self.clkb,
                 self.doutb) }
+        #self.ram = self.instance_type()(**self.instance_signals())
+
+    def instance_type(self):
+        return inferred_ram
+
+    def instance_signals(self):
+        return {
+            'reset': self.resetn,
+            'addra': self.addra,
+            'dina': self.dina,
+            'pipea': self.pipea,
+            'wmodea': self.wmodea,
+            'blka': self.blka,
+            'wena': self.wena,
+            'clka': self.clka,
+            'douta': self.douta,
+            'addrb': self.addrb,
+            'dinb': self.dinb,
+            'pipeb': self.pipeb,
+            'wmodeb': self.wmodeb,
+            'blkb': self.blkb,
+            'wenb': self.wenb,
+            'clkb': self.clkb,
+            'doutb': self.doutb,
+            'width': self.width,
+            'depth': self.depth,
+            'data': self.data,
+        }
 
 class Ram2(object):
     def __init__(self, resetn, clka, clkb, **kwargs):
@@ -326,6 +403,7 @@ class RamSimulation(object):
             self.clka = Signal(bool(0))
             self.clkb = Signal(bool(0))
             self.ram = Ram(self.resetn, self.clka, self.clkb)
+            self.ram.ram = self.ram.instance_type()(**self.ram.instance_signals())
 
         self.duration = duration or int(1e9 / 10e6 / 2)
         self.port = self.ram.port
@@ -349,13 +427,14 @@ class RamSimulation(object):
 
     def write(self, port, *args):
         p = self.ram.port[port]
-        p.blk.next = False
 
+        print 'WRITING', [i for i in args]
         for (addr, data) in args:
             print '-- Writing %s %s=%s --' % (port.upper(), hex(addr), hex(data))
             p.addr.next = intbv(addr)
             p.din.next = intbv(data)
             p.wen.next = False
+            p.blk.next = False
             p.clk.next = True
             yield delay(self.duration // 2)
             p.clk.next = False
@@ -442,4 +521,9 @@ class TestRam(unittest.TestCase):
         s.simulate(test_ram_interface)
 
 if __name__ == '__main__':
+    resetn = ResetSignal(0, 0, async=True)
+    clka = Signal(bool(0))
+    clkb = Signal(bool(0))
+    r = Ram(resetn, clka, clkb, width=9, depth=512)
+    toVerilog(r.instance_type(), **r.instance_signals())
     unittest.main()

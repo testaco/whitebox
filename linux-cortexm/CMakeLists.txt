@@ -1,4 +1,5 @@
 set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0)
+include_directories(${INSTALL_ROOT}/A2F/root/usr/include)
 
 if(NOT DEFINED KERNELDIR)
     set(KERNELDIR ${INSTALL_ROOT}/linux)

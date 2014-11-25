@@ -8,9 +8,9 @@ import unittest
 from dsp import Signature
 from test_dsp import DSPSim, figure_discrete_quadrature
 from fir import fir
-from ram import Ram, Ram2
+from ram import Ram, RamSimulation
 
-COEFF_SHIFT = 12
+COEFF_SHIFT = 14
 
 class FirSim(DSPSim):
     def input_signal(self):
@@ -188,6 +188,17 @@ class FirSim(DSPSim):
 
         #show()
 
+    def simulate(self, in_i, in_q, test_fir_impulse, interp, coeff_ram, taps):
+        def load_coeffs():
+            s = RamSimulation(coeff_ram)
+            yield s.reset()
+            tap_tuple = [i for i in enumerate(taps)]
+            yield s.write('a', *tap_tuple)
+            yield s.read('a', *range(len(taps)))
+            assert tuple([i.signed() for i in s.result]) == taps
+
+        return self.simulate_quadrature(in_i, in_q, test_fir_impulse, interp=interp, loader=load_coeffs)
+
 class TestFirImpulse(unittest.TestCase):
     def test_fir_impulse(self):
         in_sign = Signature("in", True, bits=9)
@@ -196,13 +207,19 @@ class TestFirImpulse(unittest.TestCase):
         s = FirSim(in_sign=in_sign, out_sign=out_sign)
         #s.design(48e3, 6e3, 1e3, 40.0)
         taps = (4 << COEFF_SHIFT, 3 << COEFF_SHIFT, 2 << COEFF_SHIFT, 1 << COEFF_SHIFT)
-        coeff_ram = Ram2(s.clearn, s.clock, s.clock, data=taps)
-        delay_line_i_ram = Ram(s.clearn, s.clock, s.clock)
-        delay_line_q_ram = Ram(s.clearn, s.clock, s.clock)
-        bypass = Signal(bool(0))
+        coeff_ram = Ram(s.clearn, s.clock, s.clock, data=taps,
+            width=18, depth=512)
+        delay_line_i_ram = Ram(s.clearn, s.clock, s.clock, width=9, depth=512)
+        delay_line_q_ram = Ram(s.clearn, s.clock, s.clock, width=9, depth=512)
+        enable = Signal(bool(1))
         bank1 = Signal(bool(0))
         bank0 = Signal(bool(0))
         N = Signal(intbv(4, min=0, max=2**7-1))
+
+        coeff_ram_inst = coeff_ram.instance_type()(**coeff_ram.instance_signals())
+        delay_line_i_ram_inst = delay_line_i_ram.instance_type()(**delay_line_i_ram.instance_signals())
+        delay_line_q_ram_inst = delay_line_q_ram.instance_type()(**delay_line_q_ram.instance_signals())
+
 
         def test_fir_impulse():
             load_coeff_ram_addr = coeff_ram.port['b'].addr
@@ -210,12 +227,10 @@ class TestFirImpulse(unittest.TestCase):
             load_coeff_ram_wen = coeff_ram.port['b'].wen
             fir_0 = fir(s.clearn, s.clock, s.input, s.output,
                     coeff_ram.port['a'].addr,
-                    coeff_ram.port['a'].din[0],
-                    coeff_ram.port['a'].din[1],
+                    coeff_ram.port['a'].din,
                     coeff_ram.port['a'].blk,
                     coeff_ram.port['a'].wen,
-                    coeff_ram.port['a'].dout[0],
-                    coeff_ram.port['a'].dout[1],
+                    coeff_ram.port['a'].dout,
                     delay_line_i_ram.port['a'].addr,
                     delay_line_i_ram.port['a'].din,
                     delay_line_i_ram.port['a'].blk,
@@ -226,10 +241,10 @@ class TestFirImpulse(unittest.TestCase):
                     delay_line_q_ram.port['a'].blk,
                     delay_line_q_ram.port['a'].wen,
                     delay_line_q_ram.port['a'].dout,
-                    bypass, bank1, bank0, N,
+                    enable, bank1, bank0, N,
                     sim=s)
 
-            return fir_0, coeff_ram.rama, coeff_ram.ramb, delay_line_i_ram.ram, delay_line_q_ram.ram
+            return fir_0, coeff_ram_inst, delay_line_i_ram_inst, delay_line_q_ram_inst
 
         in_t = arange(0, 8)
 
@@ -239,7 +254,8 @@ class TestFirImpulse(unittest.TestCase):
         in_i[0] = 1 << 5
         in_i[4] = 1 << 5
 
-        out_i, out_q = s.simulate_quadrature(in_i, in_q, test_fir_impulse, interp=128)
+        out_i, out_q = s.simulate(in_i, in_q, test_fir_impulse, 128,
+                coeff_ram, taps)
         out_t = arange(0, out_i.shape[0])
 
         new_shape = tuple([in_t.shape[i] for i in range(len(in_t.shape))])
@@ -254,13 +270,14 @@ class TestFirBypass(unittest.TestCase):
 
         s = FirSim(in_sign=in_sign, out_sign=out_sign)
         s.design(48e3, 6e3, 1e3, 40.0)
-        s.input_signal()
+        #s.input_signal()
 
         taps = (4 << COEFF_SHIFT, 3 << COEFF_SHIFT, 2 << COEFF_SHIFT, 1 << COEFF_SHIFT)
-        coeff_ram = Ram2(s.clearn, s.clock, s.clock, data=taps)
-        delay_line_i_ram = Ram(s.clearn, s.clock, s.clock)
-        delay_line_q_ram = Ram(s.clearn, s.clock, s.clock)
-        bypass = Signal(bool(1))
+        coeff_ram = Ram(s.clearn, s.clock, s.clock, data=taps,
+            width=18, depth=512)
+        delay_line_i_ram = Ram(s.clearn, s.clock, s.clock, width=9, depth=512)
+        delay_line_q_ram = Ram(s.clearn, s.clock, s.clock, width=9, depth=512)
+        enable = Signal(bool(0))
         bank1 = Signal(bool(0))
         bank0 = Signal(bool(0))
         N = Signal(intbv(4, min=0, max=2**7-1))
@@ -271,12 +288,10 @@ class TestFirBypass(unittest.TestCase):
             load_coeff_ram_wen = coeff_ram.port['b'].wen
             fir_0 = fir(s.clearn, s.clock, s.input, s.output,
                     coeff_ram.port['a'].addr,
-                    coeff_ram.port['a'].din[0],
-                    coeff_ram.port['a'].din[1],
+                    coeff_ram.port['a'].din,
                     coeff_ram.port['a'].blk,
                     coeff_ram.port['a'].wen,
-                    coeff_ram.port['a'].dout[0],
-                    coeff_ram.port['a'].dout[1],
+                    coeff_ram.port['a'].dout,
                     delay_line_i_ram.port['a'].addr,
                     delay_line_i_ram.port['a'].din,
                     delay_line_i_ram.port['a'].blk,
@@ -287,18 +302,22 @@ class TestFirBypass(unittest.TestCase):
                     delay_line_q_ram.port['a'].blk,
                     delay_line_q_ram.port['a'].wen,
                     delay_line_q_ram.port['a'].dout,
-                    bypass, bank1, bank0, N,
+                    enable, bank1, bank0, N,
                     sim=s)
 
-            return fir_0, coeff_ram.ram, delay_line_i_ram.ram, delay_line_q_ram.ram
+            coeff_ram_inst = coeff_ram.instance_type()(**coeff_ram.instance_signals())
+            delay_line_i_ram_inst = delay_line_i_ram.instance_type()(**delay_line_i_ram.instance_signals())
+            delay_line_q_ram_inst = delay_line_q_ram.instance_type()(**delay_line_q_ram.instance_signals())
+
+            return fir_0, coeff_ram_inst, delay_line_i_ram_inst, delay_line_q_ram_inst
 
         in_t = arange(0, 8)
 
         in_c = 0*in_t + 1j * 0*in_t
         in_i = 0*in_t
         in_q = 0*in_t
-        in_i[0] = 1 << COEFF_SHIFT
-        in_i[4] = 1 << COEFF_SHIFT
+        in_i[0] = 1 << 5
+        in_i[4] = 1 << 5
 
         out_i, out_q = s.simulate_quadrature(in_i, in_q, test_fir_bypass, interp=128)
         out_t = arange(0, out_i.shape[0])
@@ -322,10 +341,11 @@ class TestFirDesign(unittest.TestCase):
 
         s.verify_design()
 
-        coeff_ram = Ram2(s.clearn, s.clock, s.clock, data=taps)
-        delay_line_i_ram = Ram(s.clearn, s.clock, s.clock)
-        delay_line_q_ram = Ram(s.clearn, s.clock, s.clock)
-        bypass = Signal(bool(0))
+        coeff_ram = Ram(s.clearn, s.clock, s.clock, data=taps,
+            width=18, depth=512)
+        delay_line_i_ram = Ram(s.clearn, s.clock, s.clock, width=9, depth=512)
+        delay_line_q_ram = Ram(s.clearn, s.clock, s.clock, width=9, depth=512)
+        enable = Signal(bool(1))
         bank1 = Signal(bool(0))
         bank0 = Signal(bool(0))
         N = Signal(intbv(len(taps), min=0, max=2**7-1))
@@ -336,12 +356,10 @@ class TestFirDesign(unittest.TestCase):
             load_coeff_ram_wen = coeff_ram.port['b'].wen
             fir_0 = fir(s.clearn, s.clock, s.input, s.output,
                     coeff_ram.port['a'].addr,
-                    coeff_ram.port['a'].din[0],
-                    coeff_ram.port['a'].din[1],
+                    coeff_ram.port['a'].din,
                     coeff_ram.port['a'].blk,
                     coeff_ram.port['a'].wen,
-                    coeff_ram.port['a'].dout[0],
-                    coeff_ram.port['a'].dout[1],
+                    coeff_ram.port['a'].dout,
                     delay_line_i_ram.port['a'].addr,
                     delay_line_i_ram.port['a'].din,
                     delay_line_i_ram.port['a'].blk,
@@ -352,10 +370,14 @@ class TestFirDesign(unittest.TestCase):
                     delay_line_q_ram.port['a'].blk,
                     delay_line_q_ram.port['a'].wen,
                     delay_line_q_ram.port['a'].dout,
-                    bypass, bank1, bank0, N,
+                    enable, bank1, bank0, N,
                     sim=s)
 
-            return fir_0, coeff_ram.rama, coeff_ram.ramb, delay_line_i_ram.ram, delay_line_q_ram.ram
+            coeff_ram_inst = coeff_ram.instance_type()(**coeff_ram.instance_signals())
+            delay_line_i_ram_inst = delay_line_i_ram.instance_type()(**delay_line_i_ram.instance_signals())
+            delay_line_q_ram_inst = delay_line_q_ram.instance_type()(**delay_line_q_ram.instance_signals())
+
+            return fir_0, coeff_ram_inst, delay_line_i_ram_inst, delay_line_q_ram_inst
 
         out_i, out_q = s.simulate_quadrature(in_i, in_q, test_fir_design, interp=128)
         out_t = arange(0, out_i.shape[0])
