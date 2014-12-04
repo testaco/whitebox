@@ -17,7 +17,7 @@
 
 int main(int c, char **v) {
     int sample_rate = 200e3;
-    int latency_ms = 1000;
+    int latency_ms = 100;
     int count;
     struct timespec start, finish, cleanup;
     struct reactor *reactor = reactor_new();
@@ -34,19 +34,6 @@ int main(int c, char **v) {
 
     actor_add_open_instr(actor, whitebox_sink);
     actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
-    //actor_add_io_instr(actor, "writef", whitebox_sink, FILENAME, 0);
     actor_add_instr(actor, "halt", 0, 0, NULL);
     reactor_open_resource(reactor, actor_resource);
 

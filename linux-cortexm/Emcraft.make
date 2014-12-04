@@ -86,7 +86,7 @@ busybox		: $(SAMPLE).busybox
 	$(MAKE) -C $(INSTALL_ROOT)/A2F/busybox
 #	cp -f $(INSTALL_ROOT)/A2F/busybox/busybox $@
 
-%.$(KERNEL_IMAGE) : %.$(KERNEL_CONFIG) %.$(RAMFS_CONFIG) $(CUSTOM_APPS) busybox
+%.$(KERNEL_IMAGE) : _do_modules %.$(KERNEL_CONFIG) %.$(RAMFS_CONFIG) $(CUSTOM_APPS) busybox
 	cp -f $(SAMPLE).$(RAMFS_CONFIG) $(INSTALL_ROOT)/linux/initramfs-list-min
 	rm -f $(INSTALL_ROOT)/linux/usr/initramfs_data.cpio \
 		$(INSTALL_ROOT)/linux/usr/initramfs_data.cpio.gz

@@ -8,3 +8,8 @@ mount -o nolock,rsize=1024 192.168.220.1:/srv/home /mnt
 ifconfig lo 127.0.0.1
 
 modprobe whitebox
+modprobe g_audio
+
+#while date; do
+#    whiteboxd
+#done

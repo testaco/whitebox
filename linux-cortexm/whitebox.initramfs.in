@@ -1,5 +1,6 @@
 dir /dev 0755 0 0
 dir /dev/pts 0755 0 0
+dir /dev/snd 0755 0 0
 dir /root 0700 0 0
 dir /proc 0755 0 0
 dir /sys 0755 0 0
@@ -29,6 +30,17 @@ nod /dev/random 0600 0 0 c 1 8
 nod /dev/urandom 0600 0 0 c 1 9
 nod /dev/whitebox 0600 0 0 c 254 0
 
+nod /dev/snd/controlC0 0660 0 0 c 116 0
+nod /dev/snd/pcmC0D0p 0660 0 0 c 116 16
+nod /dev/snd/pcmC0D0c 0660 0 0 c 116 24
+nod /dev/snd/timer 0660 0 0 c 116 33 
+
+file /lib/modules/2.6.33-arm1/modules.dep @CMAKE_CURRENT_SOURCE_DIR@/local/lib/modules/2.6.33-arm1/modules.dep 644 0 0
+file /lib/modules/2.6.33-arm1/pdma.ko  @CMAKE_BINARY_DIR@/driver/pdma.ko 644 0 0
+file /lib/modules/2.6.33-arm1/whitebox.ko  @CMAKE_BINARY_DIR@/driver/whitebox.ko 644 0 0
+file /lib/modules/2.6.33-arm1/g_audio.ko @INSTALL_ROOT@/linux/drivers/usb/gadget/g_audio.ko 644 0 0
+file /lib/modules/2.6.33-arm1/g_serial.ko @INSTALL_ROOT@/linux/drivers/usb/gadget/g_serial.ko 644 0 0
+
 file /etc/inittab @CMAKE_CURRENT_SOURCE_DIR@/local/etc/inittab 755 0 0
 file /etc/rc @CMAKE_CURRENT_SOURCE_DIR@/local/etc/rc 755 0 0
 file /etc/hosts @CMAKE_CURRENT_SOURCE_DIR@/local/etc/hosts 644 0 0
@@ -37,10 +49,6 @@ file /etc/passwd @CMAKE_CURRENT_SOURCE_DIR@/local/etc/passwd 644 0 0
 file /etc/group @CMAKE_CURRENT_SOURCE_DIR@/local/etc/group 644 0 0
 file /etc/shadow @CMAKE_CURRENT_SOURCE_DIR@/local/etc/shadow 644 0 0
 file /etc/securetty @CMAKE_CURRENT_SOURCE_DIR@/local/etc/securetty 644 0 0
-
-file /lib/modules/2.6.33-arm1/modules.dep @CMAKE_CURRENT_SOURCE_DIR@/local/lib/modules/2.6.33-arm1/modules.dep 644 0 0
-file /lib/modules/2.6.33-arm1/pdma.ko  @CMAKE_BINARY_DIR@/driver/pdma.ko 644 0 0
-file /lib/modules/2.6.33-arm1/whitebox.ko  @CMAKE_BINARY_DIR@/driver/whitebox.ko 644 0 0
 
 file /bin/busybox @INSTALL_ROOT@/A2F/busybox/busybox 755 0 0
 slink /bin/init busybox 777 0 0
@@ -95,7 +103,7 @@ dir /usr/sbin 755 0 0
 dir /usr/share 755 0 0
 dir /usr/share/udhcpc 755 0 0
 
-file /demo1.samples @CMAKE_SOURCE_DIR@/gnuradio/modem.samples 644 0 0
+#file /demo1.samples @CMAKE_SOURCE_DIR@/gnuradio/modem.samples 644 0 0
 file /usr/bin/whiteboxd @CMAKE_BINARY_DIR@/lib/whiteboxd 755 0 0
 file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
 file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0

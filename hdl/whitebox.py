@@ -18,11 +18,11 @@ whitebox_config = dict(
         interp=128,
         rfe_enable=True,
         duc_enable=True,
-        fir_enable=True,
+        fir_enable=False,
         cic_enable=True,
         cic_order=4,
         cic_delay=1,
-        dds_enable=True,
+        dds_enable=False,
         conditioning_enable=True,
         ddc_enable=True)
 
@@ -312,11 +312,16 @@ def whitebox(
 
     rfe = RFE(*rfe_args)
 
-    fir_coeff_ram_inst = fir_coeff_ram.instance_type()(**fir_coeff_ram.instance_signals())
-    fir_delay_line_i_ram_inst = fir_delay_line_i_ram.instance_type()(**fir_delay_line_i_ram.instance_signals())
-    fir_delay_line_q_ram_inst = fir_delay_line_q_ram.instance_type()(**fir_delay_line_q_ram.instance_signals())
+    instances = (rfe, duc)
 
-    return rfe, duc, fir_coeff_ram_inst, fir_delay_line_i_ram_inst, fir_delay_line_q_ram_inst
+    if kwargs.get('fir_enable', True):
+        fir_coeff_ram_inst = fir_coeff_ram.instance_type()(**fir_coeff_ram.instance_signals())
+        fir_delay_line_i_ram_inst = fir_delay_line_i_ram.instance_type()(**fir_delay_line_i_ram.instance_signals())
+        fir_delay_line_q_ram_inst = fir_delay_line_q_ram.instance_type()(**fir_delay_line_q_ram.instance_signals())
+        instances += (fir_coeff_ram_inst, fir_delay_line_i_ram_inst, fir_delay_line_q_ram_inst)
+
+
+    return instances
 
 if __name__ == '__main__':
     from apb3_utils import Apb3Bus
