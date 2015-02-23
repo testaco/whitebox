@@ -25,9 +25,11 @@ function(find_python_module module)
     find_package_handle_standard_args(PY_${module} DEFAULT_MSG PY_${module_upper})
 endfunction(find_python_module)
 
+find_python_module(Cheetah REQUIRED)
 find_python_module(myhdl REQUIRED)
 find_python_module(matplotlib REQUIRED)
 find_python_module(numpy REQUIRED)
+find_python_module(scipy REQUIRED)
 
 add_custom_command(
     OUTPUT whitebox.v
