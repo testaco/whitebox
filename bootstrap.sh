@@ -37,7 +37,7 @@ echo "Bootstrap complete"
 echo
 echo "Add the ARM toolchain to your PATH, then configure with cmake, and finally build with make:"
 echo "    $ echo 'PATH=\"`pwd`/linux-cortexm-1.11.0/tools/bin:`pwd`/linux-cortexm-1.11.0/tools/arm-2010q1/bin:\$PATH\"' >> ~/.profile"
-echo "    $ cd build && cmake .."
+echo "    $ cd build && cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchains/arm_cortex_m3_native.cmake .."
 echo "    $ make linux"
 echo
 echo "This will give you a linux kernel image at build/whitebox.uImage which can be loaded via TFTP following these steps."
