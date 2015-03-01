@@ -17,6 +17,7 @@ add_custom_target(whitebox_doxygen_docs
 
 # Now, compile everything together with Sphinx
 find_package(Sphinx REQUIRED)
+find_python_module(breathe)
 
 if(NOT DEFINED SPHINX_THEME)
     set(SPHINX_THEME whiteboxtheme)
@@ -46,7 +47,7 @@ configure_file(
 
 add_custom_target(whitebox_html_docs
     ${SPHINX_EXECUTABLE}
-    -vvv -b singlehtml -E
+    -b singlehtml -E
     -c "${BINARY_BUILD_DIR}"
     -d "${SPHINX_CACHE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -80,7 +81,7 @@ add_dependencies(upload_docs DPENDS whitebox_html_docs)
 
 add_custom_target(whitebox_pdf_docs
     ${SPHINX_EXECUTABLE}
-    -vvv -q -b pdf
+    -q -b pdf
     -c "${BINARY_BUILD_DIR}"
     -d "${SPHINX_CACHE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}"
