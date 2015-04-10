@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# "devel" sets up a development environment with an NFS mount.
+# "demo1" just repeats a CQ over and over.
+image_type="@IMAGE_TYPE@"
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devpts none /dev/pts
+mount -t debugfs none /sys/kernel/debug
+
+ifconfig lo 127.0.0.1
+
+#modprobe snd-dummy
+#modprobe g_audio
+
+modprobe whitebox
+
+#modprobe snd-usb-audio
+
+if [ "$image_type" = "devel" ]; then
+    mkdir /mnt
+    mount -o nolock,rsize=1024 192.168.220.1:/srv/home /mnt
+fi
+
+if [ "$image_type" = "demo1" ]; then
+    while date; do
+        whiteboxd
+    done
+fi
