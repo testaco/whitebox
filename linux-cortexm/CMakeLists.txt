@@ -63,5 +63,7 @@ add_custom_command(OUTPUT whitebox.uImage
 add_custom_target(linux
     DEPENDS whitebox.uImage)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/whitebox.uImage
-    DESTINATION ${TFTP_DIR})
+if (defined ${TFTP_DIR})
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/whitebox.uImage
+        DESTINATION ${TFTP_DIR})
+endif()

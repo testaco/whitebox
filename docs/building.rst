@@ -21,7 +21,7 @@ Compiling the Kernel
 
 After the bootstrap, add the ARM toolchain to your PATH by running the final commands or adding the appopriate statement to your .profile.
 
-~/whitebox/build$ cd build && cmake ..
+~/whitebox/build$ cd build && cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchains/arm_cortex_m3_native.cmake ..
 ~/whitebox/build$ make
 
 This will compile the kernel and leave the bootable image as whitebox.uImage.

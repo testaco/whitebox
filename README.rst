@@ -36,8 +36,8 @@ Getting Started
     # Bootstrap your toolchain
     whitebox$ sh bootstrap.sh
     whitebox$ cd build
-    # Configure with cmake
-    whitebox/build$ cmake ..
+    # Configure with cmake, don't forget to cross compile
+    whitebox/build$ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchains/arm_cortex_m3_native.cmake ..
     # Build the user space library
     whitebox/build$ make
     # Patch the kernel, do this only ONCE

@@ -56,7 +56,7 @@ This is a list of synthesizable blocks.
 
 .. autofunction:: dsp.iqdemux
 
-.. autofunction:: duc.truncator
+.. autofunction:: dsp.truncator
 
 .. autofunction:: duc.upsampler
 
@@ -64,11 +64,11 @@ This is a list of synthesizable blocks.
 
 .. autofunction:: duc.interpolator
 
-.. autofunction:: duc.delay_n
+.. autofunction:: dsp.delay_n
 
-.. autofunction:: duc.comb
+.. autofunction:: dsp.comb
 
-.. autofunction:: duc.accumulator
+.. autofunction:: dsp.accumulator
 
 .. autofunction:: duc.cic
 
@@ -100,8 +100,6 @@ Digital Down Converter
 ----------------------
 
 .. automodule:: ddc
-
-.. autofunction:: ddc.ddc
 
 Direct Digital Synthesizer
 --------------------------
