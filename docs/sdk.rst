@@ -2,5 +2,5 @@ SDK
 ===
 
 .. toctree::
-    installing
     building
+    installing
