@@ -60,15 +60,18 @@ file(GLOB images
     ${CMAKE_CURRENT_SOURCE_DIR}/_images/*.png
 )
 
+
 add_custom_target(whitebox_html_images
     COMMENT "Copying images")
+add_custom_command(TARGET whitebox_html_images PRE_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/html/_images/)
 foreach(image ${images})
-    add_custom_command(TARGET whitebox_html_images PRE_BUILD
+    add_custom_command(TARGET whitebox_html_images POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E
             copy ${image} ${CMAKE_CURRENT_BINARY_DIR}/html/_images/)
 endforeach()
 
-add_dependencies(whitebox_html_images DEPENDS whitebox_doxygen_docs whitebox_html_docs)
+add_dependencies(whitebox_html_docs DEPENDS whitebox_doxygen_docs whitebox_html_images)
 
 add_custom_target(upload_docs
     s3cmd sync
