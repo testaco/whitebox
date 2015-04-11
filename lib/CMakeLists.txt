@@ -6,19 +6,22 @@ include_directories(${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/includ
 ExternalProject_add(
     alsa-lib-build
     URL ftp://ftp.alsa-project.org/pub/lib/alsa-lib-1.0.21.tar.bz2
+    PATCH_COMMAND patch -p1 -t -N < ${CMAKE_CURRENT_SOURCE_DIR}/alsa_lib_cortex_m3.patch
     CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --with-softfloat --with-libdl=no --with-pthread=yes --enable-shared=no --enable-static=yes --with-debug=yes --with-versioned=no CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
     LOG_INSTALL 1
 )
+
 #ExternalProject_Add_Step(alsa-lib-build forcebuild
 #    COMMAND ${CMAKE_COMMAND} -E echo "Force build of alsa-lib"
 #    DEPENDEES configure
 #    DEPENDERS build
 #    ALWAYS 1)
-find_library(libasound NAMES libasound.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
+#find_library(libasound NAMES libasound.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
 
 ExternalProject_add(
     alsa-util-build
     URL ftp://ftp.alsa-project.org/pub/utils/alsa-utils-1.0.21.tar.bz2
+    PATCH_COMMAND patch -p1 -t -N < ${CMAKE_CURRENT_SOURCE_DIR}/alsa_util_cortex_m3.patch
     CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --with-udev-rules-dir=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root --with-alsa-prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib --with-alsa-inc-prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include --disable-alsamixer --disable-xmlto CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
     LOG_INSTALL 1
 )
@@ -28,13 +31,13 @@ ExternalProject_add(
 #    DEPENDERS build
 #    ALWAYS 1)
 
-ExternalProject_add(
-    libevent-build
-    URL http://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --disable-openssl CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
-    LOG_INSTALL 1
-)
-find_library(libevent NAMES libevent.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
+#ExternalProject_add(
+#    libevent-build
+#    URL http://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz
+#    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --disable-openssl CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
+#    LOG_INSTALL 1
+#)
+#find_library(libevent NAMES libevent.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
 
 add_custom_command(
     OUTPUT adf4351.c adf4351.h
@@ -90,9 +93,9 @@ target_link_libraries(test_driver ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_device test_device.c)
 target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(test_reactor test_reactor.c reactor.c)
-add_dependencies(test_reactor libevent-build)
-target_link_libraries(test_reactor ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+#add_executable(test_reactor test_reactor.c reactor.c)
+#add_dependencies(test_reactor libevent-build)
+#target_link_libraries(test_reactor ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
 
 add_executable(test_slave test_slave.c)
 
@@ -100,13 +103,16 @@ add_executable(test_slave test_slave.c)
 #target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
 
 add_executable(main main.c)
-target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libasound})
+target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_dependencies(main alsa-lib-build)
+target_link_libraries(main ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib/libasound.a)
 
-add_executable(rfcat rfcat.c)
-target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(gnuradio_peripheral gnuradio_peripheral.c)
-target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+#add_executable(rfcat rfcat.c)
+#target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
+#add_executable(gnuradio_peripheral gnuradio_peripheral.c)
+#target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_executable(qa_tx qa_tx.c)
 target_link_libraries(qa_tx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
@@ -117,9 +123,9 @@ target_link_libraries(qa_rx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(whiteboxd whiteboxd.c reactor.c)
-add_dependencies(whiteboxd libevent-build)
-target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+#add_executable(whiteboxd whiteboxd.c reactor.c)
+#add_dependencies(whiteboxd libevent-build)
+#target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
 
 
 add_custom_target(apps

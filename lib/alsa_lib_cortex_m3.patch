@@ -1,0 +1,57 @@
+diff -Naur alsa-lib-build/modules/mixer/simple/sbasedl.c /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/modules/mixer/simple/sbasedl.c
+--- alsa-lib-build/modules/mixer/simple/sbasedl.c	2009-08-31 06:09:38.000000000 -0700
++++ /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/modules/mixer/simple/sbasedl.c	2015-02-19 12:36:05.236989732 -0800
+@@ -27,7 +27,9 @@
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <math.h>
+-#include <dlfcn.h>
++//#include <dlfcn.h>
++#define RTLD_NOW 0
++#define RTLD_GLOBAL 0
+ #include "config.h"
+ #include "asoundlib.h"
+ #include "mixer_abst.h"
+diff -Naur alsa-lib-build/src/mixer/simple_abst.c /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/src/mixer/simple_abst.c
+--- alsa-lib-build/src/mixer/simple_abst.c	2009-08-31 06:09:38.000000000 -0700
++++ /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/src/mixer/simple_abst.c	2015-02-19 12:35:01.553168221 -0800
+@@ -34,7 +34,9 @@
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <math.h>
+-#include <dlfcn.h>
++//#include <dlfcn.h>
++#define RTLD_NOW 0
++#define RTLD_GLOBAL 0
+ #include "config.h"
+ #include "asoundlib.h"
+ #include "mixer_simple.h"
+diff -Naur alsa-lib-build/src/pcm/pcm_direct.c /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/src/pcm/pcm_direct.c
+--- alsa-lib-build/src/pcm/pcm_direct.c	2009-08-31 06:09:38.000000000 -0700
++++ /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/src/pcm/pcm_direct.c	2015-02-19 12:36:23.315810908 -0800
+@@ -425,12 +425,12 @@
+ 		return ret;
+ 	}
+ 	
+-	ret = fork();
++	ret = vfork();
+ 	if (ret < 0) {
+ 		close(dmix->server_fd);
+ 		return ret;
+ 	} else if (ret == 0) {
+-		ret = fork();
++		ret = vfork();
+ 		if (ret == 0)
+ 			server_job(dmix);
+ 		_exit(EXIT_SUCCESS);
+diff -Naur alsa-lib-build/src/userfile.c /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/src/userfile.c
+--- alsa-lib-build/src/userfile.c	2009-08-31 06:09:38.000000000 -0700
++++ /home/testa/whitebox/build/lib/alsa-lib-build-prefix/src/alsa-lib-build/src/userfile.c	2015-02-19 12:37:59.957558745 -0800
+@@ -32,6 +32,7 @@
+  * stores the first matchine one.  The returned string is strdup'ed.
+  */
+ 
++#undef HAVE_WORDEXP_H
+ #ifdef HAVE_WORDEXP_H
+ #include <wordexp.h>
+ #include <assert.h>

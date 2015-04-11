@@ -1,0 +1,29 @@
+diff -Naur alsa-util-build/alsactl/init_utils_run.c /home/testa/whitebox/build/lib/alsa-util-build-prefix/src/alsa-util-build/alsactl/init_utils_run.c
+--- alsa-util-build/alsactl/init_utils_run.c	2009-08-31 08:13:36.000000000 -0700
++++ /home/testa/whitebox/build/lib/alsa-util-build-prefix/src/alsa-util-build/alsactl/init_utils_run.c	2015-02-19 12:39:21.864317169 -0800
+@@ -89,7 +89,7 @@
+ 		argv[0] = program;
+ 	}
+ 
+-	pid = fork();
++	pid = vfork();
+ 	switch(pid) {
+ 	case 0:
+ 		/* child closes parent ends of pipes */
+diff -Naur alsa-util-build/configure /home/testa/whitebox/build/lib/alsa-util-build-prefix/src/alsa-util-build/configure
+--- alsa-util-build/configure	2009-08-31 08:14:25.000000000 -0700
++++ /home/testa/whitebox/build/lib/alsa-util-build-prefix/src/alsa-util-build/configure	2015-02-19 12:39:02.721537963 -0800
+@@ -6480,7 +6480,7 @@
+ 	LDFLAGS="$LDFLAGS $ALSA_LIBS"
+ fi
+ 
+-ALSA_LIBS="$ALSA_LIBS -lasound -lm -ldl -lpthread"
++ALSA_LIBS="$ALSA_LIBS -lasound -lm -lpthread"
+ LIBS="$ALSA_LIBS $LIBS"
+ { echo "$as_me:$LINENO: result: $ALSA_LIBS" >&5
+ echo "${ECHO_T}$ALSA_LIBS" >&6; }
+diff -Naur alsa-util-build/version /home/testa/whitebox/build/lib/alsa-util-build-prefix/src/alsa-util-build/version
+--- alsa-util-build/version	1969-12-31 16:00:00.000000000 -0800
++++ /home/testa/whitebox/build/lib/alsa-util-build-prefix/src/alsa-util-build/version	2015-02-19 12:39:07.021263542 -0800
+@@ -0,0 +1 @@
++1.0.21
