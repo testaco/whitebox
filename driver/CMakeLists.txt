@@ -1,5 +1,5 @@
 if(NOT DEFINED INSTALL_ROOT)
-    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
+    set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0)
 endif()
 
 if(NOT DEFINED KERNELDIR)

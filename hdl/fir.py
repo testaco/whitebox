@@ -3,12 +3,10 @@ from myhdl import Signal, always, always_comb, always_seq, \
 
 def fir(clearn, clock, in_sign, out_sign,
         coeff_ram_addr,
-        coeff_ram_din0,
-        coeff_ram_din1,
+        coeff_ram_din,
         coeff_ram_blk,
         coeff_ram_wen,
-        coeff_ram_dout0,
-        coeff_ram_dout1,
+        coeff_ram_dout,
         delay_line_i_ram_addr,
         delay_line_i_ram_din,
         delay_line_i_ram_blk,
@@ -22,10 +20,10 @@ def fir(clearn, clock, in_sign, out_sign,
         enable, bank1, bank0, N,
         **kwargs):
     
-    state_t = enum('READY', 'WAIT1', 'WAIT2', 'WAIT3', 'RUN', 'DONE')
+    state_t = enum('READY', 'WAIT1', 'WAIT2', 'RUN', 'DONE')
     state = Signal(state_t.READY)
 
-    coeff_width = len(coeff_ram_dout1) + len(coeff_ram_dout0)
+    coeff_width = len(coeff_ram_dout)
     delay_line_width = len(delay_line_i_ram_dout)
     mo = coeff_width + delay_line_width - 1
     ao = mo + 1
@@ -43,8 +41,8 @@ def fir(clearn, clock, in_sign, out_sign,
     last = Signal(bool(0))
     n = Signal(modbv(0, min=0, max=2**7))
     k = Signal(modbv(0, min=0, max=2**7))
-    m_i = Signal(intbv(0, min=-2**mo, max=2**mo))
-    m_q = Signal(intbv(0, min=-2**mo, max=2**mo))
+    #m_i = Signal(intbv(0, min=-2**mo, max=2**mo))
+    #m_q = Signal(intbv(0, min=-2**mo, max=2**mo))
     ac_i = Signal(intbv(0, min=-2**ao, max=2**ao))
     ac_q = Signal(intbv(0, min=-2**ao, max=2**ao))
 
@@ -65,9 +63,8 @@ def fir(clearn, clock, in_sign, out_sign,
                 delay_line_i_ram_blk.next = True
                 delay_line_q_ram_blk.next = True
                 
-        elif state == state_t.WAIT1 or state == state_t.WAIT2 or state == state_t.WAIT3 or state == state_t.RUN:
-            delay_line_i_ram_addr.next = concat(bank1, bank0,
-                    modbv(n - k, min=0, max=2**7-1))
+        elif state == state_t.WAIT1 or state == state_t.WAIT2 or state == state_t.RUN:
+            delay_line_i_ram_addr.next = concat(bank1, bank0, modbv(n - k, min=0, max=2**7-1))
             delay_line_i_ram_blk.next = False
             delay_line_i_ram_wen.next = True
             delay_line_q_ram_addr.next = concat(bank1, bank0,
@@ -113,16 +110,12 @@ def fir(clearn, clock, in_sign, out_sign,
             k.next = 0
         else:
             k.next = k + 1
-            m_i.next = concat(coeff_ram_dout1, coeff_ram_dout0).signed() * delay_line_i_ram_dout.signed()
-            m_q.next = concat(coeff_ram_dout1, coeff_ram_dout0).signed() * delay_line_q_ram_dout.signed()
             if state == state_t.RUN:
-                ac_i.next = ac_i + m_i
-                ac_q.next = ac_q + m_q
+                ac_i.next = coeff_ram_dout.signed() * delay_line_i_ram_dout.signed() + ac_i
+                ac_q.next = coeff_ram_dout.signed() * delay_line_q_ram_dout.signed() + ac_q
             elif state == state_t.WAIT1:
                 state.next = state_t.WAIT2
             elif state == state_t.WAIT2:
-                state.next = state_t.WAIT3
-            elif state == state_t.WAIT3:
                 state.next = state_t.RUN
 
             if k == N + 3:

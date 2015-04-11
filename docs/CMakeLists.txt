@@ -68,7 +68,7 @@ foreach(image ${images})
             copy ${image} ${CMAKE_CURRENT_BINARY_DIR}/html/_images/)
 endforeach()
 
-add_dependencies(whitebox_html_docs DEPENDS whitebox_doxygen_docs whitebox_html_images)
+add_dependencies(whitebox_html_images DEPENDS whitebox_doxygen_docs whitebox_html_docs)
 
 add_custom_target(upload_docs
     s3cmd sync

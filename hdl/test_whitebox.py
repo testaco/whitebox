@@ -59,9 +59,6 @@ class WhiteboxSim(object):
         self.tx_i = []
         self.tx_n = []
         pclk = self.bus.pclk
-        self.fir_coeff_ram = Ram2(self.bus.presetn, self.dac_clock, pclk)
-        self.fir_delay_line_i_ram = Ram(self.bus.presetn, self.dac_clock, self.dac_clock)
-        self.fir_delay_line_q_ram = Ram(self.bus.presetn, self.dac_clock, self.dac_clock)
 
     def simulate(self, stimulus, whitebox, **kwargs):
         """Acturally run the cosimulation with iverilog.
@@ -367,51 +364,6 @@ class WhiteboxSim(object):
         cmd = 'iverilog -o %s.v -c %s whitebox.v whitebox_reset.v /home/testa/whitebox/hdl/cosim_whitebox.v' % (cosim_name, config_file.name)
         os.system(cmd)
 
-        fir_coeff_ram_addr = self.fir_coeff_ram.port['a'].addr
-        fir_coeff_ram_din0 = self.fir_coeff_ram.port['a'].din[0]
-        fir_coeff_ram_din1 = self.fir_coeff_ram.port['a'].din[1]
-        fir_coeff_ram_width0 = self.fir_coeff_ram.port['a'].width0
-        fir_coeff_ram_width1 = self.fir_coeff_ram.port['a'].width1
-        fir_coeff_ram_pipe = self.fir_coeff_ram.port['a'].pipe
-        fir_coeff_ram_wmode = self.fir_coeff_ram.port['a'].wmode
-        fir_coeff_ram_blk = self.fir_coeff_ram.port['a'].blk
-        fir_coeff_ram_wen = self.fir_coeff_ram.port['a'].wen
-        fir_coeff_ram_clk = self.fir_coeff_ram.port['a'].clk
-        fir_coeff_ram_dout0 = self.fir_coeff_ram.port['a'].dout[0]
-        fir_coeff_ram_dout1 = self.fir_coeff_ram.port['a'].dout[1]
-        fir_load_coeff_ram_addr = self.fir_coeff_ram.port['b'].addr
-        fir_load_coeff_ram_din0 = self.fir_coeff_ram.port['b'].din[0]
-        fir_load_coeff_ram_din1 = self.fir_coeff_ram.port['b'].din[1]
-        fir_load_coeff_ram_width0 = self.fir_coeff_ram.port['b'].width0
-        fir_load_coeff_ram_width1 = self.fir_coeff_ram.port['b'].width1
-        fir_load_coeff_ram_pipe = self.fir_coeff_ram.port['b'].pipe
-        fir_load_coeff_ram_wmode = self.fir_coeff_ram.port['b'].wmode
-        fir_load_coeff_ram_blk = self.fir_coeff_ram.port['b'].blk
-        fir_load_coeff_ram_wen = self.fir_coeff_ram.port['b'].wen
-        fir_load_coeff_ram_clk = self.fir_coeff_ram.port['b'].clk
-        fir_load_coeff_ram_dout0 = self.fir_coeff_ram.port['b'].dout[0]
-        fir_load_coeff_ram_dout1 = self.fir_coeff_ram.port['b'].dout[1]
-        fir_delay_line_i_ram_addr = self.fir_delay_line_i_ram.port['a'].addr
-        fir_delay_line_i_ram_din = self.fir_delay_line_i_ram.port['a'].din
-        fir_delay_line_i_ram_width0 = self.fir_delay_line_i_ram.port['a'].width0
-        fir_delay_line_i_ram_width1 = self.fir_delay_line_i_ram.port['a'].width1
-        fir_delay_line_i_ram_pipe = self.fir_delay_line_i_ram.port['a'].pipe
-        fir_delay_line_i_ram_wmode = self.fir_delay_line_i_ram.port['a'].wmode
-        fir_delay_line_i_ram_blk = self.fir_delay_line_i_ram.port['a'].blk
-        fir_delay_line_i_ram_wen = self.fir_delay_line_i_ram.port['a'].wen
-        fir_delay_line_i_ram_clk = self.fir_delay_line_i_ram.port['a'].clk
-        fir_delay_line_i_ram_dout = self.fir_delay_line_i_ram.port['a'].dout
-        fir_delay_line_q_ram_addr = self.fir_delay_line_q_ram.port['a'].addr
-        fir_delay_line_q_ram_din = self.fir_delay_line_q_ram.port['a'].din
-        fir_delay_line_q_ram_width0 = self.fir_delay_line_q_ram.port['a'].width0
-        fir_delay_line_q_ram_width1 = self.fir_delay_line_q_ram.port['a'].width1
-        fir_delay_line_q_ram_pipe = self.fir_delay_line_q_ram.port['a'].pipe
-        fir_delay_line_q_ram_wmode = self.fir_delay_line_q_ram.port['a'].wmode
-        fir_delay_line_q_ram_blk = self.fir_delay_line_q_ram.port['a'].blk
-        fir_delay_line_q_ram_wen = self.fir_delay_line_q_ram.port['a'].wen
-        fir_delay_line_q_ram_clk = self.fir_delay_line_q_ram.port['a'].clk
-        fir_delay_line_q_ram_dout = self.fir_delay_line_q_ram.port['a'].dout
-
         whitebox_test = Cosimulation(
                     'vvp -m ./myhdl.vpi %s.v' % (cosim_name, ),
                     resetn=self.bus.presetn,
@@ -472,52 +424,8 @@ class WhiteboxSim(object):
                     rx_fifo_underflow=rx_fifo_underflow,
                     rx_fifo_rdcnt=rx_fifo_rdcnt,
                     rx_fifo_wrcnt=rx_fifo_wrcnt,
-                    fir_coeff_ram_addr=fir_coeff_ram_addr,
-                    fir_coeff_ram_din0=fir_coeff_ram_din0,
-                    fir_coeff_ram_din1=fir_coeff_ram_din1,
-                    fir_coeff_ram_width0=fir_coeff_ram_width0,
-                    fir_coeff_ram_width1=fir_coeff_ram_width1,
-                    fir_coeff_ram_pipe=fir_coeff_ram_pipe,
-                    fir_coeff_ram_wmode=fir_coeff_ram_wmode,
-                    fir_coeff_ram_blk=fir_coeff_ram_blk,
-                    fir_coeff_ram_wen=fir_coeff_ram_wen,
-                    fir_coeff_ram_clk=fir_coeff_ram_clk,
-                    fir_coeff_ram_dout0=fir_coeff_ram_dout0,
-                    fir_coeff_ram_dout1=fir_coeff_ram_dout1,
-                    fir_load_coeff_ram_addr=fir_load_coeff_ram_addr,
-                    fir_load_coeff_ram_din0=fir_load_coeff_ram_din0,
-                    fir_load_coeff_ram_din1=fir_load_coeff_ram_din1,
-                    fir_load_coeff_ram_width0=fir_load_coeff_ram_width0,
-                    fir_load_coeff_ram_width1=fir_load_coeff_ram_width1,
-                    fir_load_coeff_ram_pipe=fir_load_coeff_ram_pipe,
-                    fir_load_coeff_ram_wmode=fir_load_coeff_ram_wmode,
-                    fir_load_coeff_ram_blk=fir_load_coeff_ram_blk,
-                    fir_load_coeff_ram_wen=fir_load_coeff_ram_wen,
-                    fir_load_coeff_ram_clk=fir_load_coeff_ram_clk,
-                    fir_load_coeff_ram_dout0=fir_load_coeff_ram_dout0,
-                    fir_load_coeff_ram_dout1=fir_load_coeff_ram_dout1,
-                    fir_delay_line_i_ram_addr=fir_delay_line_i_ram_addr,
-                    fir_delay_line_i_ram_din=fir_delay_line_i_ram_din,
-                    fir_delay_line_i_ram_width0=fir_delay_line_i_ram_width0,
-                    fir_delay_line_i_ram_width1=fir_delay_line_i_ram_width1,
-                    fir_delay_line_i_ram_pipe=fir_delay_line_i_ram_pipe,
-                    fir_delay_line_i_ram_wmode=fir_delay_line_i_ram_wmode,
-                    fir_delay_line_i_ram_blk=fir_delay_line_i_ram_blk,
-                    fir_delay_line_i_ram_wen=fir_delay_line_i_ram_wen,
-                    fir_delay_line_i_ram_clk=fir_delay_line_i_ram_clk,
-                    fir_delay_line_i_ram_dout=fir_delay_line_i_ram_dout,
-                    fir_delay_line_q_ram_addr=fir_delay_line_q_ram_addr,
-                    fir_delay_line_q_ram_din=fir_delay_line_q_ram_din,
-                    fir_delay_line_q_ram_width0=fir_delay_line_q_ram_width0,
-                    fir_delay_line_q_ram_width1=fir_delay_line_q_ram_width1,
-                    fir_delay_line_q_ram_pipe=fir_delay_line_q_ram_pipe,
-                    fir_delay_line_q_ram_wmode=fir_delay_line_q_ram_wmode,
-                    fir_delay_line_q_ram_blk=fir_delay_line_q_ram_blk,
-                    fir_delay_line_q_ram_wen=fir_delay_line_q_ram_wen,
-                    fir_delay_line_q_ram_clk=fir_delay_line_q_ram_clk,
-                    fir_delay_line_q_ram_dout=fir_delay_line_q_ram_dout,
         )
-        return tx_fifo, rx_fifo, self.fir_coeff_ram.rama, self.fir_coeff_ram.ramb, self.fir_delay_line_i_ram.ram, self.fir_delay_line_q_ram.ram, whitebox_test
+        return tx_fifo, rx_fifo, whitebox_test
 
 def whitebox_clear(bus):
     yield bus.transmit(WE_STATUS_ADDR, WS_CLEAR)

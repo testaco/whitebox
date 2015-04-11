@@ -2,5 +2,8 @@ SDK
 ===
 
 .. toctree::
-    installing
     building
+    installing
+    api
+    examples
+    license

@@ -6,21 +6,10 @@
 #include "whitebox_gpio.h"
 
 /*
- * Driver verbosity level: 0->silent; >0->verbose
- */
-static int whitebox_gpio_debug = 0;
-
-/*
- * User can change verbosity of the driver
- */
-module_param(whitebox_gpio_debug, int, S_IRUSR | S_IWUSR);
-MODULE_PARM_DESC(whitebox_gpio_debug, "whitebox gpio debugging level, >0 is verbose");
-
-/*
  * Service to print debug messages
  */
 #define d_printk(level, fmt, args...)				\
-	if (whitebox_gpio_debug >= level) printk(KERN_INFO "%s: " fmt,	\
+	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
 void whitebox_gpio_free(struct platform_device* pdev) {
@@ -156,13 +145,13 @@ void _cmx991_wr_byte(struct whitebox_platform_data_t* platform_data, u8 byte) {
 }
 
 void whitebox_gpio_cmx991_write(struct whitebox_platform_data_t* platform_data, u8 address, u8 data) {
+    d_printk(4, "write %x=%x\n", address, data);
     gpio_set_value(platform_data->radio_csn_pin, 0);
     _cmx991_wr_byte(platform_data, address);
     udelay(10);
     _cmx991_wr_byte(platform_data, data);
     gpio_set_value(platform_data->radio_csn_pin, 1);
     gpio_set_value(platform_data->radio_sclk_pin, 0);
-    d_printk(2, "write %x=%x\n", address, data);
 }
 EXPORT_SYMBOL(whitebox_gpio_cmx991_write);
 
@@ -182,20 +171,21 @@ u8 _cmx991_rd_byte(struct whitebox_platform_data_t* platform_data) {
 
 u8 whitebox_gpio_cmx991_read(struct whitebox_platform_data_t* platform_data, u8 address) {
     u8 value;
+    d_printk(4, "read %x=xx\n", address);
     gpio_set_value(platform_data->radio_csn_pin, 0);
     _cmx991_wr_byte(platform_data, address);
     udelay(10);
     value = _cmx991_rd_byte(platform_data);
     gpio_set_value(platform_data->radio_csn_pin, 1);
     gpio_set_value(platform_data->radio_sclk_pin, 0);
-    d_printk(2, "read %x=%x\n", address, value);
+    d_printk(4, "read %x=%x\n", address, value);
     return value;
 }
 EXPORT_SYMBOL(whitebox_gpio_cmx991_read);
 
 void whitebox_gpio_adf4351_write(struct whitebox_platform_data_t* platform_data, u32 data) {
     int i;
-    d_printk(2, "write %x\n", data);
+    d_printk(4, "write %x\n", data);
 
     // Setup
     gpio_set_value(platform_data->vco_le_pin, 1);

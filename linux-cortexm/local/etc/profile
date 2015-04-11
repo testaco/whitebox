@@ -1,0 +1,2 @@
+export ALSA_CONFIG_PATH=/usr/share/alsa/alsa.conf
+export EDITOR=vi

@@ -1,4 +1,40 @@
 find_package(PythonInterp REQUIRED)
+include(ExternalProject)
+
+include_directories(${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include)
+
+ExternalProject_add(
+    alsa-lib-build
+    URL ftp://ftp.alsa-project.org/pub/lib/alsa-lib-1.0.21.tar.bz2
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --with-softfloat --with-libdl=no --with-pthread=yes --enable-shared=no --enable-static=yes --with-debug=yes --with-versioned=no CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
+    LOG_INSTALL 1
+)
+#ExternalProject_Add_Step(alsa-lib-build forcebuild
+#    COMMAND ${CMAKE_COMMAND} -E echo "Force build of alsa-lib"
+#    DEPENDEES configure
+#    DEPENDERS build
+#    ALWAYS 1)
+find_library(libasound NAMES libasound.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
+
+ExternalProject_add(
+    alsa-util-build
+    URL ftp://ftp.alsa-project.org/pub/utils/alsa-utils-1.0.21.tar.bz2
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --with-udev-rules-dir=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root --with-alsa-prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib --with-alsa-inc-prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include --disable-alsamixer --disable-xmlto CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
+    LOG_INSTALL 1
+)
+#ExternalProject_Add_Step(alsa-util-build forcebuild
+#    COMMAND ${CMAKE_COMMAND} -E echo "Force build of alsa-util"
+#    DEPENDEES configure
+#    DEPENDERS build
+#    ALWAYS 1)
+
+ExternalProject_add(
+    libevent-build
+    URL http://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --disable-openssl CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
+    LOG_INSTALL 1
+)
+find_library(libevent NAMES libevent.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
 
 add_custom_command(
     OUTPUT adf4351.c adf4351.h
@@ -45,14 +81,26 @@ target_link_libraries(test_adf4351 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_cmx991 test_cmx991.c)
 target_link_libraries(test_cmx991 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(test_rf test_rf.c)
+target_link_libraries(test_rf ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
 add_executable(test_driver test_driver.c)
 target_link_libraries(test_driver ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_executable(test_device test_device.c)
 target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
+add_executable(test_reactor test_reactor.c reactor.c)
+add_dependencies(test_reactor libevent-build)
+target_link_libraries(test_reactor ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+
+add_executable(test_slave test_slave.c)
+
 #add_executable(cw cw.c)
 #target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
+
+add_executable(main main.c)
+target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libasound})
 
 add_executable(rfcat rfcat.c)
 target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
@@ -69,11 +117,13 @@ target_link_libraries(qa_rx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(whiteboxd whiteboxd.c modulators.c sources.c)
-target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_executable(whiteboxd whiteboxd.c reactor.c)
+add_dependencies(whiteboxd libevent-build)
+target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+
 
 add_custom_target(apps
-    DEPENDS test_adf4351 test_cmx991 test_driver test_device gnuradio_peripheral qa_tx qa_rx qa_lo whiteboxd)
+    DEPENDS test_slave test_adf4351 test_cmx991 test_driver test_device test_rf main)
 
 add_test(NAME target_netboot
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot

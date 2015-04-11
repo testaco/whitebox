@@ -34,9 +34,9 @@ class Pin:
                 % (pin_des, e)
 
     def parse(self, pin_des):
-        x = re.match('^([^\s]+)\s*([^\s]+)$', pin_des)
+        x = re.match('^([^\s]+)\s*([^\s]+)\s*([^\s]*)$', pin_des)
         
-        k, v = x.groups()
+        k, v, self.direction = x.groups()
 
         self.name = k
         self.points_to(v)
@@ -66,7 +66,7 @@ def do_mapping():
     pin_mapping = parse_mapping(os.path.join(options.src_dir, 'whitebox.pinmap'))
     bsb_mapping = parse_mapping(os.path.join(options.src_dir, 'bsb-ext.pinmap'))
     som_mapping = parse_mapping(os.path.join(options.src_dir, 'som-ext.pinmap'))
-    a2f_mapping = parse_mapping(os.path.join(options.src_dir, 'a2f.pinmap'))
+    m2s_mapping = parse_mapping(os.path.join(options.src_dir, 'm2s.pinmap'))
 
     pin_names = pin_mapping.iterkeys()
 
@@ -74,7 +74,7 @@ def do_mapping():
         p = pin_mapping[p_name]
         p.points_to(bsb_mapping[p.current_pointer()].current_pointer())
         p.points_to(som_mapping[p.current_pointer()].current_pointer())
-        p.points_to(a2f_mapping[p.current_pointer()].current_pointer())
+        p.points_to(m2s_mapping[p.current_pointer()].current_pointer())
 
     return pin_mapping
 
@@ -97,7 +97,9 @@ if __name__ == '__main__':
     designer_pdc_f = None
     try:
         designer_pdc_tmpl_f = open(os.path.join(options.src_dir, 'designer.pdc.tmpl'), 'r')
-        designer_pdc = parse_tmpl(designer_pdc_tmpl_f.read(), pin_names=pin_names, pin_mapping=pin_mapping)
+        designer_pdc = parse_tmpl(designer_pdc_tmpl_f.read(),
+            pin_names=pin_names,
+            pin_mapping=pin_mapping)
         designer_pdc_f = open(os.path.join(options.binary_dir, 'designer.pdc'), 'w')
         designer_pdc_f.write(designer_pdc)
     finally:

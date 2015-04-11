@@ -1,0 +1,161 @@
+# Transcribed from Table 4 in the 'SmartFusion SOM Hardware Archtecture'
+#SOM.P1[1]   LED_ACT     eth
+#SOM.P1[2]   GND         pwr
+#SOM.P1[3]   GND         pwr
+#SOM.P1[4]   TD_P        eth
+#SOM.P1[5]   GND         pwr
+#SOM.P1[6]   TD_N        eth
+#SOM.P1[7]   LED_SPD     eth
+#SOM.P1[8]   GND         pwr
+#SOM.P1[9]   GND         pwr
+#SOM.P1[10]  RD_P        eth
+#SOM.P1[11]  GND         pwr
+#SOM.P1[12]  RD_N        eth
+#SOM.P1[13]  AC27        reset
+#SOM.P1[14]  GND         pwr
+#SOM.P1[15]  R2          reset
+#SOM.P1[16]  AC2         mssgpio
+#SOM.P1[17]  AD1         mssgpio25
+#SOM.P1[18]  AC3         mssgpio25
+#SOM.P1[19]  AD2         mssgpio25
+#SOM.P1[20]  AC26        jtag
+#SOM.P1[21]  AD3         mssgpio25
+#SOM.P1[22]  AA25        jtag
+#SOM.P1[23]  AC1         mssgpio25
+#SOM.P1[24]  AB27        jtag
+#SOM.P1[25]  V26         i2c
+#SOM.P1[26]  V23         i2c
+#SOM.P1[27]  K23         i2c
+#SOM.P1[28]  H30         uart
+#SOM.P1[29]  H27         uart
+#SOM.P1[30]  L23         uart
+#SOM.P1[31]  G29         uart
+#SOM.P1[32]  AC4         mssgpio25
+#SOM.P1[33]  K24         i2c
+#SOM.P1[34]  AA1         mssgpio25
+#SOM.P1[35]  AA2         mssgpio25
+#SOM.P1[36]  AB25        jtag
+#SOM.P1[37]  AB1         mssgpio25
+#SOM.P1[38]  AC25        jtag
+#SOM.P1[39]  AB2         mssgpio25
+#SOM.P1[40]  V1          mssgpio25
+#SOM.P1[41]  V7          mssgpio25
+#SOM.P1[42]  V5          mssgpio25
+#SOM.P1[43]  W1          mssgpio25
+#SOM.P1[44]  V6          mssgpio25
+#SOM.P1[45]  Y1          mssgpio25
+#SOM.P1[46]  W6          mssgpio25
+#SOM.P1[47]  Y23         jtag
+#SOM.P1[48]  W7          mssgpio25
+#SOM.P1[49]  Y2          mssgpio25
+#SOM.P1[50]  AK18        mssgpio25
+#SOM.P1[51]  AJ18        mssgpio25
+#SOM.P1[52]  AJ19        mssgpio25
+#SOM.P1[53]  AK19        mssgpio25
+#SOM.P1[54]  AJ20        mssgpio25
+#SOM.P1[55]  AK20        mssgpio25
+#SOM.P1[56]  AJ22        mssgpio25
+#SOM.P1[57]  GND         pwr
+#SOM.P1[58]  AK22        mssgpio25
+#SOM.P1[59]  V27         spi
+#SOM.P1[60]  AJ24        mssgpio25
+#SOM.P1[61]  U27         spi
+#SOM.P1[62]  
+#SOM.P1[63]  Y29         spi
+#SOM.P1[64]  R29         spi
+#SOM.P1[65]  Y28         spi
+#SOM.P1[66]  R24         spi
+#SOM.P1[67]  U23         spi
+#SOM.P1[68]  R28         spi
+#SOM.P1[69]  
+#SOM.P1[70]  
+#SOM.P1[71]  
+#SOM.P1[72]  
+#SOM.P1[73]  
+#SOM.P1[74]  
+#SOM.P1[75]  GND         pwr
+#SOM.P1[76]  GND         pwr
+#SOM.P1[77]  VCC3        pwr
+#SOM.P1[78]  
+#SOM.P1[79]  VCC3        pwr
+#SOM.P1[80]  
+SOM.P2[1]   B1
+SOM.P2[2]   B2
+SOM.P2[3]   C3
+SOM.P2[4]   A2
+SOM.P2[5]   C4
+SOM.P2[6]   B3
+SOM.P2[7]   E4
+SOM.P2[8]   D4
+SOM.P2[9]   F5
+SOM.P2[10]  Y9
+SOM.P2[11]  G6
+SOM.P2[12]  W9
+SOM.P2[13]  F6
+SOM.P2[14]  Y10
+SOM.P2[15]  G7
+SOM.P2[16]  W10
+SOM.P2[17]  H7
+SOM.P2[18]  W11
+SOM.P2[19]  J6
+SOM.P2[20]  V11
+SOM.P2[21]  K7
+SOM.P2[22]  T13
+SOM.P2[23]  K6
+SOM.P2[24]  GND
+SOM.P2[25]  H6
+SOM.P2[26]  R17
+SOM.P2[27]  K15
+SOM.P2[28]  GND
+SOM.P2[29]  L16
+SOM.P2[30]  V19
+SOM.P2[31]  P16
+SOM.P2[32]  P17
+SOM.P2[33]  R16
+SOM.P2[34]  T21
+SOM.P2[35]  N17
+SOM.P2[36]  T20
+SOM.P2[37]  N16
+SOM.P2[38]  U21
+SOM.P2[39]  P18
+SOM.P2[40]  U22
+SOM.P2[41]  K17
+SOM.P2[42]  V21
+SOM.P2[43]  F18
+SOM.P2[44]  V22
+SOM.P2[45]  F19
+SOM.P2[46]  R18
+SOM.P2[47]  L18
+SOM.P2[48]  T19
+SOM.P2[49]  L19
+SOM.P2[50]  T18
+SOM.P2[51]  G19
+SOM.P2[52]  GND
+SOM.P2[53]  H20XXX
+SOM.P2[54]  M7
+SOM.P2[55]  F20
+SOM.P2[56]  L7
+SOM.P2[57]  F21
+SOM.P2[58]  L8
+SOM.P2[59]  K20
+SOM.P2[60]  K8
+SOM.P2[61]  K21
+SOM.P2[62]  AB15
+SOM.P2[63]  E22
+SOM.P2[64]  AA15
+SOM.P2[65]  E21
+SOM.P2[66]  W15
+SOM.P2[67]  B22
+SOM.P2[68]  Y15
+SOM.P2[69]  Y18
+SOM.P2[70]  U15
+SOM.P2[71]  AA17
+SOM.P2[72]  Y17
+SOM.P2[73]  AA16
+SOM.P2[74]  W17
+SOM.P2[75]  W16
+SOM.P2[76]  AB17
+SOM.P2[77]  V16
+SOM.P2[78]  AA18
+SOM.P2[79]  U19
+SOM.P2[80]  AB18

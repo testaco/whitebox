@@ -12,12 +12,13 @@ Features
 * Half-duplex
 * 1MHz bandwidth
 * 10 MS/s, 10 bit ADC & DAC
-* 16MB SDRAM, 16MB Flash
+* 64MB LPDDR, 16MB Flash
 * 3.3V low power operation
 * 100mA sleep state, 500mA transceiving
 
 **Interfaces**
 
+* USB On The Go
 * UART over USB
 * 10/100 Ethernet
 * ARM & FlashPro JTAG

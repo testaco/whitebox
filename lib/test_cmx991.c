@@ -79,6 +79,7 @@ int test_cmx991_rf_responds(void *data) {
     ioctl(fd, WC_GET, &w);
     cmx991_ioctl_get(&cmx991, &w);
     assert(cmx991.hi_lo == HI_LO_LOWER);
+    close(fd);
     return 0;
 }
 

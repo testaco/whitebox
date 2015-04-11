@@ -1,4 +1,5 @@
-set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.11.0)
+set(INSTALL_ROOT ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0)
+include_directories(${INSTALL_ROOT}/A2F/root/usr/include)
 
 if(NOT DEFINED KERNELDIR)
     set(KERNELDIR ${INSTALL_ROOT}/linux)
@@ -8,15 +9,29 @@ if(NOT DEFINED TOOLS_PATH)
     set(TOOLS_PATH ${INSTALL_ROOT}/tools)
 endif()
 
+if(NOT DEFINED IMAGE_TYPE)
+    set(IMAGE_TYPE devel)
+endif()
+
+if (IMAGE_TYPE STREQUAL "demo1")
+    set(INCLUDE_DEMO1_SAMPLES "")
+else()
+    set(INCLUDE_DEMO1_SAMPLES "#")
+endif()
+
 configure_file(Emcraft.make Emcraft.make
     COPYONLY
 )
 
-configure_file(whitebox.kernel.A2F whitebox.kernel.A2F
+configure_file(whitebox.kernel.M2S whitebox.kernel.M2S
     COPYONLY
 )
 
 configure_file(whitebox.initramfs.in whitebox.initramfs
+    @ONLY
+)
+
+configure_file(local/etc/rc.in local/etc/rc
     @ONLY
 )
 

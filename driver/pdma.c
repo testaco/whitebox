@@ -9,14 +9,20 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 
-#include <mach/a2f.h>
+#include <mach/m2s.h>
 
 #include "pdma.h"
 
 static int *STCVR = (int *)0xE000E018;
 
+#if 0
 #define PDMA_REGS 0x40004000 
 #define PDMA_IRQ  9
+#else
+#define PDMA_REGS 0x40003000
+#define PDMA_IRQ  13
+#endif
+
 
 /*
  * Spinlock for accessing the PDMA regs
@@ -39,7 +45,7 @@ MODULE_PARM_DESC(pdma_debug, "pdma debugging level, >0 is verbose");
 /*
  * Use ping pong mode
  */
-static int pdma_ping_pong = 1;
+static int pdma_ping_pong = 0;
 module_param(pdma_ping_pong, int, S_IRUSR | S_IWUSR);
 MODULE_PARM_DESC(pdma_ping_pong, "pdma ping pong mode, 0 to disable, 1 to enable");
 
@@ -469,16 +475,17 @@ void pdma_release(u8 ch) {
 } EXPORT_SYMBOL(pdma_release);
 
 static int pdma_init(struct pdma_device_t* p) {
-	uint32_t v;
+	//uint32_t v;
     u8 ch;
     int ret = 0;
     d_printk(2, "init\n");
 
     spin_lock_init(&pdma_lock);
+#define PERIPHERAL_DMA_SOFT_RESET (1<<5)
     /*
      * Reset the PDMA block.
      */
-#define PERIPHERAL_DMA_SOFT_RESET (1<<5)
+#if 0
     v = readl(&A2F_SYSREG->soft_rst_cr) |
         PERIPHERAL_DMA_SOFT_RESET;
     writel(v, &A2F_SYSREG->soft_rst_cr);
@@ -491,6 +498,9 @@ static int pdma_init(struct pdma_device_t* p) {
     writel(v, &A2F_SYSREG->soft_rst_cr);
 
     PDMA(p)->ratio = PDMA_RATIO_HIGH_LOW_255_TO_1;
+#else
+    M2S_SYSREG->soft_reset_cr &= ~PERIPHERAL_DMA_SOFT_RESET;
+#endif
 
     /*
      * Initialize the PDMA channel bookkeeping structure.

@@ -8,7 +8,6 @@
 
 import numpy as np
 
-sample_rate = 48e3
 scale_factor = 1.0
 sample_resolution = 16 # in bits
 
@@ -80,4 +79,8 @@ uint32_t sincos16c(uint32_t fcw, uint32_t *phase) {
 
 uint32_t freq_to_fcw(float freq, float sample_rate) {
     return (uint32_t)(freq / (sample_rate / (DDS_PA_MAX >> 1)));
+}
+
+void awgn(int16_t *s) {
+    *s = rand() % (1 << 16 - 1);
 }

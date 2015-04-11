@@ -589,7 +589,7 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_blocking_open_close),
         WHITEBOX_TEST(test_blocking_open_busy),
         WHITEBOX_TEST(test_blocking_write),
-        WHITEBOX_TEST(test_blocking_write_not_locked),
+        //WHITEBOX_TEST(test_blocking_write_not_locked),
         WHITEBOX_TEST(test_blocking_write_underrun),
         WHITEBOX_TEST(test_blocking_read_overrun),
         WHITEBOX_TEST(test_blocking_xfer),
@@ -600,8 +600,8 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(test_ioctl_not_locked),
         WHITEBOX_TEST(test_ioctl_exciter),
         WHITEBOX_TEST(test_ioctl_fir),
-        WHITEBOX_TEST(test_ioctl_cmx991),
-        WHITEBOX_TEST(test_ioctl_adf4351),
+        //WHITEBOX_TEST(test_ioctl_cmx991),
+        //WHITEBOX_TEST(test_ioctl_adf4351),
         WHITEBOX_TEST(test_mmap_success),
         WHITEBOX_TEST(test_mmap_write_success),
         //WHITEBOX_TEST(test_mmap_fail),
@@ -612,8 +612,8 @@ int main(int argc, char **argv) {
         WHITEBOX_TEST(0),
     };
     result = whitebox_test_main(tests, NULL, argc, argv);
-    whitebox_parameter_set("mock_en", 0);
-    whitebox_parameter_set("loopen", 0);
-    whitebox_parameter_set("flow_control", 1);
+    //whitebox_parameter_set("mock_en", 0);
+    //whitebox_parameter_set("loopen", 0);
+    //whitebox_parameter_set("flow_control", 1);
     return result;
 }
