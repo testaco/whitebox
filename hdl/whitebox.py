@@ -15,14 +15,16 @@ from rfe import print_rfe_ioctl
 from ram import Ram, Ram2
 
 whitebox_config = dict(
-        interp=128,
+        dac_sample_rate=10e6,
+        default_sample_rate=200e3,
+        #interp=50,
         rfe_enable=True,
         duc_enable=True,
-        fir_enable=False,
+        fir_enable=True,
         cic_enable=True,
         cic_order=4,
         cic_delay=1,
-        dds_enable=False,
+        dds_enable=True,
         conditioning_enable=True,
         ddc_enable=True)
 
@@ -147,7 +149,11 @@ def whitebox(
     :param clear_enable: To reset controller, set this high for reset
     """
     dspsim = kwargs.get('dspsim', None)
-    interp_default = kwargs.get('interp', 1)
+    dac_sample_rate = kwargs.get('dac_sample_rate', 10e6)
+    default_sample_rate = kwargs.get('default_sample_rate', 200e3)
+    interp_default = kwargs.get('interp', int(dac_sample_rate / default_sample_rate))
+    assert interp_default * default_sample_rate == dac_sample_rate
+    whitebox_config['interp'] = interp_default
     fcw_bitwidth = kwargs.get('fcw_bitwidth', 25)
 
     ######### VARS AND FLAGS ###########
@@ -328,8 +334,8 @@ if __name__ == '__main__':
     from fifo import fifo as FIFO
     fifo_depth = 1024
     fifo_width = 32
-    duc_enable = True
-    rfe_enable = True
+    #duc_enable = True
+    #rfe_enable = True
 
     clearn = ResetSignal(0, 0, async=True)
     clear_enable = Signal(bool(0))

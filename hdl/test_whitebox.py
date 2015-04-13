@@ -36,6 +36,9 @@ from rfe import WF_ACCESS_COEFFS
 WF_ACCESS_COEFFS = intbv(1 << WF_ACCESS_COEFFS)[32:]
 
 APB3_DURATION = int(1e9 / 40e6)
+# hacky
+whitebox_config['interp'] = int(whitebox_config['dac_sample_rate'] / whitebox_config['default_sample_rate'])
+whitebox_config['decim'] = whitebox_config['interp']
 
 class WhiteboxSim(object):
     """Simulate Whitebox Peripheral and control it with a ``bus``.
@@ -71,7 +74,8 @@ class WhiteboxSim(object):
         """
         record_tx = kwargs.get('record_tx', None)
         auto_stop = kwargs.get('auto_stop', False)
-        self.sample_rate = kwargs.get('sample_rate', 10e6)
+        #self.sample_rate = kwargs.get('sample_rate', 10e6)
+        self.sample_rate = whitebox_config.get('dac_sample_rate')
         DAC2X_DURATION = int(1e9 / (self.sample_rate * 2))
         DAC_DURATION = int(1e9 / self.sample_rate)
 
@@ -206,7 +210,8 @@ class WhiteboxSim(object):
         :param auto_stop: Raise ``StopSimulation`` when the correct number of samples have been recorded.
         :param sample_rate: Samples per second.
         """
-        self.sample_rate = kwargs.get('sample_rate', 10e6)
+        #self.sample_rate = kwargs.get('sample_rate', 10e6)
+        self.sample_rate = whitebox_config.get('dac_sample_rate')
         auto_stop = kwargs.get('auto_stop', False)
         DAC2X_DURATION = int(1e9 / (self.sample_rate * 2))
         DAC_DURATION = int(1e9 / self.sample_rate)
@@ -252,7 +257,7 @@ class WhiteboxSim(object):
     def start_receive(self):
         self.receive_started = True
      
-    def cosim_dut(self, cosim_name, fifo_args, whitebox_args):
+    def cosim_dut(self, cosim_name, fifo_args):#, whitebox_args):
         """Get the ``Cosimulation`` object.
 
         :param cosim_name: The name of the cosimulation.
@@ -440,10 +445,9 @@ class TestApb3Transaction(unittest.TestCase):
         s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': 1024}
-        whitebox_args = {'interp': 200,}
         def test_whitebox_apb3_transaction():
             return s.cosim_dut("cosim_whitebox_apb3_transaction",
-                    fifo_args, whitebox_args)
+                    fifo_args)
 
         @instance
         def stimulus():
@@ -470,18 +474,17 @@ class TestApb3Transaction(unittest.TestCase):
 
 class TestOverrunUnderrun(unittest.TestCase):
     def test_overrun_underrun(self):
-        INTERP = 200
+        INTERP = whitebox_config.get('interp')
         FIFO_DEPTH = 4
         bus = Apb3Bus(duration=APB3_DURATION)
 
         s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': FIFO_DEPTH}
-        whitebox_args = { 'interp': INTERP }
 
         def test_whitebox_overrun_underrun():
             return s.cosim_dut("cosim_whitebox_overrun_underrun",
-                    fifo_args, whitebox_args)
+                    fifo_args)
 
         @instance
         def stimulus():
@@ -756,7 +759,7 @@ class TestUpsamplerImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.interp = 1
         self.fifo_depth = 64
         self.bulk_size = 16
-        self.sample_rate = 6.144e6
+        self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
         self.duration = 4e-6 # 2 mS
         self.status = 0
@@ -773,7 +776,7 @@ class TestUpsamplerImpulseResponse(WhiteboxImpulseResponseTestCase):
     def test_whitebox_upsampler_impulse_response(self):
         def test_whitebox_upsampler_impulse_response():
             return self.s.cosim_dut("cosim_whitebox_upsampler_impulse_response",
-                    self.fifo_args, self.whitebox_args)
+                    self.fifo_args)
 
         self.simulate(test_whitebox_upsampler_impulse_response)
 
@@ -787,7 +790,7 @@ class TestUpsampler3xImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.interp = 3
         self.fifo_depth = 64
         self.bulk_size = 16
-        self.sample_rate = 6.144e6
+        self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
         self.duration = 4e-6 # 2 mS
         self.status = 0
@@ -804,7 +807,7 @@ class TestUpsampler3xImpulseResponse(WhiteboxImpulseResponseTestCase):
     def test_whitebox_upsampler_3x_impulse_response(self):
         def test_whitebox_upsampler_3x_impulse_response():
             return self.s.cosim_dut("cosim_whitebox_upsampler_3x_impulse_response",
-                    self.fifo_args, self.whitebox_args)
+                    self.fifo_args)
 
         self.simulate(test_whitebox_upsampler_3x_impulse_response)
 
@@ -817,7 +820,7 @@ class TestFirImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.apb3_duration = APB3_DURATION
         self.fifo_depth = 64
         self.bulk_size = 16
-        self.sample_rate = 6.144e6
+        self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
         self.taps = [1, 2, 3, 5, 31, -5, -3, -2, -1]
         self.interp = 16
@@ -835,7 +838,7 @@ class TestFirImpulseResponse(WhiteboxImpulseResponseTestCase):
     def test_whitebox_fir_impulse_response(self):
         def test_whitebox_fir_impulse_response():
             return self.s.cosim_dut("cosim_whitebox_fir_impulse_response",
-                    self.fifo_args, self.whitebox_args)
+                    self.fifo_args)
 
         self.simulate(test_whitebox_fir_impulse_response)
 
@@ -849,7 +852,7 @@ class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.interp = 1
         self.fifo_depth = 64
         self.bulk_size = 16
-        self.sample_rate = 6.144e6
+        self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
         self.status = WES_FILTEREN
 
@@ -871,7 +874,7 @@ class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
     def test_whitebox_cic_impulse_response(self):
         def test_whitebox_cic_impulse_response():
             return self.s.cosim_dut("cosim_whitebox_cic_impulse_response",
-                    self.fifo_args, self.whitebox_args)
+                    self.fifo_args)
 
         self.simulate(test_whitebox_cic_impulse_response)
 
@@ -887,7 +890,7 @@ class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.apb3_duration = APB3_DURATION
         self.fifo_depth = 64
         self.bulk_size = 16
-        self.sample_rate = 6.144e6
+        self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
         self.duration = 4e-6 # 2 mS
         self.status = WES_FILTEREN
@@ -910,7 +913,7 @@ class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
     def test_whitebox_cic_3x_impulse_response(self):
         def test_whitebox_cic_3x_impulse_response():
             return self.s.cosim_dut("cosim_whitebox_cic_3x_impulse_response",
-                    self.fifo_args, self.whitebox_args)
+                    self.fifo_args)
 
         self.simulate(test_whitebox_cic_3x_impulse_response)
 
@@ -930,7 +933,7 @@ class TestDdsSpectrumMask(WhiteboxSpectrumMaskTestCase):
         self.apb3_duration = APB3_DURATION
         self.fifo_depth = 64
         self.bulk_size = 16
-        self.sample_rate = 6.144e6
+        self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
         self.interp = 1
         self.status = WES_DDSEN | WES_FILTEREN
@@ -948,7 +951,7 @@ class TestDdsSpectrumMask(WhiteboxSpectrumMaskTestCase):
     def test_whitebox_dds_spectrum_mask(self):
         def test_whitebox_dds_spectrum_mask():
             return self.s.cosim_dut("cosim_whitebox_dds_spectrum_mask",
-                    self.fifo_args, self.whitebox_args)
+                    self.fifo_args)
 
         self.simulate(test_whitebox_dds_spectrum_mask)
 
@@ -963,19 +966,18 @@ class TestRx(unittest.TestCase):
         s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': 1024,}
-        whitebox_args = {'decim': 128,}
         def test_whitebox_rx():
             return s.cosim_dut("cosim_whitebox_rx",
-                    fifo_args, whitebox_args)
+                    fifo_args)
 
         @instance
         def stimulus():
             yield bus.reset()
             yield whitebox_clear(bus)
-            yield bus.transmit(WR_DECIM_ADDR, 128)
+            yield bus.transmit(WR_DECIM_ADDR, whitebox_config['decim'])
             yield bus.transmit(WE_FCW_ADDR, 100)
             yield bus.receive(WR_DECIM_ADDR)
-            assert bus.rdata == 128
+            assert bus.rdata == whitebox_config['decim']
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == 100
             s.start_receive()
@@ -1005,10 +1007,9 @@ class TestRxOverrun(unittest.TestCase):
         s = WhiteboxSim(bus)
 
         fifo_args = {'width': 32, 'depth': 1024,}
-        whitebox_args = {'decim': 128,}
         def test_whitebox_rx_overrun():
             return s.cosim_dut("cosim_whitebox_rx_overrun",
-                    fifo_args, whitebox_args)
+                    fifo_args)
 
         @instance
         def stimulus():
@@ -1035,7 +1036,7 @@ class TestRxOverrun(unittest.TestCase):
 
         rx_signal = np.zeros(2048/4, dtype=np.complex64)
         s.rx_signal(rx_signal)
-        s.simulate_rx(stimulus, test_whitebox_rx_overrun, sample_rate=6.144e6)
+        s.simulate_rx(stimulus, test_whitebox_rx_overrun)
 
 if __name__ == '__main__':
     unittest.main()
