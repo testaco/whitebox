@@ -23,7 +23,7 @@ from whitebox import whitebox, whitebox_config
 from rfe import WHITEBOX_STATUS_REGISTER, WHITEBOX_REGISTER_FILE
 from test_dsp import figure_discrete_quadrature, figure_fft_power, figure_fft_phase
 from dds import freq_to_fcw
-from duc import cic_shift, cic_filter_response
+from duc import cic_shift, cic_filter_response, cic_interp_coefficients
 from ram import Ram, Ram2
 
 for name, bit in WHITEBOX_STATUS_REGISTER.iteritems():
@@ -76,6 +76,7 @@ class WhiteboxSim(object):
         auto_stop = kwargs.get('auto_stop', False)
         #self.sample_rate = kwargs.get('sample_rate', 10e6)
         self.sample_rate = whitebox_config.get('dac_sample_rate')
+        print "SAMPLE RATE IS", self.sample_rate
         DAC2X_DURATION = int(1e9 / (self.sample_rate * 2))
         DAC_DURATION = int(1e9 / self.sample_rate)
 
@@ -131,7 +132,6 @@ class WhiteboxSim(object):
                 (1e6) / (sample_rate / 2))
         y = signal.lfilter(fir_coeff, 1.0, y2)
         y += np.random.normal(scale=10e-4, size=len(y))
-        print 'LENGTH OF Y', len(y)
         #y = signal.decimate(y, decim)
         n = len(y)
         frq = np.fft.fftfreq(n, 1/sample_rate)
@@ -147,6 +147,15 @@ class WhiteboxSim(object):
         im = [intbv(concat(not q[len(q)-1], q[len(q)-1:])).signed() for q in im]
         y = np.array([i + 1j * q for i, q in zip(re, im)])
         return y
+
+    def tx_duration(self):
+        return self.tx_n[-1] - self.tx_n[0]
+
+    def assert_tx_duration(self, expected_duration):
+        print "Asserting tx duration...", expected_duration, self.tx_n[-1], self.tx_n[0], self.tx_duration() / 1e9
+        err = abs(expected_duration - self.tx_duration() / 1e9)
+        assert err < .5e-6, "Times are expected=%s actual=%s" % (expected_duration,
+            self.tx_duration() / 1e9)
 
     def plot_tx(self, name, decim=1):
         """Plot the transmitter's output."""
@@ -210,12 +219,13 @@ class WhiteboxSim(object):
         :param auto_stop: Raise ``StopSimulation`` when the correct number of samples have been recorded.
         :param sample_rate: Samples per second.
         """
-        #self.sample_rate = kwargs.get('sample_rate', 10e6)
         self.sample_rate = whitebox_config.get('dac_sample_rate')
+        print "SAMPLE RATE IS", self.sample_rate
         auto_stop = kwargs.get('auto_stop', False)
         DAC2X_DURATION = int(1e9 / (self.sample_rate * 2))
         DAC_DURATION = int(1e9 / self.sample_rate)
         self.receive_started = False
+        self.rx_time = []
 
         @instance
         def dac2x_clock():
@@ -225,7 +235,6 @@ class WhiteboxSim(object):
 
         @instance
         def dac_clock():
-            yield delay(DAC2X_DURATION // 4)
             while True:
                 self.dac_clock.next = not self.dac_clock
                 yield delay(DAC_DURATION // 2)
@@ -240,6 +249,7 @@ class WhiteboxSim(object):
             elif self.receive_started and self.rx_n < len(self.rx_i):
                 self.adc_idata.next = self.rx_i[self.rx_n]
                 self.adc_qdata.next = self.rx_q[self.rx_n]
+                self.rx_time.append(now())
                 self.rx_n = self.rx_n + 1
 
         traced = traceSignals(whitebox)
@@ -256,6 +266,13 @@ class WhiteboxSim(object):
 
     def start_receive(self):
         self.receive_started = True
+
+    def receive_done(self):
+        return self.rx_n == len(self.rx_i)
+
+    def rx_duration(self):
+        print 'worked on', self.rx_n
+        return self.rx_time[-1] - self.rx_time[0]
      
     def cosim_dut(self, cosim_name, fifo_args):#, whitebox_args):
         """Get the ``Cosimulation`` object.
@@ -366,7 +383,7 @@ class WhiteboxSim(object):
         config_file.write('+define+COSIM_NAME="%s"' % (cosim_name,))
         config_file.close()
 
-        cmd = 'iverilog -o %s.v -c %s whitebox.v whitebox_reset.v /home/testa/whitebox/hdl/cosim_whitebox.v' % (cosim_name, config_file.name)
+        cmd = 'iverilog -o %s.v -c %s whitebox.v whitebox_reset.v /home/testa/whitebox-master/whitebox/hdl/cosim_whitebox.v' % (cosim_name, config_file.name)
         os.system(cmd)
 
         whitebox_test = Cosimulation(
@@ -610,7 +627,7 @@ class TestLoop(unittest.TestCase):
 
 class WhiteboxImpulseResponseTestCase(unittest.TestCase):
     def setUp(self):
-        self.bus = Apb3Bus(duration=APB3_DURATION)
+        self.bus = Apb3Bus(duration=self.apb3_duration)
         self.s = WhiteboxSim(self.bus)
 
         self.fifo_args = { 'width': 32, 'depth': self.fifo_depth }
@@ -750,6 +767,7 @@ class WhiteboxImpulseResponseTestCase(unittest.TestCase):
             record_tx = self.record_tx
         else:
             record_tx = self.interp * self.cnt
+
         self.s.simulate(stimulus, dut, sample_rate=self.sample_rate,
                 record_tx=record_tx, auto_stop=False)
 
@@ -761,16 +779,20 @@ class TestUpsamplerImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.bulk_size = 16
         self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
-        self.duration = 4e-6 # 2 mS
+        self.duration = 4e-6 # uS
         self.status = 0
 
-        self.cnt = ceil(self.sample_rate * self.duration)
-        self.n = np.arange(0, self.cnt)
+        # Input signal
+        self.cnt = ceil((self.sample_rate / self.interp) * self.duration)
+        self.n = np.arange(self.cnt)
         self.x = np.zeros(self.cnt, dtype=np.complex128)
         self.x[0] = (1 << 14) + 1j * (1 << 14)
-        self.y = np.zeros(self.interp*self.cnt, dtype=np.complex128)
+
+        # Expected output signal
+        self.y = np.zeros(self.interp * self.cnt, dtype=np.complex128)
         for i in range(self.interp):
             self.y[i] = (1 << 7) + 1j * (1 << 7)
+
         WhiteboxImpulseResponseTestCase.setUp(self)
         
     def test_whitebox_upsampler_impulse_response(self):
@@ -782,6 +804,7 @@ class TestUpsamplerImpulseResponse(WhiteboxImpulseResponseTestCase):
 
         self.s.plot_tx("whitebox_upsampler_impulse_response", decim=self.interp)
         plt.savefig("test_whitebox_upsampler_impulse_response.png")
+        self.s.assert_tx_duration(self.duration)
         assert (self.s.tx() == self.y).all()
 
 class TestUpsampler3xImpulseResponse(WhiteboxImpulseResponseTestCase):
@@ -792,13 +815,16 @@ class TestUpsampler3xImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.bulk_size = 16
         self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
-        self.duration = 4e-6 # 2 mS
+        self.duration = 16e-6 # uS
         self.status = 0
 
-        self.cnt = ceil(self.sample_rate * self.duration)
-        self.n = np.arange(0, self.cnt)
+        # Input signal
+        self.cnt = ceil((self.sample_rate / self.interp) * self.duration)
+        self.n = np.arange(self.cnt)
         self.x = np.zeros(self.cnt, dtype=np.complex128)
         self.x[0] = (1 << 14) + 1j * (1 << 14)
+
+        # Output signal
         self.y = np.zeros(self.interp*self.cnt, dtype=np.complex128)
         for i in range(self.interp):
             self.y[i] = (1 << 7) + 1j * (1 << 7)
@@ -813,6 +839,7 @@ class TestUpsampler3xImpulseResponse(WhiteboxImpulseResponseTestCase):
 
         self.s.plot_tx("whitebox_upsampler_3x_impulse_response", decim=self.interp)
         plt.savefig("test_whitebox_upsampler_3x_impulse_response.png")
+        self.s.assert_tx_duration(self.duration)
         assert (self.s.tx() == self.y).all()
 
 class TestFirImpulseResponse(WhiteboxImpulseResponseTestCase):
@@ -827,6 +854,7 @@ class TestFirImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.status = WS_FIREN
 
         self.cnt = 128
+        self.duration = self.sample_rate / self.cnt / self.interp
         self.n = np.arange(0, self.cnt)
         self.x = np.zeros(self.cnt, dtype=np.complex128)
         self.x[0] = (1 << 14) + 1j * (1 << 14)
@@ -862,10 +890,14 @@ class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
                 self.cic_order, self.cic_delay)
         print 'shift', self.shift
 
+        # Input signal
         self.cnt = 128
-        self.n = np.arange(0, self.cnt)
+        self.duration = (self.cnt * self.interp) / self.sample_rate
+        self.n = np.arange(self.cnt)
         self.x = np.zeros(self.cnt, dtype=np.complex128)
         self.x[0] = (1 << 14) + 1j * (1 << 14)
+
+        #output signal
         self.y = np.zeros(self.interp*self.cnt, dtype=np.complex128)
         for i in range(self.interp):
             self.y[i] = (1 << 7) + 1j * (1 << 7)
@@ -880,10 +912,8 @@ class TestCicImpulseResponse(WhiteboxImpulseResponseTestCase):
 
         self.s.plot_tx("whitebox_cic_impulse_response", decim=self.interp)
         plt.savefig("test_whitebox_cic_impulse_response.png")
-        print 'this is it'
-        print [t / 2 for t in self.s.tx()]
-        print cic_filter_response(self.interp, self.cic_order, self.cic_delay)
-        #assert (self.s.tx() == self.y).all()
+        self.s.assert_tx_duration(self.duration)
+        assert (self.s.tx() == self.y).all()
 
 class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
     def setUp(self):
@@ -892,20 +922,24 @@ class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
         self.bulk_size = 16
         self.sample_rate = whitebox_config['dac_sample_rate']
         self.freq = 1.7e3 
-        self.duration = 4e-6 # 2 mS
         self.status = WES_FILTEREN
+        self.interp = 3
+        self.duration = 32e-6 # uS
         self.coeffs = [1, 4, 10, 16, 19, 16, 10, 4, 1]
 
-        self.interp = 3
         cic_order = whitebox_config.get('cic_order', 4)
         cic_delay = whitebox_config.get('cic_delay', 1)
+
         self.shift = cic_shift(9, 10, self.interp, cic_order, cic_delay)
-        print 'shift', self.shift
-        self.cnt = self.record_tx = 32 #ceil(self.sample_rate * self.duration)
+
+        # Input signal
+        self.cnt = ceil((self.sample_rate / self.interp) * self.duration)
         self.n = np.arange(0, self.cnt)
         self.x = np.zeros(self.cnt, dtype=np.complex128)
         self.x[0] = (1 << 14) + 1j * (1 << 14)
-        self.y = np.zeros(self.cnt, dtype=np.complex128)
+
+        # Output signal
+        self.y = np.zeros(self.cnt*self.interp, dtype=np.complex128)
         for i, c in enumerate(self.coeffs):
             self.y[i] = (c << 3) + 1j * (c << 3)
         WhiteboxImpulseResponseTestCase.setUp(self)
@@ -919,10 +953,13 @@ class TestCic3xImpulseResponse(WhiteboxImpulseResponseTestCase):
 
         self.s.plot_tx("whitebox_cic_3x_impulse_response")
         plt.savefig("test_whitebox_cic_3x_impulse_response.png")
-        print len(self.s.tx()), len(self.y)
-        print self.s.tx()
-        print self.y
-        assert (self.s.tx() == self.y).all()
+
+        tx = self.s.tx()
+        for i in range(len(self.coeffs)):
+            assert self.y[i] == tx[i]
+        assert (tx[len(self.coeffs):] == 0).all()
+
+        self.s.assert_tx_duration(self.duration)
 
 class WhiteboxSpectrumMaskTestCase(WhiteboxImpulseResponseTestCase):
     def setUp(self):
@@ -964,6 +1001,22 @@ class TestRx(unittest.TestCase):
         bus = Apb3Bus(duration=APB3_DURATION)
 
         s = WhiteboxSim(bus)
+        self.duration = 200e-6 # uS
+        self.sample_rate = whitebox_config['dac_sample_rate']
+        self.decim = 128
+
+        # Input signal
+        self.cnt = int(ceil(self.sample_rate * self.duration))
+        self.n = np.arange(self.cnt)
+        rx_signal = np.zeros(self.cnt, dtype=np.complex64)
+        for i in range(self.decim):
+            rx_signal[i] = (1 << 8) + 1j*(1 << 8)
+        s.rx_signal(rx_signal)
+        print "LENGTH IS", self.cnt
+
+        # Expected output signal
+        self.y = np.zeros(ceil(self.cnt / self.decim), dtype=np.complex64)
+        self.y[0] = (1 << 8) + 1j*(1 << 8)
 
         fifo_args = {'width': 32, 'depth': 1024,}
         def test_whitebox_rx():
@@ -974,31 +1027,39 @@ class TestRx(unittest.TestCase):
         def stimulus():
             yield bus.reset()
             yield whitebox_clear(bus)
-            yield bus.transmit(WR_DECIM_ADDR, whitebox_config['decim'])
+            yield bus.transmit(WR_DECIM_ADDR, self.decim)
             yield bus.transmit(WE_FCW_ADDR, 100)
             yield bus.receive(WR_DECIM_ADDR)
-            assert bus.rdata == whitebox_config['decim']
+            assert bus.rdata == self.decim
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == 100
-            s.start_receive()
             yield bus.delay(1)
+
+            s.start_receive()
             yield bus.transmit(WR_STATUS_ADDR, WRS_RXEN)
             yield bus.receive(WR_STATUS_ADDR)
             assert bus.rdata & WRS_RXEN
 
-            yield bus.dma_receive(s.rx_dmaready, WR_SAMPLE_ADDR, 8)
+            yield bus.dma_receive(s.rx_dmaready, WR_SAMPLE_ADDR, len(self.y))
+
             self.rx_data = bus.rdata
+
+            while not s.receive_done():
+                yield bus.delay(1)
 
             raise StopSimulation
 
-        rx_signal = np.zeros(1024, dtype=np.complex64)
-        rx_signal[0] = (1 << 8) + 1j*(1 << 8)
-        s.rx_signal(rx_signal)
+        s.simulate_rx(stimulus, test_whitebox_rx, sample_rate=self.sample_rate)
 
-        s.simulate_rx(stimulus, test_whitebox_rx)
-        y = np.zeros(8, dtype=np.complex64)
-        y[0] = (1 << 8) + 1j*(1 << 8)
-        assert (s.rx(self.rx_data) == y).all()
+        actual_duration = s.rx_duration()
+        err = abs(self.duration - actual_duration / 1e9)
+        print 'Asserting RX duration...', self.duration, actual_duration / 1e9, err
+        assert err < .01 * self.duration, "Times are expected=%s actual=%s" % (self.duration, actual_duration / 1e9)
+
+        rx = s.rx(self.rx_data)
+        print "Expected length", len(self.y), self.y
+        print "Actual length", len(rx), rx
+        assert (s.rx(self.rx_data) == self.y).all()
 
 class TestRxOverrun(unittest.TestCase):
     def test_rx_overrun(self):

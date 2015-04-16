@@ -17,7 +17,7 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
     :param decim: The decimation factor.
     :returns: A synthesizable MyHDL instance.
     """
-    cnt = Signal(intbv(0)[len(decim):])
+    cnt = Signal(intbv(decim.max - 1)[len(decim):])
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -47,7 +47,7 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
             out_q.next = 0
             out_valid.next = False
             out_last.next = False
-            cnt.next = 0
+            cnt.next = decim - 1
 
     return downsample
 
