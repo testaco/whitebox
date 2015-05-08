@@ -7,6 +7,55 @@ from dsp import Signature, offset_corrector, binary_offseter
 from dsp import iqmux
 from dsp import accumulator, comb, truncator
 
+def adc_synchronizer(clearn, dsp_clock, adc_clock, in_sign, out_sign):
+    adc_in_i = in_sign.i
+    adc_in_q = in_sign.q
+    in_last = in_sign.last
+    in_valid = in_sign.valid
+    
+    out_i = out_sign.i
+    out_q = out_sign.q
+    out_last = out_sign.last
+    out_valid = out_sign.valid
+
+    sync_adc_clock = Signal(bool(0))
+    sync_in_clock = Signal(bool(0))
+    in_clock = Signal(bool(0))
+
+    sync_in_i = Signal(intbv(0, min=in_sign.i.min, max=in_sign.i.max))
+    in_i = Signal(intbv(0, min=in_sign.i.min, max=in_sign.i.max))
+    sync_in_q = Signal(intbv(0, min=in_sign.q.min, max=in_sign.q.max))
+    in_q = Signal(intbv(0, min=in_sign.q.min, max=in_sign.q.max))
+
+    #count = Signal(intbv(0, min=0, max=4))
+
+    @always_seq(dsp_clock.posedge, reset=clearn)
+    def synchronize():
+        sync_adc_clock.next = adc_clock
+        sync_in_clock.next = sync_adc_clock
+        in_clock.next = sync_in_clock
+
+        sync_in_i.next = adc_in_i
+        in_i.next = sync_in_i
+
+        sync_in_q.next = adc_in_q
+        in_q.next = sync_in_q
+
+    @always_seq(dsp_clock.posedge, reset=clearn)
+    def capture():
+        if in_valid:
+            if not sync_in_clock and in_clock: # if there was an edge
+                out_i.next = in_i
+                out_q.next = in_q
+                out_valid.next = True
+                out_last.next = in_last
+            else:
+                out_valid.next = False
+        else:
+            out_valid.next = False
+
+    return synchronize, capture
+
 def downsampler(clearn, clock, in_sign, out_sign, decim):
     """Takes every ``decim`` samples.
 
@@ -17,7 +66,7 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
     :param decim: The decimation factor.
     :returns: A synthesizable MyHDL instance.
     """
-    cnt = Signal(intbv(decim.max - 1)[len(decim):])
+    cnt = Signal(intbv(0)[len(decim):])
     in_valid = in_sign.valid
     in_i = in_sign.i
     in_q = in_sign.q
@@ -27,27 +76,30 @@ def downsampler(clearn, clock, in_sign, out_sign, decim):
     out_i = out_sign.i
     out_q = out_sign.q
 
+    state_t = enum('IDLE', 'DOWNSAMPLING')
+    state = Signal(state_t.IDLE)
+
     @always_seq(clock.posedge, reset=clearn)
     def downsample():
-        if in_valid:
-            if cnt == 0:
+        if state == state_t.IDLE:
+            cnt.next = decim - 1
+            if in_valid:
+                state.next = state_t.DOWNSAMPLING
                 out_i.next = in_i
                 out_q.next = in_q
                 out_last.next = in_last
                 out_valid.next = True
-                cnt.next = decim - 1
             else:
-                out_i.next = 0
-                out_q.next = 0
                 out_valid.next = False
-                out_last.next = False
-                cnt.next = cnt - 1
-        else:
-            out_i.next = 0
-            out_q.next = 0
+
+        elif state == state_t.DOWNSAMPLING:
             out_valid.next = False
-            out_last.next = False
-            cnt.next = decim - 1
+
+            if in_valid:
+                cnt.next = cnt - 1
+
+            if cnt == 0:
+                state.next = state_t.IDLE
 
     return downsample
 

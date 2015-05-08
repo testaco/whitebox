@@ -41,6 +41,8 @@ add_custom_target(hdl
     DEPENDS whitebox.v
 )
 
+configure_file(cosim_whitebox.v cosim_whitebox.v COPYONLY)
+
 add_test(NAME test_apb3_simple_slave
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/apb3_utils.py
 )
@@ -100,7 +102,6 @@ add_test(NAME test_fir_design
 add_test(NAME test_whitebox_apb3_transaction
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestApb3Transaction
 )
-    
 
 add_test(NAME test_whitebox_overrun_underrun
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestOverrunUnderrun
@@ -140,6 +141,10 @@ add_test(NAME test_whitebox_rx
 
 add_test(NAME test_whitebox_rx_overrun
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestRxOverrun
+)
+
+add_test(NAME test_whitebox_rx_sequence
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestRxSequence
 )
 
 add_subdirectory(constraint)

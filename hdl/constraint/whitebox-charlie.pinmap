@@ -1,0 +1,67 @@
+# Derived from the Whitebox Charlie Schematic, p.7
+ADC_AD[0]       SOM.P2[75]  input
+ADC_AD[1]       SOM.P2[73]  input
+ADC_AD[2]       SOM.P2[71]  input
+ADC_AD[3]       SOM.P2[69]  input
+ADC_AD[4]       SOM.P2[67]  input
+ADC_AD[5]       SOM.P2[65]  input
+ADC_AD[6]       SOM.P2[63]  input
+ADC_AD[7]       SOM.P2[61]  input
+ADC_AD[8]       SOM.P2[59]  input
+ADC_AD[9]       SOM.P2[57]  input
+
+ADC_BD[0]       SOM.P2[62]  input
+ADC_BD[1]       SOM.P2[64]  input
+ADC_BD[2]       SOM.P2[66]  input
+ADC_BD[3]       SOM.P2[68]  input
+ADC_BD[4]       SOM.P2[70]  input
+ADC_BD[5]       SOM.P2[72]  input
+ADC_BD[6]       SOM.P2[74]  input
+ADC_BD[7]       SOM.P2[76]  input
+ADC_BD[8]       SOM.P2[78]  input
+ADC_BD[9]       SOM.P2[80]  input
+
+ADC_S2          SOM.P2[2]   output
+ADC_S1          SOM.P2[4]   output
+ADC_DFS         SOM.P2[6]   output
+
+DAC_D[0]        SOM.P2[37]  output
+DAC_D[1]        SOM.P2[39]  output
+DAC_D[2]        SOM.P2[41]  output
+DAC_D[3]        SOM.P2[43]  output
+DAC_D[4]        SOM.P2[45]  output
+DAC_D[5]        SOM.P2[47]  output
+DAC_D[6]        SOM.P2[49]  output
+DAC_D[7]        SOM.P2[51]  output
+DAC_D[8]        SOM.P2[53]  output
+DAC_D[9]        SOM.P2[55]  output
+
+DAC_EN          SOM.P2[29]  output
+DAC_PD          SOM.P2[31]  output
+DAC_CS          SOM.P2[33]  output
+
+DAC_CLK         SOM.P2[8]   input
+
+PTT_IN          SOM.P2[1]   input
+PTT_OUT         SOM.P2[3]   output
+
+TR              SOM.P2[5]   output
+AMP             SOM.P2[7]   output
+DETECT          SOM.P2[9]   output
+NOISE           SOM.P2[10]  output
+
+PD              SOM.P2[13]  output
+EN              SOM.P2[79]  output
+
+SCLK            SOM.P2[15]  output
+MOSI            SOM.P2[17]  output
+MISO            SOM.P2[19]  input
+CE1             SOM.P2[21]  output
+CE2             SOM.P2[23]  output
+CE3             SOM.P2[25]  output
+CE4             SOM.P2[27]  output
+
+LED0            SOM.P2[20]  output
+LED1            SOM.P2[18]  output
+LED2            SOM.P2[16]  output
+LED3            SOM.P2[14]  output

@@ -9,7 +9,7 @@ module whitebox_toplevel(
     pready,
     prdata,
     dac_clock,
-    dac2x_clock,
+    dsp_clock,
     dac_en,
     dac_data,
     adc_idata,
@@ -20,8 +20,8 @@ module whitebox_toplevel(
     rx_dmaready
 );
     input resetn;
-    input dac2x_clock;
     input dac_clock;
+    input dsp_clock;
     input pclk;
     input [31:0] paddr;
     input psel;
@@ -74,7 +74,7 @@ module whitebox_toplevel(
     // Whitebox Reset
     whitebox_reset whitebox_reset_0(
         .resetn(resetn),
-        .dac_clock(dac_clock),
+        .dsp_clock(dsp_clock),
         .clear_enable(clear_enable),
         .clearn(clearn)
     );
@@ -86,7 +86,7 @@ module whitebox_toplevel(
         .WE(tx_fifo_we),
         .RE(tx_fifo_re),
         .WCLOCK(pclk),
-        .RCLOCK(dac_clock),
+        .RCLOCK(dsp_clock),
         .FULL(tx_fifo_full),
         .EMPTY(tx_fifo_empty),
         .RESET(clearn),
@@ -106,7 +106,7 @@ module whitebox_toplevel(
         .Q(rx_fifo_rdata),
         .WE(rx_fifo_we),
         .RE(rx_fifo_re),
-        .WCLOCK(dac_clock),
+        .WCLOCK(dsp_clock),
         .RCLOCK(pclk),
         .FULL(rx_fifo_full),
         .EMPTY(rx_fifo_empty),
@@ -135,7 +135,7 @@ module whitebox_toplevel(
         .clearn(clearn),
         .clear_enable(clear_enable),
         .dac_clock(dac_clock),
-        .dac2x_clock(dac2x_clock),
+        .dsp_clock(dsp_clock),
         .dac_en(dac_en),
         .dac_data(dac_data),
         .adc_idata(adc_idata),

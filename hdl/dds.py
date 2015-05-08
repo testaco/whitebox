@@ -121,6 +121,10 @@ def dds(resetn,
             mixed_last.next = in_last
         else:
             mixed_valid.next = False
+            output_i.next = in_i
+            output_q.next = in_q
+            output_valid.next = in_valid
+            output_last.next = in_last
 
         if mixed_valid:
             output_valid.next = mixed_valid

@@ -434,8 +434,6 @@ def accumulator(clearn, clock, in_sign, out_sign, n=0):
         else:
             out_valid.next = False
             out_last.next = False
-            out_i.next = 0
-            out_q.next = 0
 
     return accumulate
 

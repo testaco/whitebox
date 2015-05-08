@@ -48,7 +48,7 @@ class TestCicImpulse(unittest.TestCase):
             in_c[i] = 1 + 0j
 
         out_c = s.simulate(in_c, test_cic_impulse, interp=interp)
-        print cic_0_signals
+        print '***', cic_0_signals
         out_t = np.arange(0, out_c.shape[0])
 
         new_shape = tuple([in_t.shape[i] * interp for i in range(len(in_t.shape))])

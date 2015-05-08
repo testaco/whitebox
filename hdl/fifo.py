@@ -78,14 +78,14 @@ def fifo(resetn,
         afull.next = len(_fifo) >= afval
         full.next = len(_fifo) >= depth
         if write_active(we):
-            if len(_fifo) >= depth:
+            if wrcnt == 0:
                 if verbose:
                     print 'overflow'
                 overflow.next = True
                 wack.next = False
             else:
                 if verbose:
-                    print 'adding %d' % int(data)
+                    print 'adding %s' % hex(data)
                 _fifo.insert(0, int(data))
                 overflow.next = False
                 wack.next = True
@@ -97,17 +97,17 @@ def fifo(resetn,
 
     @always_seq(read_edge(rclk), reset=resetn)
     def read():
-        aempty.next = len(_fifo) <= aeval
-        empty.next = len(_fifo) == 0
+        aempty.next = rdcnt <= aeval
+        empty.next = rdcnt == 0
         if read_active(re):
-            if len(_fifo) == 0:
+            if rdcnt == 0:
                 if verbose:
                     print 'underflow'
                 underflow.next = True
                 dvld_pipe1.next = False
             else:
                 if verbose:
-                    print 'removing %d' % _fifo[-1]
+                    print 'removing %s (fifo_size=%d, rdcnt=%d, wrcnt=%d)' % (hex(_fifo[-1]), len(_fifo), rdcnt, wrcnt)
                 Q_pipe1.next = _fifo.pop()
                 dvld_pipe1.next = True
                 underflow.next = False

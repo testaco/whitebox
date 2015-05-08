@@ -1,7 +1,7 @@
 module cosim_whitebox;
 
 reg resetn;
-reg dac2x_clock;
+reg dsp_clock;
 reg pclk;
 reg [31:0] paddr;
 reg psel;
@@ -64,7 +64,7 @@ initial begin
     $dumpfile({`COSIM_NAME, ".vcd"});
     $dumpvars;
     $from_myhdl(resetn,
-            dac2x_clock, dac_clock,
+            dsp_clock, dac_clock,
             pclk, paddr, psel, penable, pwrite, pwdata,
             tx_fifo_rdata, tx_fifo_full, tx_fifo_afull, tx_fifo_empty, tx_fifo_aempty,
             tx_fifo_wack, tx_fifo_dvld, tx_fifo_overflow, tx_fifo_underflow,
@@ -88,7 +88,7 @@ end
 
 whitebox_reset whitebox_reset_0 (
     .resetn(resetn),
-    .dac_clock(dac_clock),
+    .dsp_clock(dsp_clock),
     .clear_enable(clear_enable),
     .clearn(clearn)
 );
@@ -108,7 +108,7 @@ whitebox whitebox_0 (
     .clearn(clearn),
     .clear_enable(clear_enable),
     .dac_clock(dac_clock),
-    .dac2x_clock(dac2x_clock),
+    .dsp_clock(dsp_clock),
     .dac_en(dac_en),
     .dac_data(dac_data),
     .adc_idata(adc_idata),

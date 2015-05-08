@@ -14,7 +14,7 @@ from myhdl import \
 
 from dsp import *
 
-SYSCLK_DURATION = int(1e9 / 20e6)
+SYSCLK_DURATION = int(1e9 / 40e6)
 
 def load_quadrature_short_samples(filename, **options):
     import struct

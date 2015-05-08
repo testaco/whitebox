@@ -15,16 +15,17 @@ from rfe import print_rfe_ioctl
 from ram import Ram, Ram2
 
 whitebox_config = dict(
+        dsp_clock_rate=40e6,
         dac_sample_rate=10e6,
         default_sample_rate=200e3,
         #interp=50,
         rfe_enable=True,
         duc_enable=True,
-        fir_enable=True,
+        fir_enable=False,
         cic_enable=True,
         cic_order=4,
         cic_delay=1,
-        dds_enable=True,
+        dds_enable=False,
         conditioning_enable=True,
         ddc_enable=True)
 
@@ -37,7 +38,7 @@ class UnderrunError(Exception):
     pass
 
 def whitebox_reset(resetn,
-                  dac_clock,
+                  dsp_clock,
                   clear_enable,
                   clearn):
 
@@ -48,7 +49,7 @@ def whitebox_reset(resetn,
     clear_en = Signal(bool(0))
     clear_count = Signal(intbv(0)[10:])
 
-    @always_seq(dac_clock.posedge, reset=resetn)
+    @always_seq(dsp_clock.posedge, reset=resetn)
     def controller():
         sync_clear_en.next = clear_enable
         clear_en.next = sync_clear_en
@@ -83,7 +84,7 @@ def whitebox(
         clearn,
         clear_enable,
         dac_clock,
-        dac2x_clock,
+        dsp_clock,
         dac_en,
         dac_data,
         adc_idata,
@@ -130,7 +131,7 @@ def whitebox(
     :param resetn: Reset the whole radio front end.
     :param clearn: Clear the DSP Chain
     :param dac_clock: Clock running at DAC rate
-    :param dac2x_clock: Clock running at double DAC rate
+    :param dsp_clock: Clock running at DSP rate (4x dac rate)
     :param pclk: The system bus clock
     :param paddr: The bus assdress
     :param psel: The bus slave select
@@ -140,7 +141,6 @@ def whitebox(
     :param pready: The bus slave ready signal
     :param prdata: The bus read data
     :param pslverr: The bus slave error flag
-    :param dac_clock: The DAC clock
     :param dac_data: The DAC data
     :param dac_en: Enable DAC output
     :param status_led: Output pin for whitebox status
@@ -149,8 +149,10 @@ def whitebox(
     :param clear_enable: To reset controller, set this high for reset
     """
     dspsim = kwargs.get('dspsim', None)
+    dsp_clock_rate = kwargs.get('dsp_clock_rate', 40e6)
     dac_sample_rate = kwargs.get('dac_sample_rate', 10e6)
     default_sample_rate = kwargs.get('default_sample_rate', 200e3)
+    # TODO CLOCK
     interp_default = kwargs.get('interp', int(dac_sample_rate / default_sample_rate))
     assert interp_default * default_sample_rate == dac_sample_rate
     whitebox_config['interp'] = interp_default
@@ -185,9 +187,9 @@ def whitebox(
     rxfilteren = Signal(bool(0))
 
     # The RAMs
-    fir_coeff_ram = Ram(clearn, dac_clock, bus.pclk, width=18, depth=512)
-    fir_delay_line_i_ram = Ram(clearn, dac_clock, dac_clock, width=9, depth=512)
-    fir_delay_line_q_ram = Ram(clearn, dac_clock, dac_clock, width=9, depth=512)
+    fir_coeff_ram = Ram(clearn, dsp_clock, bus.pclk, width=18, depth=512)
+    fir_delay_line_i_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
+    fir_delay_line_q_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
 
     fir_coeff_ram_addr = fir_coeff_ram.port['a'].addr
     fir_coeff_ram_din = fir_coeff_ram.port['a'].din
@@ -231,7 +233,7 @@ def whitebox(
     rx_sample_i = rx_sample.i
     rx_sample_q = rx_sample.q
 
-    duc_args = (clearn, dac_clock, dac2x_clock,
+    duc_args = (clearn, dac_clock, dsp_clock,
             loopen, loopback,
             tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
             txen, txstop,
@@ -339,7 +341,7 @@ if __name__ == '__main__':
 
     clearn = ResetSignal(0, 0, async=True)
     clear_enable = Signal(bool(0))
-    dac2x_clock = Signal(bool(0))
+    dsp_clock = Signal(bool(0))
     dac_clock = Signal(bool(0))
     dac_data = Signal(intbv(0)[10:])
     dac_en = Signal(bool(0))
@@ -462,7 +464,7 @@ if __name__ == '__main__':
                 clearn,
                 clear_enable,
                 dac_clock,
-                dac2x_clock,
+                dsp_clock,
                 dac_en,
                 dac_data,
                 adc_idata,
@@ -510,6 +512,6 @@ if __name__ == '__main__':
     toVerilog(whitebox, *signals, **whitebox_config)
 
     toVerilog(whitebox_reset, bus_presetn,
-            dac_clock, clear_enable, clearn)
+            dsp_clock, clear_enable, clearn)
 
     print_rfe_ioctl()
