@@ -19,6 +19,11 @@
     q = (int16_t)(((s) >> 16) & 0xffffUL); \
     }
 
+#ifdef __cplusplus
+extern "C"{
+#endif
+
+int dsp_init();
 
 /*
  * Figures out the frequency control word for a given frequency and sample
@@ -38,7 +43,7 @@ void accum32(int n, uint32_t fcw, uint32_t p0, uint32_t *phases);
 /*
  * Computes the cos (i) and sin (q) given the associated phase with the DDS.
  */
-inline void sincos16(uint32_t fcw, uint32_t *phase, int16_t *i, int16_t *q);
+void sincos16(uint32_t fcw, uint32_t *phase, int16_t *i, int16_t *q);
 
 /*
  * ret = cos(phase) + 1j * sin(phase)
@@ -47,6 +52,10 @@ uint32_t sincos16c(uint32_t fcw, uint32_t *phase);
 
 extern uint32_t *sincos_lut_addr;
 
-inline void awgn(int16_t *s);
+void awgn(int16_t *s);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __WHITEBOX_DSP_H__ */

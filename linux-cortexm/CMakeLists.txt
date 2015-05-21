@@ -12,6 +12,7 @@ endif()
 if(NOT DEFINED IMAGE_TYPE)
     set(IMAGE_TYPE devel)
 endif()
+message(INFO " Building an image of type ${IMAGE_TYPE}")
 
 if (IMAGE_TYPE STREQUAL "demo1")
     set(INCLUDE_DEMO1_SAMPLES "")
@@ -63,7 +64,8 @@ add_custom_command(OUTPUT whitebox.uImage
 add_custom_target(linux
     DEPENDS whitebox.uImage)
 
-if (defined ${TFTP_DIR})
+if (IS_DIRECTORY ${TFTP_DIR})
+message(INFO " Installing into TFTP directory ${TFTP_DIR}")
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/whitebox.uImage
         DESTINATION ${TFTP_DIR})
 endif()

@@ -1,6 +1,7 @@
 find_package(PythonInterp REQUIRED)
 include(ExternalProject)
 
+link_directories(${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib)
 include_directories(${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include)
 
 ExternalProject_add(
@@ -32,12 +33,19 @@ ExternalProject_add(
 #    ALWAYS 1)
 
 #ExternalProject_add(
-#    libevent-build
-#    URL http://github.com/downloads/libevent/libevent/libevent-2.0.21-stable.tar.gz
-#    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --host=arm-uclinuxeabi --disable-openssl CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS}
-#    LOG_INSTALL 1
+#    zlib-build
+#    URL http://zlib.net/zlib-1.2.8.tar.gz
+#    CONFIGURE_COMMAND CC=${CMAKE_C_COMPILER}
+#<SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --static
 #)
-#find_library(libevent NAMES libevent.a PATHS ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib NO_DEFAULT_PATH)
+
+ExternalProject_add(
+    libwebsockets-build
+    GIT_REPOSITORY git://git.libwebsockets.org/libwebsockets
+    CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_SOURCE_DIR}/cmake/Toolchains/arm_cortex_m3_native.cmake -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr -DZLIB_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include -DLWS_WITH_SSL=0  -DLWS_WITHOUT_EXTENSIONS=1 -DLWS_WITH_STATIC=1 -DLWS_WITH_SHARED=0
+    LOG_INSTALL 1
+#    DEPENDS zlib-build
+)
 
 add_custom_command(
     OUTPUT adf4351.c adf4351.h
@@ -56,7 +64,6 @@ set(WHITEBOX_SRCS
     adf4351.c
     cmx991.c
     dsp.c
-    http.c
 )
 
 add_library(whitebox ${WHITEBOX_SRCS})
@@ -69,12 +76,7 @@ set(WHITEBOX_PUBLIC_HEADERS
     adf4351.h
     cmx991.h
     dsp.h
-    http.h
 )
-
-#install(FILES ${WHITEBOX_PUBLIC_HEADERS}
-#	DESTINATION include/whitebox
-#)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/driver)
 
@@ -93,26 +95,28 @@ target_link_libraries(test_driver ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(test_device test_device.c)
 target_link_libraries(test_device ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-#add_executable(test_reactor test_reactor.c reactor.c)
-#add_dependencies(test_reactor libevent-build)
-#target_link_libraries(test_reactor ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
+add_executable(test_dsp test_dsp.c)
+target_link_libraries(test_dsp ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-add_executable(test_slave test_slave.c)
+find_library(WebSockets.lib NAMES libwebsockets.a)
 
-#add_executable(cw cw.c)
-#target_link_libraries(cw ${CMAKE_REQUIRED_LIBRARIES} whitebox m)
+set(Main.sources
+    main.cpp
+    radio.cpp
+    server.cpp
+    resources.cpp
+    soundcard.cpp
+    modem.cpp
+    cJSON.c
+)
+set_source_files_properties(${Main.sources} PROPERTIES COMPILE_FLAGS "-DMAJOR_VERSION=${PROJECT_VERSION_MAJOR} -DMINOR_VERSION=${PROJECT_VERSION_MINOR} -DPATCH_VERSION=${PROJECT_VERSION_PATCH} -DCODENAME=\"${PROJECT_VERSION_CODENAME}\" -DSYSTEM=\"${CMAKE_SYSTEM}\" -g")
+add_executable(main ${Main.sources})
+target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox
+    ${WebSockets.lib} pthread libasound.a)
 
-add_executable(main main.c)
-target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox)
-add_dependencies(main alsa-lib-build)
-target_link_libraries(main ${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/lib/libasound.a)
-
-
-#add_executable(rfcat rfcat.c)
-#target_link_libraries(rfcat ${CMAKE_REQUIRED_LIBRARIES} whitebox)
-
-#add_executable(gnuradio_peripheral gnuradio_peripheral.c)
-#target_link_libraries(gnuradio_peripheral ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+add_custom_command(TARGET main POST_BUILD
+    COMMAND arm-uclinuxeabi-flthdr -s 6000000 main
+)
 
 add_executable(qa_tx qa_tx.c)
 target_link_libraries(qa_tx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
@@ -123,30 +127,27 @@ target_link_libraries(qa_rx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
-#add_executable(whiteboxd whiteboxd.c reactor.c)
-#add_dependencies(whiteboxd libevent-build)
-#target_link_libraries(whiteboxd ${CMAKE_REQUIRED_LIBRARIES} whitebox ${libevent})
-
-
 add_custom_target(apps
-    DEPENDS test_slave test_adf4351 test_cmx991 test_driver test_device test_rf main)
+    DEPENDS test_adf4351 test_cmx991 test_driver test_device test_rf test_dsp main qa_tx qa_rx qa_lo)
 
-add_test(NAME target_netboot
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot
-)
+if (${REMOTE_DEBUG})
+    add_test(NAME target_netboot
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} --u-boot run netboot
+    )
 
-add_test(NAME target_test_cmx991
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_cmx991
-)
+    add_test(NAME target_test_cmx991
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_cmx991
+    )
 
-add_test(NAME target_test_adf4351
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_adf4351
-)
+    add_test(NAME target_test_adf4351
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_adf4351
+    )
 
-add_test(NAME target_test_driver
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_driver
-)
+    add_test(NAME target_test_driver
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_driver
+    )
 
-add_test(NAME target_test_device
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_device
-)
+    add_test(NAME target_test_device
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_device
+    )
+endif()

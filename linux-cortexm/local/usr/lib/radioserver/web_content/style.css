@@ -1,0 +1,89 @@
+/*
+ * Copyright (C) 2015 Algoram. Dual-licensed AGPL3 and commercial.
+ * If your company has not purchased a commercial license from Algoram, you are bound
+ * to the terms of the Affero GPL 3.
+ */
+
+
+#Title {
+  font-weight: bold;
+  font-size: 150%;
+}
+
+/* Make the transmit and receive button large. */
+.TransmitButton, .ReceiveButton {
+  max-width: 40%;
+  width: 8em;
+  max-height: 40%;
+  height: 8em;
+  font-size: 120%;
+  font-weight: bold;
+}
+
+/* Turn the transmit button red while transmitting. This can happen as a result of another
+   T/R switch, most likely the space bar. */
+#TransmitButtonTransmitting {
+  background-color: red;
+}
+
+/* Turn the transmit button light blue while receiving. */
+#TransmitButtonReceiving {
+  background-color: #ADD8E6;
+}
+
+#ControlsNotVisible {
+  display: none;
+}
+
+#WaitingNotificationNotVisible {
+  display: none;
+}
+
+#Logo {
+  width: 20em;
+  height: auto;
+  float: left;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  padding-right: 1em;
+  clear: left;
+}
+
+#LogoImage {
+  float: top;
+  clear: top;
+  width: 100%;
+  height:auto;
+}
+
+#LogoCaption {
+  text-align: center;
+  font-size: 250%;
+  font-family='Times New Roman';
+  font-style=bold;
+}
+
+#LegalNotice {
+  font-size: 60%;
+}
+
+#LegalLink {
+  text-decoration: none;
+  color: black;
+}
+
+#NavigationBar a {
+  appearance: button;
+  -moz-appearance: button;
+  -webkit-appearance: button;
+  text-decoration: none;
+  display: inline-block;
+  padding: 2px 8px;
+}
+
+@media only screen and (max-width: 7.5in) {
+  .LargeOnly {
+    display: none;
+  }
+}

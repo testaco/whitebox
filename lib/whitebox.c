@@ -68,6 +68,7 @@ int whitebox_parameter_get(const char *param)
 
 void whitebox_init(whitebox_t* wb) {
     wb->fd = -EINVAL;
+    adf4351_init(&wb->adf4351);
 }
 
 whitebox_t* whitebox_alloc(void) {
@@ -103,10 +104,12 @@ int whitebox_open(whitebox_t* wb, const char* filn, int flags, int rate) {
     }
 
     wb->fd = open(filename, flags);
+    if (wb->fd < 0) {
+        return -1;
+    }
 
     if (W_DAC_RATE_HZ % rate != 0) {
-        fprintf(stderr, "Error, sample rate is not a multiple of DAC clock rate!");
-        exit(1);
+        return -1;
     }
 
     wb->rate = rate;
@@ -148,6 +151,10 @@ int whitebox_close(whitebox_t* wb) {
     cmx991_suspend(&wb->cmx991);
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
+
+    adf4351_pll_disable(&wb->adf4351);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    ioctl(wb->fd, WA_SET, &w);
 
     close(wb->fd);
     wb->fd = -EINVAL;
@@ -221,82 +228,103 @@ int whitebox_tx_clear(whitebox_t* wb) {
 }
 
 int whitebox_tx(whitebox_t* wb, float frequency) {
+
+    int err;
     float vco_frequency;
     whitebox_args_t w;
 
-    ioctl(wb->fd, WC_GET, &w);
+    vco_frequency = (frequency + 45.00e6) * 4.0;
+    if (vco_frequency <= 35.00e6) {
+        return -1;
+    }
+    //printf("%f %f\n", frequency, vco_frequency);
+
+    if ((err = ioctl(wb->fd, WA_GET, &w)) < 0)
+        return err;
+    adf4351_ioctl_get(&wb->adf4351, &w);
+
+    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    if ((err = ioctl(wb->fd, WA_SET, &w)) < 0)
+        return err;
+
+
+    if ((err = ioctl(wb->fd, WC_GET, &w)) < 0)
+        return err;
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_resume(&wb->cmx991);
 #if WC_USE_PLL
     if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
-        fprintf(stderr, "Error setting the pll\n");
-        return 1;
+        return -1;
     }
 #endif
-
-    vco_frequency = (frequency + 45.00e6) * 4.0;
-    if (vco_frequency <= 35.00e6) {
-        fprintf(stderr, "VCO frequency too low\n");
-        return 2;
-    }
-    //printf("%f %f\n", frequency, vco_frequency);
 
     cmx991_tx_tune(&wb->cmx991, vco_frequency,
         IF_FILTER_BW_45MHZ, HI_LO_LOWER,
         TX_RF_DIV_BY_4, TX_IF_DIV_BY_4, GAIN_P6DB);
     cmx991_ioctl_set(&wb->cmx991, &w);
-    ioctl(wb->fd, WC_SET, &w);
+    if ((err = ioctl(wb->fd, WC_SET, &w)) < 0)
+        return err;
 
-    adf4351_init(&wb->adf4351);
+    if ((err = ioctl(wb->fd, WE_CLEAR, 0)) < 0)
+        return err;
 
-    adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
-    adf4351_ioctl_set(&wb->adf4351, &w);
-    ioctl(wb->fd, WA_SET, &w);
-
-    ioctl(wb->fd, WE_CLEAR, 0);
     whitebox_tx_flags_enable(wb, WES_FILTEREN);
     return 0;
 }
 
 int whitebox_tx_standby(whitebox_t *wb)
 {
+    int err;
     whitebox_args_t w;
 
-    ioctl(wb->fd, WC_GET, &w);
+    if ((err = ioctl(wb->fd, WC_GET, &w)) < 0)
+        return err;
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_suspend(&wb->cmx991);
     cmx991_ioctl_set(&wb->cmx991, &w);
-    ioctl(wb->fd, WC_SET, &w);
+    if ((err = ioctl(wb->fd, WC_SET, &w)) < 0)
+        return err;
+
+    if ((err = ioctl(wb->fd, WE_CLEAR, 0)) < 0)
+        return err;
+    return 0;
 }
 
 int whitebox_tx_fine_tune(whitebox_t *wb, float frequency) {
+    int err;
     float vco_frequency;
     whitebox_args_t w;
 
-    ioctl(wb->fd, WC_GET, &w);
+    if ((err = ioctl(wb->fd, WC_GET, &w)) < 0)
+        return err;
+
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_resume(&wb->cmx991);
     cmx991_ioctl_set(&wb->cmx991, &w);
-    ioctl(wb->fd, WC_SET, &w);
+    if ((err = ioctl(wb->fd, WC_SET, &w)) < 0)
+        return err;
 
     vco_frequency = (frequency + 45.00e6) * 4.0;
     if (vco_frequency <= 35.00e6) {
-        fprintf(stderr, "VCO frequency too low\n");
         return 2;
     }
 
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
-    ioctl(wb->fd, WA_SET, &w);
+    if ((err = ioctl(wb->fd, WA_SET, &w)) < 0)
+        return err;
+
+    return 0;
 }
 
-uint16_t _cic_shift(uint16_t interp)
+uint16_t whitebox_cic_shift(uint16_t interp)
 {
     // Based on the excellent work of Hogenauer, 1981.
     float cic_order = 4, cic_delay = 1, in_len=9, out_len=10; // From CIC implementation on the FPGA
     float stage = 2 * cic_order; // Last stage
     float gain = (pow(2, 2 * cic_order - stage) * pow(interp * cic_delay, stage - cic_order)) / interp;
-    float bit_width = in_len + ceil(log(gain)/log(2));
+    float bit_width = in_len + ceil(log2(gain));
     float shift = bit_width - out_len;
     return (shift < 0) ? 0 : (uint16_t)shift;
 }
@@ -305,7 +333,8 @@ int whitebox_tx_set_interp(whitebox_t* wb, uint32_t interp) {
     uint16_t shift;
     whitebox_args_t w;
     ioctl(wb->fd, WE_GET, &w);
-    w.flags.exciter.interp = (_cic_shift(interp) << 16) & 0xffff0000 | (interp & 0xffff);
+    shift = whitebox_cic_shift(interp);
+    w.flags.exciter.interp = ((((uint32_t)shift) << 16) & 0xffff0000) | (interp & 0xffff);
     ioctl(wb->fd, WE_SET, &w);
 }
 
@@ -339,7 +368,6 @@ int whitebox_tx_get_buffer_runs(whitebox_t* wb,
 int whitebox_tx_set_latency(whitebox_t *wb, int ms)
 {
     int threshold = 4 * wb->rate * ((float)ms * 1e-3);
-    printf("%dms threshold is %d\n", ms, threshold);
     return whitebox_parameter_set("user_source_buffer_threshold", threshold);
 }
 
@@ -359,11 +387,15 @@ void whitebox_tx_set_dds_fcw(whitebox_t* wb, uint32_t fcw) {
     ioctl(wb->fd, WE_SET, &w);
 }
 
-void whitebox_tx_flags_enable(whitebox_t* wb, uint32_t flags) {
+int whitebox_tx_flags_enable(whitebox_t* wb, uint32_t flags) {
+    int err;
     whitebox_args_t w;
-    ioctl(wb->fd, WE_GET, &w);
+    if ((err = ioctl(wb->fd, WE_GET, &w)) < 0)
+        return err;
     w.flags.exciter.state |= flags;
-    ioctl(wb->fd, WE_SET, &w);
+    if ((err = ioctl(wb->fd, WE_SET, &w)) < 0)
+        return err;
+    return 0;
 }
 
 void whitebox_tx_flags_disable(whitebox_t* wb, uint32_t flags) {
@@ -445,15 +477,13 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
     cmx991_resume(&wb->cmx991);
 #if WC_USE_PLL
     if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
-        fprintf(stderr, "Error setting the pll\n");
-        return 1;
+        return -1;
     }
 #endif
 
     vco_frequency = (frequency + 45.00e6) * 4.0;
     if (vco_frequency <= 35.00e6) {
-        fprintf(stderr, "VCO frequency too low\n");
-        return 2;
+        return -1;
     }
 
     //printf("%f %f\n", frequency, vco_frequency);
@@ -477,8 +507,7 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
 
     vco_frequency = (frequency + 45.00e6) * 4.0;
     if (vco_frequency <= 35.00e6) {
-        fprintf(stderr, "VCO frequency too low\n");
-        return 2;
+        return -1;
     }
 
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
@@ -495,6 +524,8 @@ int whitebox_rx_standby(whitebox_t *wb)
     cmx991_suspend(&wb->cmx991);
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
+
+    ioctl(wb->fd, WR_CLEAR, 0);
     return 0;
 }
 

@@ -136,6 +136,11 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     return _actual_frequency(FRAC, N, MOD, RFdiv, R, T, D, ref_freq);
 }
 
+void adf4351_pll_disable(adf4351_t* rf) {
+    rf->rf_output_enable = RF_OUTPUT_ENABLE_DISABLED;
+    rf->aux_output_enable = AUX_OUTPUT_ENABLE_DISABLED;
+}
+
 int get_divider(adf4351_t* rf) {
     if (rf->rf_divider_select == 0) return 1;
     if (rf->rf_divider_select == 1) return 2;

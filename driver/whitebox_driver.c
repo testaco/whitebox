@@ -146,6 +146,16 @@ static u8 whitebox_cmx991_regs_read_lut[] = {
 	if (whitebox_debug >= level) printk(KERN_INFO "%s: " fmt,	\
 					__func__, ## args)
 
+char *string_for_last_error(int e) {
+    switch (e) {
+        case 0: return "none";
+        case W_ERROR_PLL_LOCK_LOST: return "pll lock lost";
+        case W_ERROR_TX_OVERRUN: return "overrun";
+        case W_ERROR_TX_UNDERRUN: return "underrun";
+        default: return "unknown";
+    }
+}
+
 void d_printk_loop(int level) {
     unsigned long src;
     struct circ_buf *mock_buf = &whitebox_device->mock_buf;
@@ -394,33 +404,30 @@ static unsigned int whitebox_poll(struct file *filp, poll_table *wait)
 
     if (whitebox_device->state == WDS_IDLE) {
         mask |= POLLOUT | POLLRDNORM | POLLIN | POLLWRNORM;
-        up(&whitebox_device->sem);
-        return mask;
     }
-
-    if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
+    else if (whitebox_device->state == WDS_TX || whitebox_device->state == WDS_TX_STREAMING) {
         if (tx_error(whitebox_device)) {
-            up(&whitebox_device->sem);
             mask |= POLLERR;
-            return mask;
         }
-        if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0) {
-            up(&whitebox_device->sem);
+        else if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0) {
             mask |= POLLOUT | POLLWRNORM;
-            return mask;
+        }
+        else {
+            poll_wait(filp, &whitebox_device->write_wait_queue, wait);
+        }
+    }
+    else if (whitebox_device->state == WDS_RX || whitebox_device->state == WDS_RX_STREAMING) {
+        if (rx_error(whitebox_device)) {
+            mask |= POLLERR;
+        }
+        else if (whitebox_user_sink_data_available(&whitebox_device->user_sink, &src) > 0) {
+            mask |= POLLIN | POLLRDNORM;
+        }
+        else {
+            poll_wait(filp, &whitebox_device->read_wait_queue, wait);
         }
     }
 
-    poll_wait(filp, &whitebox_device->write_wait_queue, wait);
-
-    if (whitebox_user_source_space_available(&whitebox_device->user_source, &dest) > 0)
-        mask |= POLLOUT | POLLWRNORM;
-
-    if (whitebox_device->state == WDS_RX || whitebox_device->state == WDS_RX_STREAMING) {
-        poll_wait(filp, &whitebox_device->read_wait_queue, wait);
-        if (whitebox_user_sink_data_available(&whitebox_device->user_sink, &src) > 0)
-            mask |= POLLIN | POLLRDNORM;
-    }
 
     up(&whitebox_device->sem);
 
@@ -536,7 +543,7 @@ static int whitebox_write(struct file* filp, const char __user* buf, size_t coun
     }
     if ((ret = tx_error(whitebox_device))) {
         dest_count = whitebox_user_source_data_available(user_source, &dest);
-        d_printk(2, "tx_error=%d user_source_data=%zd\n", ret, dest_count);
+        d_printk(2, "tx_error=%s user_source_data=%zd\n", string_for_last_error(ret), dest_count);
         up(&whitebox_device->sem);
         return -EIO;
     }
@@ -837,7 +844,7 @@ long whitebox_ioctl_cmx991_set(unsigned long arg) {
 
     for (i = 0; i < WC_REGS_COUNT; ++i) {
         if (whitebox_device->cmx991_regs[i] != w.flags.cmx991[i]) {
-            d_printk(3, "setting %d to %08x\n", whitebox_cmx991_regs_write_lut[i], w.flags.cmx991[i]);
+            d_printk(2, "setting %d to %08x\n", whitebox_cmx991_regs_write_lut[i], w.flags.cmx991[i]);
             whitebox_device->cmx991_regs[i] = w.flags.cmx991[i];
             whitebox_gpio_cmx991_write(whitebox_device->platform_data, 
                     whitebox_cmx991_regs_write_lut[i],
@@ -1063,16 +1070,6 @@ static struct file_operations whitebox_fops = {
     .get_unmapped_area = whitebox_get_unmapped_area,
     .poll = whitebox_poll,
 };
-
-char *string_for_last_error(int e) {
-    switch (e) {
-        case 0: return "none";
-        case W_ERROR_PLL_LOCK_LOST: return "pll lock lost";
-        case W_ERROR_TX_OVERRUN: return "overrun";
-        case W_ERROR_TX_UNDERRUN: return "underrun";
-        default: return "unknown";
-    }
-}
 
 void stats_show(struct seq_file *m, struct whitebox_stats *stats) {
     int i;

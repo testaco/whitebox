@@ -53,7 +53,7 @@ int dsp_init()
     return 0;
 }
 
-inline void sincos16(uint32_t fcw, uint32_t *phase, int16_t *i, int16_t *q) {
+void sincos16(uint32_t fcw, uint32_t *phase, int16_t *i, int16_t *q) {
     uint16_t entry;
     int16_t cq, sq;
     entry = (*phase & ((DDS_ROM_NUM_SAMPLES - 1) << DDS_PHASE_SHIFT)) >> DDS_PHASE_SHIFT;
