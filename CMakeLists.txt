@@ -17,14 +17,17 @@ set(CMAKE_TOOLCHAIN_FILE cmake/Toolchains/arm_cortex_m3_native.cmake)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
 
+message(STATUS "${Param.build-type} ${Version.major}.${Version.minor}.${Version.patch}, "
+ "code name \"${Param.codename}\", "
+  "on ${Platform.name} ${Platform.distribution} ${Platform.release}.")
 #
 # Set project version information. This should probably be done via external
 # file at some point.
-#
+
 set(PROJECT_VERSION_MAJOR 0)
 set(PROJECT_VERSION_MINOR 1)
-# Set to patch level is needed, otherwise leave FALSE.
-set(PROJECT_VERSION_PATCH FALSE)
+set(PROJECT_VERSION_PATCH 0)
+set(PROJECT_VERSION_CODENAME "Bravo")
 set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION ${PROJECT_VERSION})
@@ -32,14 +35,17 @@ if(PROJECT_VERSION_PATCH)
 	set(PROJECT_VERSION "${PROJECT_VERSION}.${PROJECT_VERSION_PATCH}")
 endif()
 
-message(STATUS "whitebox version: ${PROJECT_VERSION}")
+message(STATUS "whitebox version: ${PROJECT_VERSION} ${PROJECT_VERSION_CODENAME}")
 
 if(NOT IS_DIRECTORY ${TFTP_DIR})
     message(WARNING "no tftp destination")
 endif()
 
 if(NOT EXISTS ${TTY})
-    message(WARNING "no tty for the target")
+    set(REMOTE_DEBUG FALSE)
+    message(WARNING "no tty for the target, remote debugging disabled")
+else()
+    set(REMOTE_DEBUG TRUE)
 endif()
 
 if(NOT DEFINED BAUD)

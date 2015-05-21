@@ -28,3 +28,17 @@ if [ "$image_type" = "demo1" ]; then
         whiteboxd
     done
 fi
+
+if [ "$image_type" = "demo2" ]; then
+    # Run the test suite on startup
+    test_adf4351
+    test_cmx991
+    test_dsp
+    test_driver
+    test_device
+    test_rf
+    # Loop over main
+    while date; do
+        main
+    done
+fi

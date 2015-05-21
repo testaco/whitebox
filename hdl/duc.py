@@ -404,7 +404,10 @@ def cic(clearn, clock,
     rates = kwargs.get('rates', [interp])
     max_rate = max(rates)
 
-    #print 'CIC order=%d delay=%d interp=%d' % (cic_order, cic_delay, interp)
+    print 'CIC order=%d delay=%d interp=%d' % (cic_order, cic_delay, interp)
+    print 'in_width=%d out_width=%d' % (len(in_i), len(out_i))
+    print 'expected shift for interp=%d is shift=%d' % (interp,
+        cic_shift(len(in_i), len(out_i), interp, cic_order, cic_delay))
 
     combed = [Signature('combed_%d' % i, True, bits=cic_bit_width(
             len(in_i), max_rate, cic_order, cic_delay,

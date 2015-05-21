@@ -1,33 +1,42 @@
-#ifndef __RADIO_H__
-#define __RADIO_H__
+class cJSON;
 
-typedef enum {
-    RADIO_POWER_STATE_ON,
-    RADIO_POWER_STATE_STANDBY,
-    RADIO_POWER_STATE_SUSPEND
-} radio_power_state_t;
+// These structures are known in the server code and
+// opaque from the perspective of the radio code.
+struct libwebsocket_context;
+struct client_context;
 
-struct adf4351_t;
-struct cmx991_t;
+// This class is known in the radio code and opaque
+// from the perspective of the server code.
+class radio_context;
 
-typedef struct {
-    struct adf4351_t* adf4351;
-    struct cmx991_t* cmx991;
-} radio_t;
+#define WEBSOCKET_FD 0
+#define WHITEBOX_FD 1
+#define FILE_SOURCE_FD 2
 
-void radio_init(radio_t* t);
+extern void	poll_start_fd(libwebsocket_context *, int fd, int events, int type=0);
+extern void	poll_change_fd(int fd, int mode);
+extern void	poll_end_fd(int fd);
 
-void radio_destroy(radio_t* t);
+extern void		radio_end(radio_context *);
+extern void		radio_get_status(radio_context *, cJSON * json);
+extern radio_context *	radio_start(client_context * opaque);
+extern void		radio_receive(radio_context *);
+extern void		radio_set(radio_context *, const cJSON * json);
+extern void		radio_transmit(radio_context *);
 
-// MORE OF A KERNEL IOCTL COMMAND
-//void radio_reset(radio_t* t);
-// MORE OF A KERNEL PM COMMAND
-//void radio_set_power_state(radio_t* t, radio_power_state_t state);
+extern void		radio_data_in(
+ radio_context *	context,
+ unsigned char *	type,
+ const void *		data,
+ int			length);
 
-// IDEALLY SETS THE KERNEL DRIVER
-void radio_set_center_frequency(radio_t* t);
+void		server_end();
 
-// IDEALLY ASKS THE KERNEL DRIVER
-double radio_get_center_frequency(radio_t* t);
+void		server_data_out(
+                 client_context *	opaque,
+		 unsigned char		type,
+                 void *			data,
+		 void *			length);
 
-#endif /* __RADIO_H__ */
+void		server_service_fd(libwebsocket_context * /* opaque */, pollfd * pfd);
+bool		server_start();

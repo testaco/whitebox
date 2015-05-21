@@ -152,13 +152,13 @@ int tx_error(struct whitebox_device *wb)
 #else
         c = WHITEBOX_CMX991_LD_MASK;
 #endif
-        locked = whitebox_gpio_adf4351_locked(wb->platform_data)
-                && (c & WHITEBOX_CMX991_LD_MASK);
+        locked = whitebox_gpio_adf4351_locked(wb->platform_data);
+            // TODO: why does the CMX991 always show up as not being locked?
+                //&& (c & WHITEBOX_CMX991_LD_MASK);
         if (!locked) {
             stats->error++;
-            //stats->last_error = W_ERROR_PLL_LOCK_LOST;
-            //return W_ERROR_PLL_LOCK_LOST;
-            // TODO: why you no workie!?
+            stats->last_error = W_ERROR_PLL_LOCK_LOST;
+            return W_ERROR_PLL_LOCK_LOST;
             return 0;
         }
     }

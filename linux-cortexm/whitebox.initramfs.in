@@ -109,6 +109,7 @@ slink /bin/nc busybox 777 0 0
 ifarch A2F file /bin/iap_tool @INSTALL_ROOT@/A2F/root/usr/bin/iap_tool 755 0 0
 
 dir /usr 755 0 0
+dir /usr/lib 755 0 0
 dir /usr/bin 755 0 0
 dir /usr/sbin 755 0 0
 dir /usr/share 755 0 0
@@ -137,15 +138,38 @@ file /usr/bin/aserver @INSTALL_ROOT@/A2F/root/usr/bin/aserver 755 0 0
 file /usr/bin/speaker-test @INSTALL_ROOT@/A2F/root/usr/bin/speaker-test 755 0 0
 
 @INCLUDE_DEMO1_SAMPLES@file /demo1.samples @CMAKE_SOURCE_DIR@/gnuradio/modem.samples 644 0 0
-file /usr/bin/whiteboxd @CMAKE_BINARY_DIR@/lib/whiteboxd 755 0 0
+file /usr/bin/main @CMAKE_BINARY_DIR@/lib/main 755 0 0
 file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
 file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0
+file /usr/bin/test_dsp @CMAKE_BINARY_DIR@/lib/test_dsp 755 0 0
 file /usr/bin/test_rf @CMAKE_BINARY_DIR@/lib/test_rf 755 0 0
 file /usr/bin/test_driver @CMAKE_BINARY_DIR@/lib/test_driver 755 0 0
 file /usr/bin/test_device @CMAKE_BINARY_DIR@/lib/test_device 755 0 0
 file /usr/bin/test_slave @CMAKE_BINARY_DIR@/lib/test_slave 755 0 0
 file /usr/bin/test_reactor @CMAKE_BINARY_DIR@/lib/test_reactor 755 0 0
+file /usr/bin/qa_tx @CMAKE_BINARY_DIR@/lib/qa_tx 755 0 0
 file /usr/share/udhcpc/default.script @CMAKE_CURRENT_SOURCE_DIR@/local/usr/share/udhcpc/default.script 755 0 0
 
-dir /var/www 0755 0 0
-file /var/www/index.html @CMAKE_SOURCE_DIR@/lib/www/index.html 644 0 0
+dir /etc/radioserver 0755 0 0
+dir /etc/radioserver/certificates 0755 0 0
+dir /etc/radioserver/certificates/authority 0755 0 0
+dir /etc/radioserver/certificates/private 0755 0 0
+dir /etc/radioserver/certificates/public 0755 0 0
+file /etc/radioserver/certificates/authority/default.pem @CMAKE_CURRENT_SOURCE_DIR@/local/etc/radioserver/certificates/authority/default.pem 644 0 0
+file /etc/radioserver/certificates/private/default.key @CMAKE_CURRENT_SOURCE_DIR@/local/etc/radioserver/certificates/private/default.key 644 0 0
+file /etc/radioserver/certificates/public/default.pem @CMAKE_CURRENT_SOURCE_DIR@/local/etc/radioserver/certificates/public/default.pem 644 0 0
+
+dir /usr/lib/radioserver 0755 0 0
+dir /usr/lib/radioserver/web_content 0755 0 0
+dir /usr/lib/radioserver/web_content/images 0755 0 0
+dir /usr/lib/radioserver/web_content/tools 0755 0 0
+dir /usr/lib/radioserver/web_content/docs 0755 0 0
+file /usr/lib/radioserver/web_content/index.html @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/index.html 644 0 0
+file /usr/lib/radioserver/web_content/favicon.ico @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/favicon.ico 644 0 0
+file /usr/lib/radioserver/web_content/monitor.html @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/monitor.html 644 0 0
+file /usr/lib/radioserver/web_content/panel.html @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/panel.html 644 0 0
+file /usr/lib/radioserver/web_content/panel.js @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/panel.js 644 0 0
+file /usr/lib/radioserver/web_content/style.css @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/style.css 644 0 0
+file /usr/lib/radioserver/web_content/images/AlgoramLogo1Crushed.svg @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/images/AlgoramLogo1Crushed.svg 644 0 0
+file /usr/lib/radioserver/web_content/tools/index.html @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/tools/index.html 644 0 0
+file /usr/lib/radioserver/web_content/docs/index.html @CMAKE_CURRENT_SOURCE_DIR@/local/usr/lib/radioserver/web_content/docs/index.html 644 0 0

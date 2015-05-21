@@ -63,6 +63,10 @@ int test_ioctl_exciter(void *data) {
     whitebox_tx_get_correction(&wb, &ic, &qc);
     assert(ic == -1 && qc == 1);
 
+    whitebox_tx_set_correction(&wb, -31, 14);
+    whitebox_tx_get_correction(&wb, &ic, &qc);
+    assert(ic == -31 && qc == 14);
+
     assert(whitebox_tx_set_gain(&wb, 0.75, 1.25) == 0);
     whitebox_tx_get_gain(&wb, &ig, &qg);
     assert(ig == 0.75 && qg == 1.25);
@@ -82,6 +86,8 @@ int test_ioctl_exciter(void *data) {
     whitebox_tx_flags_disable(&wb, WS_FIREN);
     assert(ioctl(fd, WE_GET, &w) == 0);
     assert(!(w.flags.exciter.state & WS_FIREN));
+
+    assert(w.flags.exciter.debug == 0);
 
     assert(whitebox_close(&wb) == 0);
     return 0;
@@ -304,6 +310,7 @@ int test_tx_halt(void* data) {
     for (k = 0; k < 10; ++k) {
         assert(whitebox_tx(&wb, 145.00e6) == 0);
         while (!whitebox_plls_locked(&wb)) {
+            printf("waiting\n");
             continue;
         }
         assert(whitebox_plls_locked(&wb));
@@ -334,9 +341,9 @@ int test_tx_halt(void* data) {
             }
         }
         assert(fsync(fd) == 0);
-        whitebox_tx_standby(&wb);
         ioctl(wb.fd, WE_GET, &w);
         assert(last_count == w.flags.exciter.debug);
+        whitebox_tx_standby(&wb);
     }
     whitebox_parameter_set("flow_control", 1);
 

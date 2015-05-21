@@ -11,6 +11,10 @@
 #include "adf4351.h"
 #include "dsp.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct whitebox {
     int fd;
     cmx991_t cmx991;
@@ -55,7 +59,7 @@ int whitebox_tx_get_buffer_runs(whitebox_t* wb, uint16_t* overruns, uint16_t* un
 int whitebox_tx_set_latency(whitebox_t *wb, int ms);
 int whitebox_tx_get_latency(whitebox_t *wb);
 
-void whitebox_tx_flags_enable(whitebox_t* wb, uint32_t flags);
+int whitebox_tx_flags_enable(whitebox_t* wb, uint32_t flags);
 void whitebox_tx_flags_disable(whitebox_t* wb, uint32_t flags);
 
 void whitebox_tx_dds_enable(whitebox_t* wb, float fdes);
@@ -83,5 +87,11 @@ void whitebox_rx_flags_disable(whitebox_t* wb, uint32_t flags);
 
 void whitebox_rx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t correct_q);
 void whitebox_rx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q);
+
+uint16_t whitebox_cic_shift(uint16_t interp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __WHITEBOX_H__ */

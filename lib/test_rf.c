@@ -34,7 +34,7 @@ int _test_tx_pll(float freq) {
     whitebox_plls_locked(&wb);
     assert(whitebox_plls_locked(&wb));
     clock_gettime(CLOCK_MONOTONIC, &tx_ready);
-    printf("tx start to ready: %f\n", diff(tx_start, tx_ready));
+    //printf("tx start to ready: %f\n", diff(tx_start, tx_ready));
     assert(whitebox_close(&wb) == 0);
 }
 

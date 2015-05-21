@@ -17,7 +17,7 @@
 #define TONE_FREQ    7e3
 #define N 512
 #define COUNT 1024 
-#define SAMPLE_RATE 48e3 
+#define SAMPLE_RATE 100e3 
 #define DURATION_IN_SECS 1
 #define TOTAL_SAMPLES (DURATION_IN_SECS * SAMPLE_RATE)
 
@@ -68,6 +68,7 @@ void calibrate_dc_offset(int use_dds, int16_t *i, int16_t *q)
     uint32_t phase = 0;
     uint32_t fcw = freq_to_fcw(TONE_FREQ, sample_rate);
 
+    dsp_init();
     whitebox_init(&wb);
     assert((fd = whitebox_open(&wb, "/dev/whitebox", O_RDWR, sample_rate)) > 0);
     assert(whitebox_mmap(&wb) == 0);
@@ -110,7 +111,7 @@ void calibrate_dc_offset(int use_dds, int16_t *i, int16_t *q)
             for (j = 0; j < count; ++j) {
                 int16_t re, im;
                 QUAD_UNPACK(sincos16c(fcw, &phase), re, im);
-                ((uint32_t*)dest)[j] = QUAD_PACK(re, im);
+                ((uint32_t*)dest)[j] = QUAD_PACK(re >> 2, im >> 2);
             }
         } else {
             memset((void*)dest, 0, count << 2);
@@ -124,6 +125,9 @@ void calibrate_dc_offset(int use_dds, int16_t *i, int16_t *q)
     //assert(fsync(fd) == 0);
     assert(whitebox_munmap(&wb) == 0);
     assert(whitebox_close(&wb) == 0);
+
+    whitebox_parameter_set("tx_i_correction", *i);
+    whitebox_parameter_set("tx_q_correction", *q);
 }
 
 void calibrate_gain_and_phase(int16_t i, int16_t q, float *i_gain, float *q_gain)
@@ -187,7 +191,7 @@ void calibrate_gain_and_phase(int16_t i, int16_t q, float *i_gain, float *q_gain
         for (j = 0; j < count; ++j) {
             int16_t re, im;
             QUAD_UNPACK(sincos16c(fcw, &phase), re, im);
-            ((uint32_t*)dest)[j] = QUAD_PACK(re, im);
+            ((uint32_t*)dest)[j] = QUAD_PACK(re >> 2, im >> 2);
         }
 
         ret = write(fd, 0, count << 2);
@@ -337,6 +341,7 @@ int main(int argc, char **argv) {
     int16_t i, q;
     float i_gain, q_gain, phase;
 
+    dsp_init();
     whitebox_init(&wb);
     assert(whitebox_open(&wb, "/dev/whitebox", O_RDWR, SAMPLE_RATE) > 0);
     whitebox_tx_get_correction(&wb, &i, &q);
