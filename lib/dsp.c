@@ -45,11 +45,11 @@ void accum32(int n, uint32_t fcw, uint32_t p0, uint32_t *phases) {
     }
 }
 
-uint32_t *sincos_lut_addr = (uint32_t*)DDS_LUT_ADDR;
+uint32_t *sincos_lut_addr = &sincos_lut; //(uint32_t*)DDS_LUT_ADDR;
 
 int dsp_init()
 {
-    memcpy(sincos_lut_addr, sincos_lut, DDS_RAM_SIZE_BITS >> 3); 
+    //memcpy(sincos_lut_addr, sincos_lut, DDS_RAM_SIZE_BITS >> 3); 
     return 0;
 }
 
