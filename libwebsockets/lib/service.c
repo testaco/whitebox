@@ -400,8 +400,14 @@ libwebsocket_service_fd(struct libwebsocket_context *context,
 					/* it was the guy we came to service! */
 					timed_out = 1;
 					/* mark as handled */
-					if (pollfd)
-						pollfd->revents = 0;
+					/*
+					 * If libsocket_service_timeout_check()
+					 * returned true, *pollfd is not valid.
+					 * Don't clear pollfd->revents here.
+					 *
+					 * if (pollfd)
+					 *	pollfd->revents = 0;
+                                         */
 				}
 		}
 	}
@@ -610,7 +616,12 @@ close_and_handled:
 	lwsl_debug("Close and handled\n");
 	libwebsocket_close_and_free_session(context, wsi,
 						LWS_CLOSE_STATUS_NOSTATUS);
+	/*
+         * *pollfd is no longer valid after the above close
+         * So, don't clear pollfd->revents.
+         */
 	n = 1;
+        return n;
 
 handled:
 	pollfd->revents = 0;

@@ -154,8 +154,21 @@ lws_context_init_server_ssl(struct lws_context_creation_info *info,
 
 		/* absolutely require the client cert */
 
+		/*
+		 * Must set session-id when using a client certificate, or
+		 * ssl fails with a fatal error and the error code isn't
+		 * helpful. It's a session caching issue.
+ 		 * The session ID must be unique per session, that's the only
+		 * constraint on what you set it to. So, just use the context
+		 * address as the session ID.
+		 */
+		SSL_CTX_set_session_id_context(context->ssl_ctx, (const unsigned char *)&context, sizeof(context));
+		/*
+		 * Kludge for Katena: Don't fail if there is no peer cert.
+		 * FIX: Give that an API.
+		 */
 		SSL_CTX_set_verify(context->ssl_ctx,
-		       SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+		       SSL_VERIFY_PEER /* | SSL_VERIFY_FAIL_IF_NO_PEER_CERT */,
 						       OpenSSL_verify_callback);
 
 		/*

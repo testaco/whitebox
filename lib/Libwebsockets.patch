@@ -64,7 +64,7 @@ diff -Naur libwebsockets-old/lib/service.c libwebsockets/lib/service.c
  	libwebsocket_close_and_free_session(context, wsi,
  						LWS_CLOSE_STATUS_NOSTATUS);
 +	/*
-+         * *pollfd is no longer valid after the above close */
++         * *pollfd is no longer valid after the above close
 +         * So, don't clear pollfd->revents.
 +         */
  	n = 1;
