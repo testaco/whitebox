@@ -123,9 +123,11 @@ include(FindALSA)
 target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox
     ${WEBSOCKETS_LIBRARIES} ${ALSA_LIBRARIES})
 
-add_custom_command(TARGET main POST_BUILD
-    COMMAND arm-uclinuxeabi-flthdr -s 6000000 main
-)
+if (TARGET_BUILD)
+    add_custom_command(TARGET main POST_BUILD
+        COMMAND arm-uclinuxeabi-flthdr -s 6000000 main
+    )
+endif()
 
 add_executable(qa_tx qa_tx.c)
 target_link_libraries(qa_tx ${CMAKE_REQUIRED_LIBRARIES} whitebox)
