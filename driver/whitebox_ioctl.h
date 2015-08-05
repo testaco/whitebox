@@ -13,6 +13,9 @@
 // Number of registers for the ADF4351
 #define WA_REGS_COUNT   6U
 
+// Number of registers for the ADF4360
+#define WA60_REGS_COUNT   3U
+
 // Maximum number of coefficients that can be in the FIR
 #define WF_COEFF_COUNT 128
 
@@ -41,11 +44,19 @@ typedef struct whitebox_args {
         } receiver;
         uint8_t cmx991[WC_REGS_COUNT];
         uint32_t adf4351[WA_REGS_COUNT];
+        uint32_t adf4360[WA60_REGS_COUNT];
         struct {
             uint8_t bank;
             uint8_t n;
             int32_t coeff[WF_COEFF_COUNT];
         } fir;
+        struct {
+            uint8_t transmit;
+            uint8_t amplifier;
+            uint8_t detect;
+            uint8_t noise;
+            uint8_t bpf;
+        } gateway;
     } flags;
     uint8_t locked;
     uint32_t mock_command;
@@ -148,15 +159,23 @@ typedef struct whitebox_args {
 #define WC_LOCKED _IO('w', 17)
 
 // Whether or not to use the CMX991 PLL
-#define WC_USE_PLL      1
+#define WC_USE_PLL      0
 
 /* ADF4351 */
 #define WA_GET _IOR('w', 11, whitebox_args_t*)
 #define WA_SET _IOW('w', 12, whitebox_args_t*)
 #define WA_LOCKED _IO('w', 16)
 
-#define WA_CLOCK_RATE 26.0e6
+#define WA_CLOCK_RATE 10.0e6
 #define WA_PD_MASK   0x00000020
+
+/* ADF4360 */
+#define WA60_GET _IOR('w', 22, whitebox_args_t*)
+#define WA60_SET _IOW('w', 23, whitebox_args_t*)
+#define WA60_LOCKED _IO('w', 24)
+
+#define WA60_CLOCK_RATE 10.0e6
+#define WA60_PD_MASK   0x300000
 
 /* Mock Commands */
 #define WM_CMD _IOW('w', 13, whitebox_args_t*)
@@ -171,3 +190,7 @@ typedef struct whitebox_args {
 /* FIR Filter */
 #define WF_GET _IOR('w', 18, whitebox_args_t*)
 #define WF_SET _IOR('w', 19, whitebox_args_t*)
+
+/* Gateway */
+#define WG_GET _IOR('w', 25, whitebox_args_t*)
+#define WG_SET _IOW('w', 26, whitebox_args_t*)

@@ -1,0 +1,100 @@
+/* vim: set filetype=cpp: */
+
+uint32_t adf4360_pack(adf4360_t* rf, uint8_t addr) {
+    uint32_t reg = addr & 0x3;
+    switch(addr) {
+    #for $addr in range(2+1)
+    case $addr:
+        #for $reg in filter(lambda r: r.get_addr() == addr, $regs)
+        reg |= ((uint32_t)(rf->$reg.get_name()) & $reg.get_mask()) << $reg.get_shift();
+        #end for
+        break;
+    #end for
+    }
+    return reg;
+}
+
+void adf4360_load(adf4360_t* rf, uint32_t data) {
+    uint32_t addr = data & 0x3;
+    switch(addr) {
+    #for $addr in range(2+1)
+    case $addr:
+        #for $reg in filter(lambda r: r.get_addr() == addr, $regs)
+        rf->$reg.get_name() = (data >> $reg.get_shift()) & $reg.get_mask();
+        #end for
+        break;
+    #end for
+    }
+}
+
+double _mod_for_prescaler(adf4360_t* rf) {
+    switch (rf->adf4360_prescaler) {
+        case ADF4360_PRESCALER_16_17: return 16.;
+        case ADF4360_PRESCALER_32_33: return 32.;
+        default: return 8.;
+    }
+}
+
+double adf4360_actual_frequency(adf4360_t* rf, double ref_freq) {
+    double P = _mod_for_prescaler(rf);
+    int B = rf->adf4360_b_counter_13_bit;
+    int A = rf->adf4360_a_counter_5_bit;
+    int R = rf->adf4360_r_counter_14_bit;
+
+    double fvco = ((P * B) + A) * (ref_freq / R);
+    return fvco;
+}
+
+\#include "whitebox_ioctl.h"
+
+void adf4360_ioctl_get(adf4360_t* rf, whitebox_args_t* w) {
+    #for $i in range(2+1)
+    adf4360_load(rf, w->flags.adf4360[$i]);
+    #end for
+}
+
+void adf4360_ioctl_set(adf4360_t* rf, whitebox_args_t* w) {
+    #for $i in range(2+1)
+    w->flags.adf4360[$i] = adf4360_pack(rf, $i);
+    #end for
+}
+
+/*rf_divider_select_t get_divider_select(int div) {
+    if (div == 1) return RF_DIVIDER_SELECT_DIV1;
+    if (div == 2) return RF_DIVIDER_SELECT_DIV2;
+    if (div == 4) return RF_DIVIDER_SELECT_DIV4;
+    if (div == 8) return RF_DIVIDER_SELECT_DIV8;
+    if (div == 16) return RF_DIVIDER_SELECT_DIV16;
+    if (div == 32) return RF_DIVIDER_SELECT_DIV32;
+    if (div == 42) return RF_DIVIDER_SELECT_DIV64;
+}*/
+
+double adf4360_pll_enable(adf4360_t* rf, double ref_freq, double res_freq, double target_freq) {
+    // TODO: make this fancier?
+    adf4360_load(rf, 0x000000C9);
+    adf4360_load(rf, 0x004FF920);
+    adf4360_load(rf, 0x00007022);
+    rf->adf4360_mute_till_lock_detect = ADF4360_MUTE_TILL_LOCK_DETECT_MUTE_DISABLED;
+    rf->adf4360_ld_precision = ADF4360_LD_PRECISION_LOW;
+    rf->adf4360_muxout = ADF4360_MUXOUT_DLD;
+    //adf4360_load(rf, 0x0001C202);
+    //adf4360_load(rf, 0x004FE920);
+    //adf4360_load(rf, 0x00300321);
+    return adf4360_actual_frequency(rf, ref_freq);
+}
+
+void adf4360_pll_disable(adf4360_t* rf) {
+    // TODO
+    /*rf->rf_output_enable = RF_OUTPUT_ENABLE_DISABLED;
+    rf->aux_output_enable = AUX_OUTPUT_ENABLE_DISABLED;*/
+}
+
+/*int get_divider(adf4360_t* rf) {
+    if (rf->rf_divider_select == 0) return 1;
+    if (rf->rf_divider_select == 1) return 2;
+    if (rf->rf_divider_select == 2) return 4;
+    if (rf->rf_divider_select == 3) return 8;
+    if (rf->rf_divider_select == 4) return 16;
+    if (rf->rf_divider_select == 5) return 32;
+    if (rf->rf_divider_select == 6) return 64;
+}*/

@@ -58,6 +58,15 @@ radio_get_status(radio_context *, cJSON * json)
 {
     cJSON_AddNumberToObject(json, "frequency", modem_get_frequency());
     cJSON_AddStringToObject(json, "mode", modem_get_mode());
+    cJSON_AddBoolToObject(json, "lna", modem_get_lna());
+    cJSON_AddNumberToObject(json, "vga", modem_get_vga());
+    cJSON_AddStringToObject(json, "if_bw", modem_get_if_bw());
+    cJSON_AddNumberToObject(json, "bpf", modem_get_bpf());
+    cJSON_AddNumberToObject(json, "rssi", modem_get_rssi());
+    cJSON_AddNumberToObject(json, "temp", modem_get_temp());
+    cJSON_AddNumberToObject(json, "voltage", modem_get_voltage());
+    cJSON_AddNumberToObject(json, "locked", modem_get_locked_status());
+    cJSON_AddBoolToObject(json, "pa", modem_get_pa());
 }
 
 void
@@ -78,6 +87,31 @@ radio_set(radio_context *, const cJSON * json)
     if (mode_obj) {
         char* mode = mode_obj->valuestring;
         modem_set_mode(mode);
+    }
+    const cJSON * lna_obj = cJSON_GetObjectItem((cJSON*)json, "lna");
+    if (lna_obj) {
+        bool lna = lna_obj->valueint;
+        modem_set_lna(lna);
+    }
+    const cJSON * vga_obj = cJSON_GetObjectItem((cJSON*)json, "vga");
+    if (vga_obj) {
+        int vga = vga_obj->valueint;
+        modem_set_vga(vga);
+    }
+    const cJSON * if_bw_obj = cJSON_GetObjectItem((cJSON*)json, "if_bw");
+    if (if_bw_obj) {
+        const char* if_bw = if_bw_obj->valuestring;
+        modem_set_if_bw(if_bw);
+    }
+    const cJSON * bpf_obj = cJSON_GetObjectItem((cJSON*)json, "bpf");
+    if (bpf_obj) {
+        int bpf = bpf_obj->valueint;
+        modem_set_bpf(bpf);
+    }
+    const cJSON * pa_obj = cJSON_GetObjectItem((cJSON*)json, "pa");
+    if (pa_obj) {
+        bool pa = pa_obj->valueint;
+        modem_set_pa(pa);
     }
 }
 

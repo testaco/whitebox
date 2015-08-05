@@ -140,6 +140,7 @@ file /usr/bin/speaker-test @INSTALL_ROOT@/A2F/root/usr/bin/speaker-test 755 0 0
 @INCLUDE_DEMO1_SAMPLES@file /demo1.samples @CMAKE_SOURCE_DIR@/gnuradio/modem.samples 644 0 0
 file /usr/bin/main @CMAKE_BINARY_DIR@/lib/main 755 0 0
 file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
+file /usr/bin/test_adf4360 @CMAKE_BINARY_DIR@/lib/test_adf4360 755 0 0
 file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0
 file /usr/bin/test_dsp @CMAKE_BINARY_DIR@/lib/test_dsp 755 0 0
 file /usr/bin/test_rf @CMAKE_BINARY_DIR@/lib/test_rf 755 0 0

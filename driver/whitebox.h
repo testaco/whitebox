@@ -116,6 +116,7 @@ struct whitebox_device {
     atomic_t mapped;
 
     u32 adf4351_regs[WA_REGS_COUNT];
+    u32 adf4360_regs[WA60_REGS_COUNT];
     u8 cmx991_regs[WC_REGS_COUNT];
     u16 cur_overruns, cur_underruns;
 
@@ -135,29 +136,55 @@ struct whitebox_device {
 
     struct whitebox_stats tx_stats;
     struct whitebox_stats rx_stats;
+    struct {
+        u8 transmit;
+        u8 amplifier;
+        u8 detect;
+        u8 noise;
+        u8 bpf;
+    } gateway;
 };
 
 /*
  * Platform data includes pin mappings for each GPIO on the Bravo card
  */
 struct whitebox_platform_data_t {
+    // Power Control
+    unsigned en_pin;
+    unsigned pd_pin;
+
+    // RF SPI Select
+    unsigned radio_cs_pin; // ce1
+    unsigned rflo_cs_pin;  // ce2
+    unsigned iflo_cs_pin;  // ce3
+    unsigned gw_cs_pin;    // ce4
+
+    // RF SPI
+    unsigned mosi_pin;
+    unsigned sclk_pin;
+    unsigned miso_pin;
+
+    // Lock Detect
+    unsigned rfld_pin;
+
+    // CODEC
     unsigned adc_s1_pin;
     unsigned adc_s2_pin;
     unsigned adc_dfs_pin;
-    unsigned dac_en_pin;
     unsigned dac_pd_pin;
     unsigned dac_cs_pin;
-    unsigned radio_resetn_pin;
-    unsigned radio_cdata_pin;
-    unsigned radio_sclk_pin;
-    unsigned radio_rdata_pin;
-    unsigned radio_csn_pin;
-    unsigned vco_clk_pin;
-    unsigned vco_data_pin;
-    unsigned vco_le_pin;
-    unsigned vco_ce_pin;
-    unsigned vco_pdb_pin;
-    unsigned vco_ld_pin;
+
+    // Gateway
+    unsigned detect_pin;
+    unsigned amp_pin;
+    unsigned tr_pin;
+    unsigned noise_pin;
+
+    // Input-Output
+    unsigned ptt_out_pin;
+    unsigned ptt_in_pin;
+
+    // DMA
     u8 tx_dma_ch;
     u8 rx_dma_ch;
 };

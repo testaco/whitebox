@@ -281,7 +281,8 @@ static int whitebox_open(struct inode* inode, struct file* filp) {
     memset(&whitebox_device->tx_stats, 0, sizeof(struct whitebox_stats));
     memset(&whitebox_device->rx_stats, 0, sizeof(struct whitebox_stats));
 
-    // enable dac
+    // enable analog stuff
+    whitebox_gpio_analog_enable(whitebox_device->platform_data);
     whitebox_gpio_dac_enable(whitebox_device->platform_data);
 
     whitebox_device->state = WDS_IDLE;
@@ -327,8 +328,9 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
     whitebox_gpio_adf4351_write(whitebox_device->platform_data,
         whitebox_device->adf4351_regs[2]);
 
-    // Disable DAC
+    // Disable analog stuff
     whitebox_gpio_dac_disable(whitebox_device->platform_data);
+    whitebox_gpio_analog_disable(whitebox_device->platform_data);
 
     whitebox_rf_sink_free(rf_sink);
     whitebox_user_source_free(user_source);
@@ -698,6 +700,9 @@ long whitebox_ioctl_reset(void) {
     for (i = 0; i < WA_REGS_COUNT; ++i) {
         whitebox_device->adf4351_regs[i] = 0;
     }
+    for (i = 0; i < WA60_REGS_COUNT; ++i) {
+        whitebox_device->adf4360_regs[i] = 0;
+    }
     for (i = 0; i < WC_REGS_COUNT; ++i) {
         whitebox_device->cmx991_regs[i] = 0;
     }
@@ -880,7 +885,7 @@ long whitebox_ioctl_adf4351_set(unsigned long arg) {
             sizeof(whitebox_args_t)))
         return -EACCES;
 
-    for (i = WA_REGS_COUNT - 1; i >= 0; --i) {
+    for (i = WA_REGS_COUNT - 1; i > 0; --i) {
         if (whitebox_device->adf4351_regs[i] != w.flags.adf4351[i]) {
             whitebox_device->adf4351_regs[i] = w.flags.adf4351[i];
             whitebox_gpio_adf4351_write(whitebox_device->platform_data, 
@@ -888,11 +893,63 @@ long whitebox_ioctl_adf4351_set(unsigned long arg) {
         }
     }
 
+    //usleep(100);
+
+    //if (whitebox_device->adf4351_regs[0] != w.flags.adf4351[0]) {
+        whitebox_device->adf4351_regs[0] = w.flags.adf4351[0];
+        whitebox_gpio_adf4351_write(whitebox_device->platform_data, 
+                w.flags.adf4351[0]);
+    //}
+
     return 0;
 }
 
 long whitebox_ioctl_adf4351_locked(void) {
     return whitebox_gpio_adf4351_locked(whitebox_device->platform_data);
+}
+
+long whitebox_ioctl_adf4360_get(unsigned long arg) {
+    whitebox_args_t w;
+    int i;
+    for (i = 0; i < WA60_REGS_COUNT; ++i)
+        w.flags.adf4360[i] = whitebox_device->adf4360_regs[i];
+
+    if (copy_to_user((whitebox_args_t*)arg, &w,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    return 0;
+}
+
+long whitebox_ioctl_adf4360_set(unsigned long arg) {
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+
+    if (whitebox_device->adf4360_regs[1] != w.flags.adf4360[1]) {
+        whitebox_device->adf4360_regs[1] = w.flags.adf4360[1];
+        whitebox_gpio_adf4360_write(whitebox_device->platform_data, 
+                w.flags.adf4360[1]);
+    }
+
+    if (whitebox_device->adf4360_regs[0] != w.flags.adf4360[0]) {
+        whitebox_device->adf4360_regs[0] = w.flags.adf4360[0];
+        whitebox_gpio_adf4360_write(whitebox_device->platform_data, 
+                w.flags.adf4360[0]);
+    }
+
+    if (whitebox_device->adf4360_regs[2] != w.flags.adf4360[2]) {
+        msleep(20);
+        whitebox_device->adf4360_regs[2] = w.flags.adf4360[2];
+        whitebox_gpio_adf4360_write(whitebox_device->platform_data, 
+                w.flags.adf4360[2]);
+    }
+
+    return 0;
+}
+
+long whitebox_ioctl_adf4360_locked(void) {
+    return whitebox_gpio_adf4360_locked(whitebox_device->platform_data);
 }
 
 long whitebox_ioctl_mock_command(unsigned long arg) {
@@ -1008,6 +1065,42 @@ long whitebox_ioctl_fir_set(unsigned long arg) {
     return 0;
 }
 
+long whitebox_ioctl_gateway_get(unsigned long arg) {
+    whitebox_args_t w;
+    w.flags.gateway.transmit = whitebox_device->gateway.transmit;
+    w.flags.gateway.amplifier = whitebox_device->gateway.amplifier;
+    w.flags.gateway.detect = whitebox_device->gateway.detect;
+    w.flags.gateway.noise = whitebox_device->gateway.noise;
+    w.flags.gateway.bpf = whitebox_device->gateway.bpf;
+
+    if (copy_to_user((whitebox_args_t*)arg, &w,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    return 0;
+}
+
+long whitebox_ioctl_gateway_set(unsigned long arg) {
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+
+    whitebox_device->gateway.transmit = w.flags.gateway.transmit;
+    whitebox_device->gateway.amplifier = w.flags.gateway.amplifier;
+    whitebox_device->gateway.detect = w.flags.gateway.detect;
+    whitebox_device->gateway.noise = w.flags.gateway.noise;
+    whitebox_device->gateway.bpf = w.flags.gateway.bpf;
+
+    whitebox_gpio_gateway_control(
+        whitebox_device->platform_data,
+        whitebox_device->gateway.transmit,
+        whitebox_device->gateway.amplifier,
+        whitebox_device->gateway.detect,
+        whitebox_device->gateway.noise,
+        whitebox_device->gateway.bpf);
+
+    return 0;
+}
 static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long arg) {
     switch(cmd) {
         case W_RESET:
@@ -1042,6 +1135,12 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_adf4351_set(arg);
         case WA_LOCKED:
             return whitebox_ioctl_adf4351_locked();
+        case WA60_GET:
+            return whitebox_ioctl_adf4360_get(arg);
+        case WA60_SET:
+            return whitebox_ioctl_adf4360_set(arg);
+        case WA60_LOCKED:
+            return whitebox_ioctl_adf4360_locked();
         case WM_CMD:
             return whitebox_ioctl_mock_command(arg);
         case W_MMAP_WRITE:
@@ -1052,6 +1151,10 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_fir_get(arg);
         case WF_SET:
             return whitebox_ioctl_fir_set(arg);
+        case WG_GET:
+            return whitebox_ioctl_gateway_get(arg);
+        case WG_SET:
+            return whitebox_ioctl_gateway_set(arg);
         default:
             return -EINVAL;
     }
@@ -1311,7 +1414,7 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_gpio_request;
     }
 
-	printk(KERN_INFO "Whitebox bravo mapped to address 0x%08lx\n", (unsigned long)whitebox_exciter_regs->start);
+	printk(KERN_INFO "Whitebox Charlie mapped to address 0x%08lx\n", (unsigned long)whitebox_exciter_regs->start);
 
     goto done;
 
@@ -1411,23 +1514,34 @@ static struct resource whitebox_platform_device_resources[] = {
  * Whitebox Libero SmartDesign, as is the DMA channel allocations.
  */
 static struct whitebox_platform_data_t whitebox_platform_data = {
-    .adc_s1_pin         = 36,
-    .adc_s2_pin         = 35,
-    .adc_dfs_pin        = 37,
-    .dac_en_pin         = 38,
-    .dac_pd_pin         = 39,
-    .dac_cs_pin         = 40,
-    .radio_resetn_pin   = 41,
-    .radio_cdata_pin    = 42,
-    .radio_sclk_pin     = 43,
-    .radio_rdata_pin    = 44,
-    .radio_csn_pin      = 45,
-    .vco_clk_pin        = 46,
-    .vco_data_pin       = 47,
-    .vco_le_pin         = 48,
-    .vco_ce_pin         = 49,
-    .vco_pdb_pin        = 50,
-    .vco_ld_pin         = 51,
+    .en_pin             = 32+9,
+    .pd_pin             = 32+21,
+
+    .rflo_cs_pin        = 32+17,
+    .iflo_cs_pin        = 32+2,
+    .radio_cs_pin       = 32+13,
+    .gw_cs_pin          = 32+1,
+
+    .mosi_pin           = 32+10,
+    .sclk_pin           = 32+11,
+    .miso_pin           = 32+12,
+
+    .rfld_pin           = 32+23,
+
+    .adc_s2_pin         = 32+3,
+    .adc_s1_pin         = 32+4,
+    .adc_dfs_pin        = 32+5,
+    .dac_pd_pin         = 32+7,
+    .dac_cs_pin         = 32+8,
+
+    .detect_pin         = 32+14,
+    .amp_pin            = 32+15,
+    .tr_pin             = 32+16,
+    .noise_pin          = 32+20,
+
+    .ptt_out_pin        = 32+18,
+    .ptt_in_pin         = 32+22,
+
     .tx_dma_ch          = 0,
     .rx_dma_ch          = 1,
 };

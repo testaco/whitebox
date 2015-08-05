@@ -25,9 +25,9 @@ message(STATUS "${Param.build-type} ${Version.major}.${Version.minor}.${Version.
 # file at some point.
 
 set(PROJECT_VERSION_MAJOR 0)
-set(PROJECT_VERSION_MINOR 1)
+set(PROJECT_VERSION_MINOR 2)
 set(PROJECT_VERSION_PATCH 0)
-set(PROJECT_VERSION_CODENAME "Bravo")
+set(PROJECT_VERSION_CODENAME "Charlie")
 set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION ${PROJECT_VERSION})

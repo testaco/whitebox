@@ -1,0 +1,33 @@
+########################################################################
+## address 0 - Control
+########################################################################
+adf4360_core_power_level        0[2:3]      0       5ma, 10ma, 15ma, 20ma
+adf4360_counter_reset           0[4]        0       normal, reset
+adf4360_muxout                  0[5:7]      1       3state, dld, ndiv, dvdd, rdiv, analog_ld, data_out, dgnd
+adf4360_pd_polarity             0[8]        1       negative, positive
+adf4360_cp_three_state          0[9]        0       normal, three_state
+adf4360_ctl_cp_gain             0[10]       0
+adf4360_mute_till_lock_detect   0[11]       0       mute_disabled, mute_enabled
+adf4360_output_power_level      0[12:13]    0       n14dbm, n11dbm, n8dbm, n5dbm
+adf4360_current_setting_1       0[14:16]    0       0_31ma, 0_62ma, 0_93ma, 1_25ma, 1_56ma, 1_87ma, 2_18ma, 2_50ma
+adf4360_current_setting_2       0[17:19]    0       0_31ma, 0_62ma, 0_93ma, 1_25ma, 1_56ma, 1_87ma, 2_18ma, 2_50ma
+adf4360_power_down              0[20:21]    0       normal, async_pd, sync_pd
+adf4360_prescaler               0[22:23]    0       8_9, 16_17, 32_33
+########################################################################
+## address 1 - R Counter
+########################################################################
+adf4360_r_counter_14_bit        1[2:15]     1
+adf4360_anti_backlash_pulse     1[16:17]    0       3ns, 1_3ns, 6ns
+adf4360_ld_precision            1[18]       0       low, high
+adf4360_test_mode               1[19]       0       off, on
+adf4360_band_select_div         1[20:21]    0       band1, band2, band4, band8
+##reserved              1[22:23]    0
+########################################################################
+## address 2 - N Counter
+########################################################################
+adf4360_a_counter_5_bit         2[2:6]      0
+##reserved              2[7]        0
+adf4360_b_counter_13_bit        2[8:20]     3
+adf4360_cp_gain                 2[21]       0       setting1, setting2
+adf4360_divide_by_2             2[22]       0       fundamental, divide_by_2
+adf4360_prescaler_divsel        2[23]       0       fundamental, divide_by_2

@@ -233,6 +233,11 @@ function go(foo)
     element.addEventListener('keypress', frequencyFieldKeyEvent, true);
     element.focus();
     document.getElementById('mode').addEventListener('change', sendParameters, true);
+    document.getElementById('lna').addEventListener('change', sendParameters, true);
+    document.getElementById('vga').addEventListener('change', sendParameters, true);
+    document.getElementById('if_bw').addEventListener('change', sendParameters, true);
+    document.getElementById('bpf').addEventListener('change', sendParameters, true);
+    document.getElementById('pa').addEventListener('change', sendParameters, true);
     document.getElementById('parameters_form').addEventListener('submit', parametersFormSubmit, true);
     element = document.getElementsByClassName('TransmitButton')[0];
     element.addEventListener('mousedown', transmit, false);
@@ -470,6 +475,24 @@ function responseString(data)
     document.getElementById('frequency').value = root.frequency.toFixed(3);
   if ( root.mode )
     document.getElementById('mode').value = root.mode;
+  if ( root.lna )
+    document.getElementById('lna').checked = root.lna;
+  if ( root.vga )
+    document.getElementById('vga').value = root.vga;
+  if ( root.if_bw )
+    document.getElementById('if_bw').value = root.if_bw;
+  if ( root.bpf )
+    document.getElementById('bpf').value = root.bpf;
+  if ( root.rssi )
+    document.getElementById('rssi').innerHTML = root.rssi;
+  if ( root.temp )
+    document.getElementById('temp').innerHTML = root.temp;
+  if ( root.voltage )
+    document.getElementById('voltage').innerHTML = root.voltage;
+  if ( root.locked )
+    document.getElementById('locked').innerHTML = root.locked ? 'YES' : 'NO';
+  if ( root.pa )
+    document.getElementById('pa').checked = root.pa;
 }
 
 function sendParameters()
@@ -477,9 +500,16 @@ function sendParameters()
   const r = window.radioclient;
   const frequency = parseFloat(document.getElementById('frequency').value);
   const mode = document.getElementById('mode').value;
+  const lna = document.getElementById('lna').checked;
+  const vga = document.getElementById('vga').value;
+  const if_bw = document.getElementById('if_bw').value;
+  const bpf = Number(document.getElementById('bpf').value);
+  const pa = document.getElementById('pa').checked;
 
 
-  const text = { command: "set", frequency: frequency, mode: mode };
+
+  const text = { command: "set", frequency: frequency, mode: mode,
+    lna: lna, vga: vga, if_bw: if_bw, bpf: bpf, pa: pa };
   r.soc.send(JSON.stringify(text));
   notice("Settings sent to the radio.");
 }

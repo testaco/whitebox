@@ -69,6 +69,8 @@ int whitebox_parameter_get(const char *param)
 void whitebox_init(whitebox_t* wb) {
     wb->fd = -EINVAL;
     adf4351_init(&wb->adf4351);
+    adf4360_init(&wb->adf4360);
+    wb->lna = 0;
 }
 
 whitebox_t* whitebox_alloc(void) {
@@ -156,6 +158,10 @@ int whitebox_close(whitebox_t* wb) {
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
 
+    adf4360_pll_disable(&wb->adf4360);
+    adf4360_ioctl_set(&wb->adf4360, &w);
+    ioctl(wb->fd, WA60_SET, &w);
+
     close(wb->fd);
     wb->fd = -EINVAL;
     return 0;
@@ -227,13 +233,43 @@ int whitebox_tx_clear(whitebox_t* wb) {
     return ioctl(wb->fd, WE_CLEAR);
 }
 
+void whitebox_tx_config(whitebox_t* wb) {
+    whitebox_args_t w;
+    ioctl(wb->fd, WG_GET, &w);
+    w.flags.gateway.transmit = 1;
+    if (wb->txcal) {
+        w.flags.gateway.amplifier = 0; // No PA when calibrating
+        w.flags.gateway.detect = 1;
+    } else {
+        if (!w.flags.gateway.amplifier && wb->pa)
+            printf("TURNING ON AMPLIFIER\n");
+        else if (w.flags.gateway.amplifier && !wb->pa)
+            printf("TURNING OFF AMPLIFIER\n");
+        w.flags.gateway.amplifier = wb->pa ? 1 : 0;
+        w.flags.gateway.detect = 0;
+    }
+
+    ioctl(wb->fd, WG_SET, &w);
+}
+
 int whitebox_tx(whitebox_t* wb, float frequency) {
 
     int err;
     float vco_frequency;
     whitebox_args_t w;
 
-    vco_frequency = (frequency + 45.00e6) * 4.0;
+    // Set the IF LO Frequency
+    #define IF_LO_FREQ 90e6
+    if ((err = ioctl(wb->fd, WA60_GET, &w)) < 0)
+        return err;
+    adf4360_ioctl_get(&wb->adf4360, &w);
+    adf4360_pll_enable(&wb->adf4360, WA_CLOCK_RATE, 200e3, IF_LO_FREQ * 4);
+    adf4360_ioctl_set(&wb->adf4360, &w);
+    if ((err = ioctl(wb->fd, WA60_SET, &w)) < 0)
+        return err;
+
+    // Set the RF LO Frequency
+    vco_frequency = (frequency + IF_LO_FREQ) * 4.0;
     if (vco_frequency <= 35.00e6) {
         return -1;
     }
@@ -242,17 +278,17 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     if ((err = ioctl(wb->fd, WA_GET, &w)) < 0)
         return err;
     adf4351_ioctl_get(&wb->adf4351, &w);
-
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     if ((err = ioctl(wb->fd, WA_SET, &w)) < 0)
         return err;
 
-
+    // Put the transceiver in transmit mode
     if ((err = ioctl(wb->fd, WC_GET, &w)) < 0)
         return err;
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_resume(&wb->cmx991);
+
 #if WC_USE_PLL
     if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
         return -1;
@@ -266,6 +302,8 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     if ((err = ioctl(wb->fd, WC_SET, &w)) < 0)
         return err;
 
+    whitebox_tx_config(wb); // T/R switch, etc.
+
     if ((err = ioctl(wb->fd, WE_CLEAR, 0)) < 0)
         return err;
 
@@ -277,6 +315,13 @@ int whitebox_tx_standby(whitebox_t *wb)
 {
     int err;
     whitebox_args_t w;
+
+    if ((err = ioctl(wb->fd, WG_GET, &w)) < 0)
+        return err;
+    w.flags.gateway.amplifier = 0;
+    w.flags.gateway.detect = 0;
+    if ((err = ioctl(wb->fd, WG_SET, &w)) < 0)
+        return err;
 
     if ((err = ioctl(wb->fd, WC_GET, &w)) < 0)
         return err;
@@ -314,6 +359,8 @@ int whitebox_tx_fine_tune(whitebox_t *wb, float frequency) {
     adf4351_ioctl_set(&wb->adf4351, &w);
     if ((err = ioctl(wb->fd, WA_SET, &w)) < 0)
         return err;
+
+    whitebox_tx_config(wb); // T/R switch, etc.
 
     return 0;
 }
@@ -468,6 +515,47 @@ int whitebox_rx_clear(whitebox_t* wb) {
     return ioctl(wb->fd, WR_CLEAR);
 }
 
+void whitebox_rx_config(whitebox_t* wb) {
+    whitebox_args_t w;
+    lna_t lna = wb->lna ? LNA_POWER_UP : LNA_POWER_DOWN;
+    vga_t vga = VGA_N0DB;
+    iq_filter_t iq_filter_bw;
+    mix_out_t mixout;
+    if_in_t ifin;
+
+    switch (wb->if_bw) {
+        case KHZ_30:
+            iq_filter_bw = IQ_FILTER_BW_100KHZ;
+            mixout = MIX_OUT_MIXOUT2;
+            ifin = IF_IN_IFIP2;
+            break;
+        case KHZ_100:
+            iq_filter_bw = IQ_FILTER_BW_100KHZ;
+            mixout = MIX_OUT_MIXOUT1;
+            ifin = IF_IN_IFIP1;
+            break;
+        default: // MHZ_1
+            iq_filter_bw = IQ_FILTER_BW_1MHZ;
+            mixout = MIX_OUT_MIXOUT1;
+            ifin = IF_IN_IFIP1;
+            break;
+    }
+
+    cmx991_rx_config(&wb->cmx991, mixout, ifin, iq_filter_bw, vga, lna);
+    if (wb->rxcal)
+        cmx991_rx_calibrate_enable(&wb->cmx991);
+    else
+        cmx991_rx_calibrate_disable(&wb->cmx991);
+
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+
+    ioctl(wb->fd, WG_GET, &w);
+    w.flags.gateway.transmit = 0; // Go into receive mode
+    w.flags.gateway.noise = 1; // TODO: switch is wired backward :/
+    ioctl(wb->fd, WG_SET, &w);
+}
+
 int whitebox_rx(whitebox_t* wb, float frequency) {
     float vco_frequency;
     whitebox_args_t w;
@@ -487,9 +575,9 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
     }
 
     //printf("%f %f\n", frequency, vco_frequency);
-    cmx991_rx_tune(&wb->cmx991, //vco_frequency,
-        RX_RF_DIV_BY_4, MIX_OUT_MIXOUT1, IF_IN_IFIP1,
-        IQ_FILTER_BW_1MHZ, VGA_N0DB);
+
+    whitebox_rx_config(wb);
+    cmx991_rx_tune(&wb->cmx991, RX_RF_DIV_BY_4);
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
 
@@ -635,4 +723,14 @@ int whitebox_fir_get_coeffs(whitebox_t *wb, int8_t bank, int8_t N, int32_t *coef
         coeffs[i] = w.flags.fir.coeff[i];
 
     return w.flags.fir.n;
+}
+
+int whitebox_gateway_set(whitebox_t *wb) {
+    whitebox_args_t w;
+    if (ioctl(wb->fd, WG_GET, &w) < 0)
+        return -1;
+    
+    w.flags.gateway.bpf = wb->bpf;
+
+    return ioctl(wb->fd, WG_SET, &w);
 }

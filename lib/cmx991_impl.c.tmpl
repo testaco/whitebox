@@ -168,6 +168,7 @@ void cmx991_shutdown(cmx991_t* rf) {
     rf->mix_pwr = MIX_PWR_POWER_DOWN;
     rf->iq_pwr = IQ_PWR_POWER_DOWN;
     rf->vbias = VBIAS_POWER_DOWN;
+    rf->lna = LNA_POWER_DOWN;
 
     // Tx Control Register
     rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
@@ -215,8 +216,9 @@ void cmx991_tx_tune(cmx991_t* rf, float fdes, if_filter_t if_filter,
     }
 }
 
-void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div, mix_out_t mix_out,
-        if_in_t if_in, iq_filter_t iq_filter, vga_t vga) {
+void cmx991_rx_config(cmx991_t* rf, mix_out_t mix_out,
+        if_in_t if_in, iq_filter_t iq_filter,
+        vga_t vga, lna_t lna) {
     rf->rx_mode = RX_MODE_IQ;    
     
     rf->tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
@@ -226,13 +228,16 @@ void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div, mix_out_t mix_out,
     rf->iq_pwr = IQ_PWR_POWER_UP;
     rf->vbias = VBIAS_POWER_UP;
     rf->sli_pwr = SLI_PWR_POWER_UP;
-    rf->lna = LNA_POWER_UP;
 
-    rf->rx_rf_div = div;
     rf->if_in = if_in;
     rf->mix_out = mix_out;
     rf->iq_filter = iq_filter;
     rf->vga = vga;
+    rf->lna = lna;
+}
+
+void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div) {
+    rf->rx_rf_div = div;
 }
 
 void cmx991_rx_calibrate_enable(cmx991_t* rf)

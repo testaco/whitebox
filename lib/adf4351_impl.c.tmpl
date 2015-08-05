@@ -70,6 +70,10 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     long remainder;
     prescaler_t prescaler;
 
+    if (ref_freq <= 10e6) {
+        D = REFERENCE_DOUBLER_ENABLED;
+    }
+
     while (vco_freq < 2.2e9) {
         vco_freq *= 2;
         RFdiv *= 2;
@@ -77,17 +81,18 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     
     prescaler = vco_freq > 3.6e9 ? PRESCALER_8_9 : PRESCALER_4_5;
 
-    MOD = ref_freq / res_freq; // or 4092;
-    if (MOD < 2 || MOD > 4095) {
-        fprintf(stderr, "warning, MOD is out of range\n");
-    }
-
     pfd_freq = ref_freq * ( 1 + D ) / ( R * ( 1 + T ) );
 
     if (pfd_freq > 45e6) {
         T = REFERENCE_DIVIDE_BY_2_ENABLED;
         pfd_freq = ref_freq * ( 1 + D ) / ( R * ( 1 + T ) );
     }
+
+    MOD = pfd_freq / res_freq; // or 4092;
+    if (MOD < 2 || MOD > 4095) {
+        fprintf(stderr, "warning, MOD is out of range\n");
+    }
+
 
     BS = pfd_freq / 125e3;
 
@@ -126,13 +131,16 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     rf->aux_output_power = AUX_OUTPUT_POWER_M4DBM;
     rf->aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
     rf->aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
-    rf->charge_pump_current = CHARGE_PUMP_CURRENT_5_00MA;
+    rf->charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
+    rf->cp_three_state = CP_THREE_STATE_DISABLED;
     rf->muxout = MUXOUT_3STATE;
     rf->ld_pin_mode = LD_PIN_MODE_DLD;
-    rf->mute_till_lock_detect = MUTE_TILL_LOCK_DETECT_MUTE_ENABLED;
+    rf->mute_till_lock_detect = MUTE_TILL_LOCK_DETECT_MUTE_DISABLED;
     rf->clock_div_mode = CLOCK_DIV_MODE_CLOCK_DIVIDER_OFF;
     rf->low_noise_and_spur = LOW_NOISE_AND_SPUR_LOW_SPUR;
+    rf->feedback_select = FEEDBACK_SELECT_FUNDAMENTAL;
 
+    //printf("Band select=%d\n", rf->band_select_clock_div);
     return _actual_frequency(FRAC, N, MOD, RFdiv, R, T, D, ref_freq);
 }
 

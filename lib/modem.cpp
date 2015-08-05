@@ -103,14 +103,14 @@ static const struct modulators_list modulators_list[] = {
 
 
 void *modem_init() {
-    //std::cerr << "Opening the modem";
+    std::cerr << "Opening the modem";
     whitebox = &wb;
     /*whitebox = (struct whitebox*)malloc(sizeof(whitebox));
     if (!whitebox) {
         std::cerr << "Error: out of memory" << std::endl;
         return NULL;
     }*/
-    std::cerr << "Sensitivity" << SENSITIVITY << std::endl;
+    //std::cerr << "Sensitivity" << SENSITIVITY << std::endl;
     whitebox_init(whitebox);
     whitebox->frequency = 145e6;
     fcw = freq_to_fcw(400, RF_SAMPLE_RATE);
@@ -130,9 +130,8 @@ void *modem_init() {
 }
 
 void modem_close(void *data) {
-    if (started) {
-        poll_end_fd(whitebox->fd);
-    }
+    modem_standby();
+
     whitebox_munmap(whitebox);
     whitebox_close(whitebox);
     //free(whitebox);
@@ -150,7 +149,6 @@ void modem_handler(void *data, struct pollfd *ufds, int count) {
 }
 
 void modem_transmit() {
-#if 1
     rxing = false;
     if (whitebox_tx(whitebox, whitebox->frequency) < 0) {
         std::cerr << "Transmit start failed!" << std::endl;
@@ -166,11 +164,11 @@ void modem_transmit() {
         std::cerr << "Transmit start" << std::endl;
         poll_change_fd(whitebox->fd, POLLOUT | POLLERR);
     }
-#endif
 }
 
 void modem_receive() {
-#if 1
+    long count;
+    unsigned long src;
     txing = false;
     if (whitebox_rx(whitebox, whitebox->frequency) < 0) {
         std::cerr << "Receive start failed!" << std::endl;
@@ -186,7 +184,8 @@ void modem_receive() {
         poll_change_fd(whitebox->fd, POLLIN | POLLERR);
     }
     rxing = true;
-#endif
+    // Crank the receiver to get things going.
+    count = ioctl(whitebox->fd, W_MMAP_READ, &src) >> 2;
 }
 
 void modem_standby() {
@@ -261,8 +260,9 @@ void modem_read() {
 }
 
 void modem_recover() {
-    std::cerr << "recover" << std::endl;
-    whitebox_reset(whitebox);
+    //std::cerr << "recover" << std::endl;
+    return;
+    //whitebox_reset(whitebox);
     if (txing) {
         if (whitebox_tx(whitebox, whitebox->frequency) < 0) {
             std::cerr << "tx recover failed" << std::endl;
@@ -310,6 +310,103 @@ void modem_set_mode(const char* new_mode) {
     }
     std::cerr << "uknown mode" << std::endl;
     modem_set_mode("AM");
+}
+
+const bool modem_get_lna() {
+    return whitebox->lna;
+}
+
+void modem_set_lna(const bool new_lna) {
+    if (whitebox->lna != new_lna) {
+        whitebox->lna = new_lna;
+        if (rxing) {
+            std::cerr  << "LNA" << new_lna << std::endl;
+            whitebox_rx_config(whitebox);
+        }
+    }
+}
+
+const int modem_get_vga() {
+    return whitebox->vga;
+}
+
+void modem_set_vga(const int vga) {
+    if (whitebox->vga != vga) {
+        whitebox->vga = vga;
+        if (rxing) {
+            std::cerr  << "vga" << vga;
+            whitebox_rx_config(whitebox);
+        }
+    }
+}
+
+const char* _string_for_if_bw(if_filter_bw_t if_bw) {
+    switch (whitebox->if_bw) {
+        case KHZ_30: return "30KHz";
+        case KHZ_100: return "100KHz";
+        default: return "1MHz";
+    }
+}
+
+const if_filter_bw _enum_for_if_bw(const char* if_bw) {
+    if (strcmp(if_bw, "30KHz") == 0) return KHZ_30;
+    if (strcmp(if_bw, "100KHz") == 0) return KHZ_100;
+    return MHZ_1;
+}
+
+const char* modem_get_if_bw() {
+    return _string_for_if_bw(whitebox->if_bw);
+}
+
+void modem_set_if_bw(const char* if_bw) {
+    if (strcmp(_string_for_if_bw(whitebox->if_bw), if_bw) != 0) {
+        whitebox->if_bw = _enum_for_if_bw(if_bw);
+        if (rxing) {
+            std::cerr  << "if_bw" << if_bw << std::endl;
+            whitebox_rx_config(whitebox);
+        }
+    }
+}
+
+const int modem_get_bpf() {
+    return whitebox->bpf;
+}
+
+void modem_set_bpf(const int bpf) {
+    if (bpf != whitebox->bpf) {
+        whitebox->bpf = bpf;
+        whitebox_gateway_set(whitebox);
+    }
+}
+
+const float modem_get_rssi() {
+    return 0.0; // TODO
+}
+
+const float modem_get_temp() {
+    return 0.0; // TODO
+}
+
+const float modem_get_voltage() {
+    return 0.0; // TODO
+}
+
+const bool modem_get_locked_status() {
+    return whitebox_plls_locked(whitebox);
+}
+
+const bool modem_get_pa() {
+    return whitebox->pa;
+}
+
+void modem_set_pa(const bool new_pa) {
+    if (whitebox->pa != new_pa) {
+        whitebox->pa = new_pa;
+        if (txing) {
+            std::cerr  << "PA" << new_pa << std::endl;
+            whitebox_tx_config(whitebox);
+        }
+    }
 }
 
 struct resource_ops modem_ops = {

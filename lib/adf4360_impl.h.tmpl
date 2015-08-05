@@ -1,0 +1,13 @@
+/* vim: set filetype=cpp: */
+
+struct whitebox_args;
+
+uint32_t adf4360_pack(adf4360_t* rf, uint8_t addr);
+void adf4360_load(adf4360_t* rf, uint32_t data);
+
+void adf4360_ioctl_get(adf4360_t* rf, struct whitebox_args* w);
+void adf4360_ioctl_set(adf4360_t* rf, struct whitebox_args* w);
+
+double adf4360_actual_frequency(adf4360_t* rf, double ref_freq);
+double adf4360_pll_enable(adf4360_t* rf, double ref_freq, double res_freq, double target_freq);
+void adf4360_pll_disable(adf4360_t* rf);

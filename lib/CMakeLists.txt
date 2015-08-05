@@ -39,18 +39,24 @@ ExternalProject_add(
 #<SOURCE_DIR>/configure --prefix=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr --static
 #)
 
-ExternalProject_add(
-    libwebsockets-build
-    GIT_REPOSITORY git://git.libwebsockets.org/libwebsockets
-    CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_SOURCE_DIR}/cmake/Toolchains/arm_cortex_m3_native.cmake -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr -DZLIB_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include -DLWS_WITH_SSL=0  -DLWS_WITHOUT_EXTENSIONS=1 -DLWS_WITH_STATIC=1 -DLWS_WITH_SHARED=0
-    LOG_INSTALL 1
+#ExternalProject_add(
+    #libwebsockets-build
+    #GIT_REPOSITORY git://git.libwebsockets.org/libwebsockets
+    #CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_SOURCE_DIR}/cmake/Toolchains/arm_cortex_m3_native.cmake -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr -DZLIB_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include -DLWS_WITH_SSL=0  -DLWS_WITHOUT_EXTENSIONS=1 -DLWS_WITH_STATIC=1 -DLWS_WITH_SHARED=0
+    #LOG_INSTALL 1
 #    DEPENDS zlib-build
-)
+#)
 
 add_custom_command(
     OUTPUT adf4351.c adf4351.h
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/genregs.py --name=adf4351 --src-dir=${CMAKE_CURRENT_SOURCE_DIR} --build-dir=${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/adf4351.regs ${CMAKE_CURRENT_SOURCE_DIR}/adf4351_impl.c.tmpl ${CMAKE_CURRENT_SOURCE_DIR}/adf4351_impl.h.tmpl
+)
+
+add_custom_command(
+    OUTPUT adf4360.c adf4360.h
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/genregs.py --name=adf4360 --src-dir=${CMAKE_CURRENT_SOURCE_DIR} --build-dir=${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/adf4360.regs ${CMAKE_CURRENT_SOURCE_DIR}/adf4360_impl.c.tmpl ${CMAKE_CURRENT_SOURCE_DIR}/adf4360_impl.h.tmpl
 )
 
 add_custom_command(
@@ -62,6 +68,7 @@ add_custom_command(
 set(WHITEBOX_SRCS
     whitebox.c
     adf4351.c
+    adf4360.c
     cmx991.c
     dsp.c
 )
@@ -74,6 +81,7 @@ set(WHITEBOX_PUBLIC_HEADERS
     whitebox_test.h
     whitebox.h
     adf4351.h
+    adf4360.h
     cmx991.h
     dsp.h
 )
@@ -82,6 +90,9 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/driver)
 
 add_executable(test_adf4351 test_adf4351.c)
 target_link_libraries(test_adf4351 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
+
+add_executable(test_adf4360 test_adf4360.c)
+target_link_libraries(test_adf4360 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_executable(test_cmx991 test_cmx991.c)
 target_link_libraries(test_cmx991 ${CMAKE_REQUIRED_LIBRARIES} whitebox)
@@ -128,7 +139,7 @@ add_executable(qa_lo qa_lo.c)
 target_link_libraries(qa_lo ${CMAKE_REQUIRED_LIBRARIES} whitebox)
 
 add_custom_target(apps
-    DEPENDS test_adf4351 test_cmx991 test_driver test_device test_rf test_dsp main qa_tx qa_rx qa_lo)
+    DEPENDS test_adf4351 test_adf4360 test_cmx991 test_driver test_device test_rf test_dsp main qa_tx qa_rx qa_lo)
 
 if (${REMOTE_DEBUG})
     add_test(NAME target_netboot
@@ -141,6 +152,10 @@ if (${REMOTE_DEBUG})
 
     add_test(NAME target_test_adf4351
         COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_adf4351
+    )
+
+    add_test(NAME target_test_adf4360
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/serial_command.py --tty=${TTY} --baud=${BAUD} test_adf4360
     )
 
     add_test(NAME target_test_driver

@@ -9,15 +9,23 @@
 
 #include "cmx991.h"
 #include "adf4351.h"
+#include "adf4360.h"
 #include "dsp.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+typedef enum if_filter_bw {
+    MHZ_1,
+    KHZ_100,
+    KHZ_30,
+} if_filter_bw_t;
+
 struct whitebox {
     int fd;
     cmx991_t cmx991;
+    adf4360_t adf4360;
     adf4351_t adf4351;
 
     int rate;
@@ -26,6 +34,19 @@ struct whitebox {
 
     void *user_buffer;
     unsigned long user_buffer_size;
+
+    // RX Settings
+    uint8_t lna;
+    uint8_t vga;
+    if_filter_bw_t if_bw;
+    uint8_t rxcal; // Set to true in the poll loop to start a calibration
+
+    // Gateway settings
+    uint8_t bpf;
+
+    // TX Settings
+    uint8_t pa;
+    uint8_t txcal; // Set to true in the poll loop to start a calibration
 };
 
 typedef struct whitebox whitebox_t;
@@ -48,6 +69,7 @@ unsigned int whitebox_status(whitebox_t* wb);
 int whitebox_plls_locked(whitebox_t* wb);
 
 int whitebox_tx_clear(whitebox_t* wb);
+void whitebox_tx_config(whitebox_t* wb);
 int whitebox_tx(whitebox_t* wb, float frequency);
 int whitebox_tx_fine_tune(whitebox_t* wb, float frequency);
 int whitebox_tx_standby(whitebox_t* wb);
@@ -72,6 +94,7 @@ int whitebox_tx_get_gain(whitebox_t *wb, float *gain_i, float *gain_q);
 
 
 int whitebox_rx_clear(whitebox_t* wb);
+void whitebox_rx_config(whitebox_t* wb);
 int whitebox_rx(whitebox_t* wb, float frequency);
 int whitebox_rx_fine_tune(whitebox_t* wb, float frequency);
 int whitebox_rx_standby(whitebox_t* wb);
@@ -89,6 +112,8 @@ void whitebox_rx_set_correction(whitebox_t *wb, int16_t correct_i, int16_t corre
 void whitebox_rx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *correct_q);
 
 uint16_t whitebox_cic_shift(uint16_t interp);
+
+int whitebox_gateway_set(whitebox_t *wb);
 
 #ifdef __cplusplus
 }

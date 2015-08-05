@@ -53,6 +53,68 @@
         </td>
         <td></td>
       </tr>
+      <tr>
+        <th>Band</th>
+        <td>
+          <select name="bpf" id="bpf">
+            <option value="0" selected>Other</option>
+            <option value="1" >6M</option>
+            <option value="2" >2M</option>
+            <option value="3" >70CM</option>
+            <option value="4" >33CM</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <th>LNA</th>
+        <td><input type="checkbox" name="lna" id="lna"></td>
+      </tr>
+      <tr>
+        <th>VGA</th>
+        <td>
+          <select name="vga" id="vga">
+            <option selected>0</option>
+            <option>6</option>
+            <option>12</option>
+            <option>18</option>
+            <option>24</option>
+            <option>30</option>
+            <option>36</option>
+            <option>42</option>
+            <option>48</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <th>IF Bandwidth</th>
+        <td>
+          <select name="if_bw" id="if_bw">
+            <option selected>1MHz</option>
+            <option>100KHz</option>
+            <option>30KHz</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <th>RSSI</th>
+        <td><span id="rssi"></span></td>
+      </tr>
+      <tr>
+        <th>Temperature</th>
+        <td><span id="temp"></span>&deg;F</td>
+      </tr>
+      <tr>
+        <th>Voltage</th>
+        <td><span id="voltage"></span>V</td>
+      </tr>
+      <tr>
+        <th>PLL's Locked</th>
+        <td><span id="locked"></span></td>
+      </tr>
+      <tr>
+        <th>PA</th>
+        <td><input type="checkbox" name="pa" id="pa"></td>
+      </tr>
     </table>
   </form>
   <br class="LargeOnly">
