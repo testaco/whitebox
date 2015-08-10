@@ -99,6 +99,9 @@ struct whitebox_stats {
     int last_error;
 };
 
+struct spi_device;
+struct spi_master;
+
 /*
  * Book-keeping for the device
  */
@@ -143,6 +146,18 @@ struct whitebox_device {
         u8 noise;
         u8 bpf;
     } gateway;
+
+    struct spi_master* spi1_master;
+    struct spi_device* auxcodec_spi_device;
+
+    struct {
+        s16 rssi;
+        s16 det;
+        s16 ifmuxout;
+        s16 rfmuxout;
+        s16 xcvr_temp;
+        s16 vsense;
+    } auxcodec;
 };
 
 /*

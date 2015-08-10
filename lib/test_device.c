@@ -19,6 +19,22 @@ int test_open_close(void* data) {
     return 0;
 }
 
+int test_spi(void *data) {
+    whitebox_args_t w;
+    whitebox_t wb;
+    whitebox_init(&wb);
+    assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
+    assert(ioctl(wb.fd, WAUX_GET, &w) == 0);
+    printf("THIS IS IT %d %d %d %d %d %d\n",
+        w.flags.auxcodec.rssi,
+        w.flags.auxcodec.det,
+        w.flags.auxcodec.ifmuxout,
+        w.flags.auxcodec.rfmuxout,
+        w.flags.auxcodec.xcvr_temp,
+        w.flags.auxcodec.vsense);
+    assert(whitebox_close(&wb) == 0);
+}
+
 int test_tx_clear(void* data) {
     whitebox_t wb;
     whitebox_init(&wb);
@@ -427,15 +443,16 @@ int main(int argc, char **argv) {
     whitebox_parameter_set("mock_en", 0);
     whitebox_test_t tests[] = {
         WHITEBOX_TEST(test_open_close),
+        WHITEBOX_TEST(test_spi),
         WHITEBOX_TEST(test_tx_clear),
         WHITEBOX_TEST(test_rx_clear),
         WHITEBOX_TEST(test_ioctl_exciter),
         WHITEBOX_TEST(test_ioctl_receiver),
         WHITEBOX_TEST(test_tx_overrun_underrun),
         WHITEBOX_TEST(test_tx_halt),
-#if 0
         WHITEBOX_TEST(test_rx_overrun),
         WHITEBOX_TEST(test_rx_halt),
+#if 0
         WHITEBOX_TEST(test_tx_fifo),
         WHITEBOX_TEST(test_tx_fifo_dma),
 #endif

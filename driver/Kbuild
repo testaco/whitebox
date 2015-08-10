@@ -1,5 +1,7 @@
-obj-m := whitebox.o pdma.o
+obj-m := whitebox.o pdma.o spi_m2s.o
 
-whitebox-y := whitebox_driver.o whitebox_gpio.o whitebox_user_source.o whitebox_user_sink.o whitebox_rf_source.o whitebox_rf_sink.o whitebox_exciter.o whitebox_tx.o whitebox_receiver.o whitebox_rx.o
+whitebox-y := whitebox_driver.o whitebox_gpio.o whitebox_user_source.o whitebox_user_sink.o whitebox_rf_source.o whitebox_rf_sink.o whitebox_exciter.o whitebox_tx.o whitebox_receiver.o whitebox_rx.o whitebox_spi.o
 
 pdma-y: pdma.o
+
+spi_m2s-y: spi_m2s.o

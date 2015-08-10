@@ -38,6 +38,7 @@ nod /dev/snd/timer 0660 0 0 c 116 33
 file /lib/modules/2.6.33-arm1/modules.dep @CMAKE_CURRENT_SOURCE_DIR@/local/lib/modules/2.6.33-arm1/modules.dep 644 0 0
 file /lib/modules/2.6.33-arm1/pdma.ko  @CMAKE_BINARY_DIR@/driver/pdma.ko 644 0 0
 file /lib/modules/2.6.33-arm1/whitebox.ko  @CMAKE_BINARY_DIR@/driver/whitebox.ko 644 0 0
+file /lib/modules/2.6.33-arm1/spi_m2s.ko  @CMAKE_BINARY_DIR@/driver/spi_m2s.ko 644 0 0
 #file /lib/modules/2.6.33-arm1/g_audio.ko @INSTALL_ROOT@/linux/drivers/usb/gadget/g_audio.ko 644 0 0
 #file /lib/modules/2.6.33-arm1/g_serial.ko @INSTALL_ROOT@/linux/drivers/usb/gadget/g_serial.ko 644 0 0
 file /lib/modules/2.6.33-arm1/soundcore.ko  @INSTALL_ROOT@/linux/sound/soundcore.ko 644 0 0

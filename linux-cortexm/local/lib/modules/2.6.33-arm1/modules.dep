@@ -1,4 +1,5 @@
-/lib/modules/2.6.33-arm1/whitebox.ko: /lib/modules/2.6.33-arm1/pdma.ko
+/lib/modules/2.6.33-arm1/whitebox.ko: /lib/modules/2.6.33-arm1/spi_m2s.ko /lib/modules/2.6.33-arm1/pdma.ko
+
 /lib/modules/2.6.33-arm1/g_audio.ko:
 
 /lib/modules/2.6.33-arm1/snd-dummy.ko: /lib/modules/2.6.33-arm1/snd-pcm.ko /lib/modules/2.6.33-arm1/snd-timer.ko /lib/modules/2.6.33-arm1/snd.ko /lib/modules/2.6.33-arm1/soundcore.ko /lib/modules/2.6.33-arm1/snd-page-alloc.ko

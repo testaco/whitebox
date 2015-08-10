@@ -11,16 +11,18 @@ configure_file(Kbuild Kbuild
 )
 
 set(DRIVER_SOURCES
+        pdma.c pdma.h
+        spi_m2s.c
         whitebox_driver.c
         whitebox.h
         whitebox_ioctl.h
-        pdma.c pdma.h
         whitebox_block.h
         whitebox_rf_sink.c whitebox_rf_source.c
         whitebox_user_source.c whitebox_user_sink.c
         whitebox_exciter.h whitebox_exciter.c whitebox_tx.c
         whitebox_receiver.h whitebox_receiver.c whitebox_rx.c
-        whitebox_gpio.h whitebox_gpio.c)
+        whitebox_gpio.h whitebox_gpio.c
+        whitebox_spi.h whitebox_spi.c)
 
 foreach (DRIVER_SOURCE ${DRIVER_SOURCES})
     configure_file(${DRIVER_SOURCE} ${DRIVER_SOURCE}

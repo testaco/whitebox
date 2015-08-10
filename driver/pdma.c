@@ -450,6 +450,10 @@ int pdma_request(u8 ch, pdma_irq_handler_t handler, void* user_data, u8 write_ad
     channel->flags = flags;
     channel->write_adj = write_adj;
     channel->handler = handler;
+    if (!channel->handler)
+        channel->flags &= ~PDMA_CONTROL_INTEN;
+    else
+        channel->flags |= PDMA_CONTROL_INTEN;
     channel->user_data = user_data;
 
     pdma_clear(ch);

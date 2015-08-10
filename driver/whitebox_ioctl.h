@@ -57,6 +57,15 @@ typedef struct whitebox_args {
             uint8_t noise;
             uint8_t bpf;
         } gateway;
+        struct {
+            int16_t rssi;
+            int16_t det;
+            int16_t ifmuxout;
+            int16_t rfmuxout;
+            int16_t xcvr_temp;
+            int16_t vsense;
+            int16_t ioffp, ioffn, qoffp, qoffn;
+        } auxcodec;
     } flags;
     uint8_t locked;
     uint32_t mock_command;
@@ -194,3 +203,7 @@ typedef struct whitebox_args {
 /* Gateway */
 #define WG_GET _IOR('w', 25, whitebox_args_t*)
 #define WG_SET _IOW('w', 26, whitebox_args_t*)
+
+/* Aux CODEC */
+#define WAUX_GET _IOR('w', 27, whitebox_args_t*)
+#define WAUX_SET _IOW('w', 28, whitebox_args_t*)

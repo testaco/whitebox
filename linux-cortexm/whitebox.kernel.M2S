@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.33
-# Thu Feb 12 11:37:47 2015
+# Thu Aug  6 09:52:06 2015
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -482,6 +482,7 @@ CONFIG_M2S_ETH_BUF_IN_ESRAM_BASE=0x8000
 # CONFIG_AX88796 is not set
 # CONFIG_SMC91X is not set
 # CONFIG_DM9000 is not set
+# CONFIG_ENC28J60 is not set
 # CONFIG_ETHOC is not set
 # CONFIG_SMC911X is not set
 # CONFIG_SMSC911X is not set
@@ -495,6 +496,7 @@ CONFIG_M2S_ETH_BUF_IN_ESRAM_BASE=0x8000
 # CONFIG_IBM_NEW_EMAC_MAL_COMMON_ERR is not set
 # CONFIG_B44 is not set
 # CONFIG_KS8842 is not set
+# CONFIG_KS8851 is not set
 # CONFIG_KS8851_MLL is not set
 # CONFIG_NETDEV_1000 is not set
 # CONFIG_NETDEV_10000 is not set
@@ -575,6 +577,7 @@ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
 #
 # Non-8250 serial port support
 #
+# CONFIG_SERIAL_MAX3100 is not set
 CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
@@ -585,7 +588,24 @@ CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
 # CONFIG_R3964 is not set
 # CONFIG_TCG_TPM is not set
 # CONFIG_I2C is not set
-# CONFIG_SPI is not set
+CONFIG_SPI=y
+CONFIG_SPI_DEBUG=y
+CONFIG_SPI_MASTER=y
+
+#
+# SPI Master Controller Drivers
+#
+# CONFIG_SPI_M2S is not set
+# CONFIG_SPI_BITBANG is not set
+# CONFIG_SPI_GPIO is not set
+# CONFIG_SPI_XILINX is not set
+# CONFIG_SPI_DESIGNWARE is not set
+
+#
+# SPI Protocol Masters
+#
+CONFIG_SPI_SPIDEV=y
+# CONFIG_SPI_TLE62X0 is not set
 
 #
 # PPS support
@@ -611,6 +631,9 @@ CONFIG_GPIO_SYSFS=y
 #
 # SPI GPIO expanders:
 #
+# CONFIG_GPIO_MAX7301 is not set
+# CONFIG_GPIO_MCP23S08 is not set
+# CONFIG_GPIO_MC33880 is not set
 
 #
 # AC97 GPIO expanders:
@@ -639,6 +662,9 @@ CONFIG_SSB_POSSIBLE=y
 # CONFIG_MFD_T7L66XB is not set
 # CONFIG_MFD_TC6387XB is not set
 # CONFIG_MFD_TC6393XB is not set
+# CONFIG_MFD_MC13783 is not set
+# CONFIG_EZX_PCAP is not set
+# CONFIG_AB4500_CORE is not set
 # CONFIG_REGULATOR is not set
 # CONFIG_MEDIA_SUPPORT is not set
 
@@ -654,6 +680,7 @@ CONFIG_SSB_POSSIBLE=y
 # Display device support
 #
 # CONFIG_DISPLAY_SUPPORT is not set
+# CONFIG_PANEL_NEC_NL8048HL11_01B_SPI is not set
 CONFIG_SOUND=m
 # CONFIG_SOUND_OSS_CORE is not set
 CONFIG_SND=m
@@ -682,6 +709,7 @@ CONFIG_SND_DUMMY=m
 # CONFIG_SND_SERIAL_U16550 is not set
 # CONFIG_SND_MPU401 is not set
 CONFIG_SND_ARM=y
+CONFIG_SND_SPI=y
 CONFIG_SND_USB=y
 CONFIG_SND_USB_AUDIO=m
 # CONFIG_SND_USB_CAIAQ is not set
@@ -841,6 +869,7 @@ CONFIG_LEDS_CLASS=y
 # LED drivers
 #
 # CONFIG_LEDS_GPIO is not set
+# CONFIG_LEDS_DAC124S085 is not set
 # CONFIG_LEDS_LT3593 is not set
 
 #

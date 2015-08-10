@@ -18,6 +18,7 @@
 #include "whitebox.h"
 #include "whitebox_gpio.h"
 #include "whitebox_block.h"
+#include "whitebox_spi.h"
 
 static struct whitebox_device *whitebox_device;
 static dev_t whitebox_devno;
@@ -107,7 +108,6 @@ module_param(whitebox_rx_i_correction, int, S_IRUSR | S_IWUSR);
 static int whitebox_rx_q_correction = 0;
 module_param(whitebox_rx_q_correction, int, S_IRUSR | S_IWUSR);
 
-
 /*
  * Enable the loopback (for testing)
  */
@@ -128,6 +128,30 @@ module_param(whitebox_flow_control, int, S_IRUSR | S_IWUSR);
 
 int whitebox_frame_size = 1024;
 module_param(whitebox_frame_size, int, S_IRUSR | S_IWUSR);
+
+/*
+ * Class attribues for gauges
+ */
+ssize_t show_rssi(struct device *dev, struct device_attribute *attr, char *buf) {
+    sprintf(buf, "%d\n", 0);
+    return strlen(buf) + 1;
+}
+static DEVICE_ATTR(rssi, S_IRUSR, show_rssi, 0);
+static DEVICE_ATTR(det, S_IRUSR, show_rssi, 0);
+static DEVICE_ATTR(ifmuxout, S_IRUSR, show_rssi, 0);
+static DEVICE_ATTR(rfmuxout, S_IRUSR, show_rssi, 0);
+static DEVICE_ATTR(xcvr_temp, S_IRUSR, show_rssi, 0);
+static DEVICE_ATTR(vsense, S_IRUSR, show_rssi, 0);
+
+/*static struct device_attribute* dev_attrs[] = {
+    &dev_attr_rssi.attr,
+    &dev_attr_det.attr,
+    &dev_attr_ifmuxout,
+    &dev_attr_rfmuxout,
+    &dev_attr_xcvr_temp,
+    &dev_attr_vsense,
+    NULL,
+};*/
 
 /*
  * Register mappings for the CMX991 register file.
@@ -1101,6 +1125,49 @@ long whitebox_ioctl_gateway_set(unsigned long arg) {
 
     return 0;
 }
+
+long whitebox_ioctl_auxcodec_get(unsigned long arg) {
+    whitebox_args_t w;
+    int ret;
+    int16_t values[7];
+
+    d_printk(0, "spi call\n");
+    ret = whitebox_spi_auxadc_get(whitebox_device, values);
+    if (ret < 0)
+        return ret;
+
+    d_printk(0, "spi call done\n");
+    w.flags.auxcodec.rssi = values[0];
+    w.flags.auxcodec.det = values[1];
+    w.flags.auxcodec.ifmuxout = values[2];
+    w.flags.auxcodec.rfmuxout = values[3];
+    w.flags.auxcodec.xcvr_temp = values[4];
+    w.flags.auxcodec.vsense = values[5];
+    w.flags.auxcodec.ioffp = 0;
+    w.flags.auxcodec.ioffn = 0;
+    w.flags.auxcodec.qoffp = 0;
+    w.flags.auxcodec.qoffn = 0;
+
+    if (copy_to_user((whitebox_args_t*)arg, &w,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+    return 0;
+}
+
+long whitebox_ioctl_auxcodec_set(unsigned long arg) {
+    whitebox_args_t w;
+    if (copy_from_user(&w, (whitebox_args_t*)arg,
+            sizeof(whitebox_args_t)))
+        return -EACCES;
+
+    /*whitebox_device->ioffp = w.flags.auxcodec.ioffp;
+    whitebox_device->ioffn = w.flags.auxcodec.ioffn;
+    whitebox_device->qoffp = w.flags.auxcodec.qoffp;
+    whitebox_device->qoffn = w.flags.auxcodec.qoffn;*/
+
+    return 0;
+}
+
 static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long arg) {
     switch(cmd) {
         case W_RESET:
@@ -1155,6 +1222,10 @@ static long whitebox_ioctl(struct file* filp, unsigned int cmd, unsigned long ar
             return whitebox_ioctl_gateway_get(arg);
         case WG_SET:
             return whitebox_ioctl_gateway_set(arg);
+        case WAUX_GET:
+            return whitebox_ioctl_auxcodec_get(arg);
+        case WAUX_SET:
+            return whitebox_ioctl_auxcodec_set(arg);
         default:
             return -EINVAL;
     }
@@ -1369,6 +1440,7 @@ static int whitebox_probe(struct platform_device* pdev) {
         ret = -EINVAL;
         goto fail_create_class;
     }
+    //whitebox_class->dev_attrs = dev_attrs;
 
     ret = alloc_chrdev_region(&whitebox_devno, 0, 1, WHITEBOX_DRIVER_NAME);
     if (ret < 0) {
@@ -1402,6 +1474,12 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_gpio_request;
     }
 
+    ret = whitebox_spi_init(whitebox_device);
+    if (ret < 0) {
+        d_printk(0, "Failed to allocate SPI device\n");
+        goto fail_spi_init;
+    }
+
     whitebox_device->platform_data = WHITEBOX_PLATFORM_DATA(pdev);
 
     whitebox_gpio_cmx991_reset(whitebox_device->platform_data);
@@ -1411,13 +1489,14 @@ static int whitebox_probe(struct platform_device* pdev) {
                 __GFP_NOWARN, whitebox_user_order);
 
     if (!whitebox_device->user_buffer) {
-        goto fail_gpio_request;
+        goto fail_spi_init;
     }
 
 	printk(KERN_INFO "Whitebox Charlie mapped to address 0x%08lx\n", (unsigned long)whitebox_exciter_regs->start);
 
     goto done;
 
+fail_spi_init:
 fail_gpio_request:
     device_destroy(whitebox_class, whitebox_devno);
 fail_create_device:
