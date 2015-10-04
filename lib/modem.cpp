@@ -120,10 +120,10 @@ void *modem_init() {
         std::cerr << "Error: Couldn't open the whitebox" << std::endl;
         return NULL;
     }
-    if (whitebox_mmap(whitebox) < 0) {
+    /*if (whitebox_mmap(whitebox) < 0) {
         std::cerr << "Error: couldn't mmap the whitebox" << std::endl;
         return NULL;
-    }
+    }*/
     modem_set_mode("AM");
     whitebox_tx_set_latency(whitebox, 10);
     return whitebox;
@@ -406,6 +406,21 @@ void modem_set_pa(const bool new_pa) {
             std::cerr  << "PA" << new_pa << std::endl;
             whitebox_tx_config(whitebox);
         }
+    }
+}
+
+const bool modem_get_led() {
+    return whitebox->led;
+}
+
+void modem_set_led(const bool new_led) {
+    if (whitebox->led != new_led) {
+        whitebox->led = new_led;
+        std::cerr << "LED" << new_led << std::endl;
+        if (whitebox->led)
+            whitebox_led_on();
+        else
+            whitebox_led_off();
     }
 }
 

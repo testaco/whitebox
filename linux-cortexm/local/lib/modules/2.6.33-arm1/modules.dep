@@ -5,3 +5,5 @@
 /lib/modules/2.6.33-arm1/snd-dummy.ko: /lib/modules/2.6.33-arm1/snd-pcm.ko /lib/modules/2.6.33-arm1/snd-timer.ko /lib/modules/2.6.33-arm1/snd.ko /lib/modules/2.6.33-arm1/soundcore.ko /lib/modules/2.6.33-arm1/snd-page-alloc.ko
 
 /lib/modules/2.6.33-arm1/snd-usb-audio.ko: /lib/modules/2.6.33-arm1/snd-usb-lib.ko /lib/modules/2.6.33-arm1/snd-pcm.ko /lib/modules/2.6.33-arm1/snd-timer.ko /lib/modules/2.6.33-arm1/snd-page-alloc.ko /lib/modules/2.6.33-arm1/snd-hwdep.ko /lib/modules/2.6.33-arm1/snd-rawmidi.ko /lib/modules/2.6.33-arm1/snd.ko /lib/modules/2.6.33-arm1/soundcore.ko
+
+/lib/modules/2.6.33-arm1/8188eu.ko:

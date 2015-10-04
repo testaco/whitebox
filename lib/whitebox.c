@@ -65,12 +65,42 @@ int whitebox_parameter_get(const char *param)
     return atoi(final_value);
 }
 
+int sysfs_parameter_set(const char *name, const char* value)
+{
+    int fd;
+    fd = open(name, O_WRONLY);
+    if (fd < 0) {
+        perror("sysfs_open");
+        return fd;
+    }
+    if (write(fd, value, strlen(value)+1) < 0) {
+        perror("write");
+        close(fd);
+        return 1;
+    }
+    close(fd);
+    return 0;
+}
+
+void whitebox_led_init() {
+    whitebox_led_off();
+}
+
+void whitebox_led_off() {
+    sysfs_parameter_set("/sys/class/gpio/gpio32/value", "1\n");
+}
+
+void whitebox_led_on() {
+    sysfs_parameter_set("/sys/class/gpio/gpio32/value", "0\n");
+}
 
 void whitebox_init(whitebox_t* wb) {
     wb->fd = -EINVAL;
     adf4351_init(&wb->adf4351);
     adf4360_init(&wb->adf4360);
     wb->lna = 0;
+    wb->led = 0;
+    whitebox_led_init();
 }
 
 whitebox_t* whitebox_alloc(void) {

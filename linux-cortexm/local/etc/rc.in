@@ -11,12 +11,18 @@ mount -t debugfs none /sys/kernel/debug
 
 ifconfig lo 127.0.0.1
 
+
 #modprobe snd-dummy
 #modprobe g_audio
 
 modprobe whitebox
 
 #modprobe snd-usb-audio
+
+# Charlie user space button.
+echo 32 > /sys/class/gpio/export
+echo out > /sys/class/gpio/gpio32/direction
+echo 1 > /sys/class/gpio/gpio32/value
 
 if [ "$image_type" = "devel" ]; then
     mkdir /mnt
@@ -41,4 +47,14 @@ if [ "$image_type" = "demo2" ]; then
     while date; do
         main
     done
+fi
+
+if [ "$image_type" = "wifipanel" ]; then
+    modprobe 8188eu; if [ $? != 0 ]; then reboot; fi
+    ifconfig wlan0 up 192.168.1.1
+    hostapd /etc/hostapd.conf &
+    echo > /var/tmp/udhcpd.leases
+    udhcpd /etc/udhcpd.conf
+    dnsd -d -c /etc/dnsd.conf
+    main
 fi

@@ -47,6 +47,8 @@ struct whitebox {
     // TX Settings
     uint8_t pa;
     uint8_t txcal; // Set to true in the poll loop to start a calibration
+
+    uint8_t led;
 };
 
 typedef struct whitebox whitebox_t;
@@ -54,6 +56,9 @@ typedef struct whitebox whitebox_t;
 long whitebox_tx_bytes_total();
 int whitebox_parameter_set(const char *param, int value);
 int whitebox_parameter_get(const char *param);
+
+void whitebox_led_off();
+void whitebox_led_on();
 
 void whitebox_init(whitebox_t* wb);
 whitebox_t* whitebox_alloc(void);

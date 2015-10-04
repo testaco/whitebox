@@ -238,6 +238,7 @@ function go(foo)
     document.getElementById('if_bw').addEventListener('change', sendParameters, true);
     document.getElementById('bpf').addEventListener('change', sendParameters, true);
     document.getElementById('pa').addEventListener('change', sendParameters, true);
+    document.getElementById('led').addEventListener('change', sendParameters, true);
     document.getElementById('parameters_form').addEventListener('submit', parametersFormSubmit, true);
     element = document.getElementsByClassName('TransmitButton')[0];
     element.addEventListener('mousedown', transmit, false);
@@ -493,6 +494,8 @@ function responseString(data)
     document.getElementById('locked').innerHTML = root.locked ? 'YES' : 'NO';
   if ( root.pa )
     document.getElementById('pa').checked = root.pa;
+  if ( root.led )
+    document.getElementById('led').checked = root.led;
 }
 
 function sendParameters()
@@ -505,11 +508,12 @@ function sendParameters()
   const if_bw = document.getElementById('if_bw').value;
   const bpf = Number(document.getElementById('bpf').value);
   const pa = document.getElementById('pa').checked;
+  const led = document.getElementById('led').checked;
 
 
 
   const text = { command: "set", frequency: frequency, mode: mode,
-    lna: lna, vga: vga, if_bw: if_bw, bpf: bpf, pa: pa };
+    lna: lna, vga: vga, if_bw: if_bw, bpf: bpf, pa: pa, led: led };
   r.soc.send(JSON.stringify(text));
   notice("Settings sent to the radio.");
 }

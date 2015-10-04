@@ -67,6 +67,7 @@ radio_get_status(radio_context *, cJSON * json)
     cJSON_AddNumberToObject(json, "voltage", modem_get_voltage());
     cJSON_AddNumberToObject(json, "locked", modem_get_locked_status());
     cJSON_AddBoolToObject(json, "pa", modem_get_pa());
+    cJSON_AddBoolToObject(json, "led", modem_get_led());
 }
 
 void
@@ -112,6 +113,11 @@ radio_set(radio_context *, const cJSON * json)
     if (pa_obj) {
         bool pa = pa_obj->valueint;
         modem_set_pa(pa);
+    }
+    const cJSON * led_obj = cJSON_GetObjectItem((cJSON*)json, "led");
+    if (led_obj) {
+        bool led = led_obj->valueint;
+        modem_set_led(led);
     }
 }
 

@@ -44,6 +44,9 @@ const bool modem_get_locked_status();
 const bool modem_get_pa();
 void modem_set_pa(const bool pa);
 
+const bool modem_get_led();
+void modem_set_led(const bool led);
+
 // modulator_write
 // demodulator_read
 
