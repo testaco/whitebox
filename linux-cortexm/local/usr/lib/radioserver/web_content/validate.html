@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<!--
+ Copyright (C) 2015 Algoram. Software is dual-licensed, Affero GPL 3 is the
+ default, and a commercial license is available for sale. Hardware and
+ gate-array contents licensed for Radio Amateur use, other uses require the
+ commercial license. This is a summary, see the license text.
+ -->
+
+<html lang="en">
+<head>
+  <!--
+   Don't set initial-scale in the viewport tag.
+   Handicapped people need their zoom.
+  -->
+  <meta name="viewport" content="width=device-width">
+  <meta charset="utf-8" >
+  <title>Web Browser Client Certificate Info</title>
+  <link rel="stylesheet" type="text/css" href="style.css?version=VERSION_STRING">
+  <script type="text/javascript" src="dynamic/client_info.js?version=VERSION_STRING"></script>
+  <script type="text/javascript" src="validate.js?version=VERSION_STRING"></script>
+  <script type="text/javascript" src="dynamic/version.js?version=VERSION_STRING"></script>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="katena.manifest?version=VERSION_STRING">
+</head>
+<body onload="go();">
+<p id=content>
+<span id="Notice">Waiting for Javascript to start.</span>
+</p>
+<p>
+If your certificate is valid, you should see "certificate_is_valid
+<b>true</b>, your callsign, your full name, and your email
+address. Without a certificate, you would see only your
+hostname, IP address, and user-agent.
+</p>
+</body>
+</html>

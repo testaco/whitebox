@@ -51,17 +51,17 @@
 }
 
 #LogoImage {
-  float: top;
-  clear: top;
+  float: left;
+  clear: both;
   width: 100%;
-  height:auto;
+  height: auto;
 }
 
 #LogoCaption {
   text-align: center;
   font-size: 250%;
-  font-family='Times New Roman';
-  font-style=bold;
+  font-family: 'Times New Roman';
+  font-weight: bold;
 }
 
 #LegalNotice {
@@ -74,10 +74,6 @@
 }
 
 #NavigationBar a {
-  appearance: button;
-  -moz-appearance: button;
-  -webkit-appearance: button;
-  text-decoration: none;
   display: inline-block;
   padding: 2px 8px;
 }

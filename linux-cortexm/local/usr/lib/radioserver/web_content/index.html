@@ -1,37 +1,83 @@
 <!DOCTYPE html>
+<!--
+ Copyright (C) 2015 Algoram. Software is dual-licensed, Affero GPL 3 is the
+ default, and a commercial license is available for sale. Hardware and
+ gate-array contents licensed for Radio Amateur use, other uses require the
+ commercial license. This is a summary, see the license text.
+ -->
+
 <html lang="en">
 <head>
-  <meta charset="utf-8" >
+  <!--
+   Don't set initial-scale in the viewport tag.
+   Handicapped people need their zoom.
+  -->
   <meta name="viewport" content="width=device-width">
-  <link rel="stylesheet" type="text/css" href="style.css?version=1">
-  <title>ALGORAM Whitebox Developer Board</title>
-  <script src="dynamic/version.js?version=1"></script>
+  <meta charset="utf-8" >
+  <title>ALGORAM Katena Developer Board</title>
+  <link rel="stylesheet" type="text/css" href="style.css?version=VERSION_STRING">
+  <script type="text/javascript" src="katena.js?version=VERSION_STRING"></script>
+  <script type="text/javascript" src="dynamic/version.js?version=VERSION_STRING"></script>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="katena.manifest?version=VERSION_STRING">
 </head>
-<body>
+<body onload="go();">
 <div class="LargeOnly">
 <figure id="Logo">
-<img id="LogoImage" src="images/AlgoramLogo1Crushed.svg?version=1"/>
+<img id="LogoImage" src="images/AlgoramLogo1Crushed.svg?version=VERSION_STRING"/>
 <figcaption id="LogoCaption">ALGORAM</figcaption>
 </figure>
 </div>
-<h1 class="LargeOnly">ALGORAM Whitebox Developer Board</h1>
-<ul>
-  <li>
-  <a href="panel.html?version=1">Web Front Panel.</a>
-  </li>
-  <li>
-  <a href="tools/?version=1">Tools.</a>
-  </li>
-  <li>
-  <a href="docs/?version=1">Documentation.</a>
-  </li>
-</ul>
-<p id="LegalNotice">
+<p id="Title" class="LargeOnly">ALGORAM Katena Developer Board</p>
+<p>
+<b>Status: </b>
+<span id="Notice">Waiting for Javascript to start.</span>
+</p>
+<div class="Controls" id="ControlsNotVisible">
+  <p>
+  <button class="TransmitButton" id="TransmitButtonReceiving">Transmit</button>
+  <button class="ReceiveButton">Receive</button>
+  <form id='parametersForm' action="">
+    <table>
+      <tr>
+        <th>Frequency</th>
+        <td><input type="number" step="any" name="frequency" id="frequency"></td>
+        <td><input type="submit" value="Set"/></td>
+      </tr>
+      <tr>
+        <th>Mode</th>
+        <td>
+          <select name="mode" id="mode">
+            <option selected>FM</option>
+            <option>AM</option>
+            <option>DSB</option>
+            <option>USB</option>
+            <option>LSB</option>
+            <option>CW</option>
+          </select>
+        </td>
+        <td></td>
+      </tr>
+    </table>
+  </form>
+  <br class="LargeOnly">
+  <p class="LargeOnly"><b>Instructions:</b>
+  Hold the space key down on the keyboard while transmitting,
+  or use the buttons.
+  </p>
+</div>
+<div id="NavigationBar">
+<form method="get" action="/main.html?version=VERSION_STRING">
+    <input type="submit" value="Main Page">
+</form>
+</div>
+<p id="LegalNotice" class="LargeOnly">
 Copyright &copy; 2015 Algoram. Software is dual licensed: Affero GPL 3 is the default,
 and a commercial license is available for sale. Hardware and gate-array contents are
 licensed for Radio Amateur use, all other uses require the commercial license. This is a
 summary, see
-<a id="LegalLink" href="http://algoram.com/notices/">http://algoram.com/whitebox/charley/notices/</a>
+<a id="LegalLink" href="http://algoram.com/whitebox/charley/notices/">http://algoram.com/whitebox/charley/notices/</a>
 for license text.
 </p>
 </body>

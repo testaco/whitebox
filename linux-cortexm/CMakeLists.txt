@@ -70,21 +70,32 @@ add_custom_command(OUTPUT whitebox.uImage
 add_custom_target(linux
     DEPENDS whitebox.uImage)
 
+
 if (IS_DIRECTORY ${TFTP_DIR})
 message(INFO " Installing into TFTP directory ${TFTP_DIR}")
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/whitebox.uImage
         DESTINATION ${TFTP_DIR})
 endif()
 
+set (WIFI_RTL8188EU TRUE)
+
 # Wifi drivers
+if (${WIFI_RTL8188EU})
+message(STATUS "Wifi Access Point Enabled [rtl8188eu]")
 ExternalProject_add(
     rtl8188eu
     URL https://github.com/lwfinger/rtl8188eu/archive/3091828c8f4b4a01cbec6025128bf77e6e7b9f97.zip
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND echo
-    BUILD_COMMAND ARCH=arm CROSS_COMPILE=arm-uclinuxeabi- KSRC=${KERNELDIR} USER_EXTRA_CFLAGS="-DCONFIG_WEXT_PRIV" make V=1
+    BUILD_COMMAND ARCH=arm CROSS_COMPILE=/home/testa/whitebox/build/linux-cortexm-1.12.0/tools/arm-2010q1/bin/arm-uclinuxeabi- KSRC=${KERNELDIR} USER_EXTRA_CFLAGS="-DCONFIG_WEXT_PRIV" make V=1
     INSTALL_COMMAND echo
     LOG_INSTALL 1
+)
+
+ExternalProject_add_step(
+    rtl8188eu copy-firmware
+    COMMAND cp <SOURCE_DIR>/rtl8188eufw.bin ${KERNELDIR}/firmware/rtlwifi
+    DEPENDEES build
 )
 
 ExternalProject_add_step(
@@ -93,18 +104,21 @@ ExternalProject_add_step(
     DEPENDEES build
 )
 
-#ExternalProject_add_step(
-#    rtl8188eu hostapd
-#    COMMAND CC=${CMAKE_C_COMPILER} CFLAGS=${CMAKE_C_FLAGS} LDFLAGS=${CMAKE_C_FLAGS}; cd hostapd-0.8/hostapd && make
-#    DEPENDEES hostapd-config
-#    DEPENDERS install
-#)
+ExternalProject_add_step(
+    rtl8188eu hostapd
+    COMMAND ${CMAKE_COMMAND}
+        -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+        -DHOSTAPD_SOURCE_DIR=<SOURCE_DIR>/hostapd-0.8/hostapd
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/hostapd_env.cmake
+    DEPENDEES hostapd-config
+    DEPENDERS install
+    LOG 1
+)
 
-#ExternalProject_add_step(
-#    rtl8188eu hostapd-flthdr
-#    COMMAND cd hostapd-0.8/hostapd && arm-uclinuxeabi-flthdr -s 6000000 hostapd
-#    COMMAND cd hostapd-0.8/hostapd && arm-uclinuxeabi-flthdr -s 6000000 hostapd_cli
-#    DEPENDEES hostapd-config
-#    DEPENDERS install
-#)
+add_dependencies(linux rtl8188eu)
+
+else()
+    message(STATUS "No WiFi")
+endif()
 

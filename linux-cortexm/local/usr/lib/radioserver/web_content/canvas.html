@@ -1,0 +1,67 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width">
+  <link rel="stylesheet" type="text/css" href="canvas.css?version=VERSION_STRING">
+  <script type="text/javascript" src="canvas.js"></script>
+</head>
+<body onload="go();">
+<div id="container">
+<div class="container" id="barContainer">
+  <canvas class="overlay" id="bar"></canvas>
+  <canvas class="overlay" id="barCursor"></canvas>
+</div>
+<div class="container scale" id="topScaleContainer">
+  <canvas class="overlay scale" id="topScale"></canvas>
+  <canvas class="overlay" id="topScaleCursor"></canvas>
+</div>
+<div class="container" id="waterfallContainer">
+  <canvas class="overlay" id="waterfall"></canvas>
+  <canvas class="overlay" id="cursor"></canvas>
+</div>
+<div class="container scale" id="bottomScaleContainer">
+  <canvas class="overlay scale" id="bottomScale"></canvas>
+  <canvas class="overlay" id="bottomScaleCursor"></canvas>
+</div>
+</div>
+<div id="afterWaterfall">
+<form id='parametersForm' action="">
+  <table>
+    <tr>
+      <th>Frequency</th>
+      <td><input type="number" step="any" name="frequencyField" id="frequencyField"></td>
+      <td>
+        <select name="unitsField" id="unitsField">
+          <option>GHz</option>
+          <option selected>MHz</option>
+          <option>kHz</option>
+          <option>Hz</option>
+        </select>
+      </td>
+      <td><input type="submit" value="Set"/></td>
+    </tr>
+    <tr>
+      <th>Mode</th>
+      <td>
+        <select name="mode" id="mode">
+          <option selected>FM</option>
+          <option>AM</option>
+          <option>DSB</option>
+          <option>USB</option>
+          <option>LSB</option>
+          <option>CW</option>
+        </select>
+      </td>
+      <td></td>
+    </tr>
+  </table>
+</form>
+<h3>Instructions</h3>
+<b>Put the cursor over the waterfall</b> (or touch it on tablets or phones) to test.
+</div>
+<div style="display: none;">
+<div id="filterCenterLine"></div>
+</div>
+</body>
+<script>
+</script>
+</html>
