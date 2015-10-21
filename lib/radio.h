@@ -82,6 +82,5 @@ void		server_data_out(
                  client_context *	opaque,
                  WriteBuffer *		buffer);
 
-struct pollfd;
-void		server_service_fd(libwebsocket_context *, struct pollfd * pfd);
+void		server_service_fd(libwebsocket_context *, pollfd * pfd);
 libwebsocket_context * server_start(const char * device, int port, bool use_ssl);

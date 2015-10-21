@@ -130,13 +130,11 @@ WriteBuffer::~WriteBuffer()
 static void
 get_client_info(libwebsocket_context * context, libwebsocket * wsi, client_context * client)
 {
-#if OPENSSL_FOUND
-  X509 *	certificate = SSL_get_peer_certificate(wsi->ssl);
-#endif
   char		buffer[256];
   char		rip[256];
 
 #if OPENSSL_FOUND
+  X509 *	certificate = SSL_get_peer_certificate(wsi->ssl);
   if ( certificate ) {
     client->info.certificate_is_valid = SSL_check_private_key(wsi->ssl);
     X509_NAME *subj = X509_get_subject_name(certificate);
@@ -152,10 +150,10 @@ get_client_info(libwebsocket_context * context, libwebsocket * wsi, client_conte
     rip[0] = '\0';
   }
   else {
-#endif
     client->info.certificate_is_valid = false;
-#if OPENSSL_FOUND
   }
+#else
+  client->info.certificate_is_valid = false;
 #endif
   libwebsockets_get_peer_addresses(context, wsi, libwebsocket_get_socket_fd(wsi), buffer, sizeof(buffer), rip, sizeof(rip));
   client->info.hostname = strdup(buffer);
@@ -786,11 +784,8 @@ send_status(client_context * client)
   cJSON * const json = cJSON_CreateObject();    
   radio_get_status(client->radio, &client->info, json);
   char * text = cJSON_Print(json);
-  std::cerr << "Sending status " << strlen(text) << " " << text << std::endl;
   WriteBuffer * buffer = new WriteBuffer(strlen(text), 0);
-  std::cerr << "Buffer created" << std::endl;
   strcpy((char *)buffer->data(), text);
-  std::cerr << "Copied text" << std::endl;
   free(text);
   cJSON_Delete(json);
   server_data_out(client, buffer);

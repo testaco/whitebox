@@ -134,6 +134,7 @@ else()
     add_definitions(-DETC_DIR="/etc/"
                     -DLIB_DIR="/usr/lib/")
 endif()
+
 set(Main.sources
     main.cpp
     radio.cpp

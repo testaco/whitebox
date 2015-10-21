@@ -130,8 +130,7 @@ radio_start(client_context * client, const client_info *)
 {
   std::cerr << "New client." << std::endl;
   return new radio_context(client);
-}
-
+} 
 void
 radio_transmit(radio_context *, const client_info *)
 {
