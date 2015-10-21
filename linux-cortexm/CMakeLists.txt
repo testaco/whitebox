@@ -77,7 +77,7 @@ message(INFO " Installing into TFTP directory ${TFTP_DIR}")
         DESTINATION ${TFTP_DIR})
 endif()
 
-set (WIFI_RTL8188EU TRUE)
+set (WIFI_RTL8188EU ${TARGET_BUILD})
 
 # Wifi drivers
 if (${WIFI_RTL8188EU})

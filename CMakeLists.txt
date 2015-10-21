@@ -25,6 +25,9 @@ if(PROJECT_VERSION_PATCH)
 	set(PROJECT_VERSION "${PROJECT_VERSION}.${PROJECT_VERSION_PATCH}")
 endif()
 
+# The build type is either HOST_BUILD or TARGET_BUILD, depending on
+# if there is a CMAKE_TOOLCHAIN_FILE for cross compiling on an embedded
+# system.
 if (CMAKE_TOOLCHAIN_FILE)
     set(HOST_BUILD false)
     set(TARGET_BUILD true)
@@ -35,26 +38,45 @@ else()
     set(BUILD_TYPE "HOST")
 endif()
 
+# The IMAGE_TYPE is a space separated list of features to enable for
+# development.  Options include:
+#  - devel - turn on debugging, NFS mount, etc for development
+#  - radioserver - build the main radioserver application
+#  - wifiap - enable a wifi access point on the target
+if (NOT DEFINED IMAGE_TYPE)
+    set(IMAGE_TYPE "devel radioserver")
+endif()
+string(REPLACE " " ";" IMAGE_TYPE_LIST ${IMAGE_TYPE})
+list(REMOVE_DUPLICATES IMAGE_TYPE_LIST)
 
-message(STATUS "whitebox version: ${PROJECT_VERSION} ${PROJECT_VERSION_CODENAME} ${BUILD_TYPE}")
+list(FIND IMAGE_TYPE_LIST "radioserver" RADIOSERVER_POS)
+if (NOT RADIOSERVER_POS EQUAL -1)
+    set(RADIOSERVER_ENABLED TRUE)
+else()
+    set(RADIOSERVER_ENABLED FALSE)
+endif()
+
+message(STATUS "whitebox version: V${PROJECT_VERSION} ${PROJECT_VERSION_CODENAME} BUILD_TYPE=${BUILD_TYPE} IMAGE_TYPE=\"${IMAGE_TYPE}\"")
 
 if (TARGET_BUILD)
-    if(NOT IS_DIRECTORY ${TFTP_DIR})
-        message(WARNING "no tftp destination")
+    if(IS_DIRECTORY ${TFTP_DIR})
+        message(INFO "TFTP support enabled")
     endif()
 
-    if(NOT EXISTS ${TTY})
-        set(REMOTE_DEBUG FALSE)
-        message(WARNING "no tty for the target, remote debugging disabled")
-    else()
+    if(EXISTS ${TTY})
         set(REMOTE_DEBUG TRUE)
-    endif()
-
-    if(NOT DEFINED BAUD)
-        set(BAUD "115200")
+        if(NOT DEFINED BAUD)
+            set(BAUD "115200")
+        endif()
+        message(INFO "Remote debugging enabled (${BAUD} baud)")
+    else()
+        set(REMOTE_DEBUG FALSE)
     endif()
 endif()
 
+if (RADIOSERVER_ENABLED)
+    message(STATUS "Radioserver is enabled")
+endif()
 
 add_subdirectory(linux-cortexm)
 

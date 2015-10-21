@@ -24,11 +24,12 @@ static uint32_t fcw1, fcw2;
 static uint32_t phase1, phase2;
 static int resample = 0;
 static int verbose = 0;
+static int port = 80;
 
 static unsigned int tone1 = 400;
 static unsigned int tone2 = 1900;
 
-static int modem_enabled = 0;
+static int modem_enabled = 1;
 static int server_enabled = 1;
 static int file_enabled = 0;
 static int playback_enabled = 0;
@@ -52,8 +53,7 @@ int16_t tone_source(void) {
     int16_t i, q;
     sincos16(fcw1, &phase1, &i, &q);
     // Apply a CW shaping mask
-    //if (d < (1 << 14) - 1)
-    //    d += 1;
+    //if (d < (1 << 14) - 1) //    d += 1;
     //return (int16_t)(((int32_t)d * (int32_t)i) >> 15);
     return i >> 2; //QUAD_PACK(i >> 1, q >> 1);
 }
@@ -163,7 +163,7 @@ void *server_init() {
         fprintf(stderr, "Can't allocate memory.\n");
         return NULL;
     }
-    if (!server_start(0, 80, false)) {
+    if (!server_start(0, port, false)) {
         fprintf(stderr, "Can't start the server.\n");
         free(server);
         return NULL;
@@ -430,12 +430,12 @@ int parse_args(int argc, char **argv) {
         { "channels", 1, NULL, 'c' },
         { "tone", 1, NULL, 'f' },
         { "buffer", 1, NULL, 'b' },
-        { "period", 1, NULL, 'p' },
         { "mode", 1, NULL, 'm' },
         { "format", 1, NULL, 'o' },
         { "verbose", 1, NULL, 'v' },
         { "source", 1, NULL, 'u' },
         { "sink", 1, NULL, 'i' },
+        { "port", 1, NULL, 'p' },
         { NULL, 0, NULL, 0 },
     };
 
@@ -463,7 +463,7 @@ int parse_args(int argc, char **argv) {
                 // TODO
                 break;
             case 'p':
-                // TODO
+                port = atoi(optarg);
                 break;
             case 'm':
                 // TODO

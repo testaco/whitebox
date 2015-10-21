@@ -25,8 +25,6 @@ extern "C" {
 #include "cJSON.h"
 #include "radio.h"
 
-#define ETC_DIR "/etc/"
-#define LIB_DIR "/usr/lib/"
 #define PROGRAM_NAME "radioserver/"
 
 #define DOUBLE_STRINGIZE(arg) #arg
@@ -121,8 +119,7 @@ WriteBuffer::WriteBuffer(size_t l, uint32_t _type)
   buf(&storage[LWS_SEND_BUFFER_PRE_PADDING + sizeof(uint32_t)]), next(0), maxLength(l), size(l)
 {
   unsigned char * const	d = buf - sizeof(uint32_t);
-  // TODO: this line SEGV's!!!!
-  //*(uint32_t *)d = _type;
+  *(uint32_t *)d = _type;
 }
 
 WriteBuffer::~WriteBuffer()

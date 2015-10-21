@@ -23,17 +23,17 @@ float diff(struct timespec start, struct timespec end)
 }
 
 int _test_tx_pll(float freq) {
-    struct timespec tx_start, tx_ready;
+    //struct timespec tx_start, tx_ready;
     whitebox_t wb;
     whitebox_init(&wb);
-    clock_gettime(CLOCK_MONOTONIC, &tx_start);
+    //clock_gettime(CLOCK_MONOTONIC, &tx_start);
     assert(whitebox_open(&wb, "/dev/whitebox", O_WRONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_tx_clear(&wb) == 0);
     assert(whitebox_tx(&wb, freq) == 0);
     whitebox_plls_locked(&wb);
     assert(whitebox_plls_locked(&wb));
-    clock_gettime(CLOCK_MONOTONIC, &tx_ready);
+    //clock_gettime(CLOCK_MONOTONIC, &tx_ready);
     //printf("tx start to ready: %f\n", diff(tx_start, tx_ready));
     assert(whitebox_close(&wb) == 0);
 }

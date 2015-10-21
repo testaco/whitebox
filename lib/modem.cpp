@@ -115,11 +115,11 @@ void *modem_init() {
     whitebox->frequency = 145e6;
     fcw = freq_to_fcw(400, RF_SAMPLE_RATE);
     phase = 0;
-    if (whitebox_open(whitebox, "/dev/whitebox", O_RDWR | O_NONBLOCK,
+    /*if (whitebox_open(whitebox, "/dev/whitebox", O_RDWR | O_NONBLOCK,
             RF_SAMPLE_RATE) < 0) {
         std::cerr << "Error: Couldn't open the whitebox" << std::endl;
         return NULL;
-    }
+    }*/
     /*if (whitebox_mmap(whitebox) < 0) {
         std::cerr << "Error: couldn't mmap the whitebox" << std::endl;
         return NULL;
