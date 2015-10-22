@@ -1,0 +1,22 @@
+{
+  "name": "Algoram Katena Developer Board",
+  "short_name": "Katena",
+  "description": "Front panel for Algoram Katena transceiver.",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "images/AlgoramLogo1Crushed.svg",
+      "type": "image/svg+xml",
+      "background_color": "white",
+      "sizes": "any"
+    }
+  ],
+  "splash_screens": [
+    {
+      "src": "images/AlgoramLogo1Crushed.svg",
+      "type": "image/svg+xml",
+      "background_color": "white",
+      "sizes": "any"
+    }
+  ],
+}

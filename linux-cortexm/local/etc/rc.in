@@ -27,6 +27,7 @@ echo 1 > /sys/class/gpio/gpio32/value
 if [ "$image_type" = "devel" ]; then
     mkdir /mnt
     mount -o nolock,rsize=1024 192.168.220.1:/srv/home /mnt
+    ln -s /mnt/whitebox/build/linux-cortexm-1.12.0/A2F/root/usr/bin/gdbserver /usr/bin/gdbserver
 fi
 
 if [ "$image_type" = "demo1" ]; then
@@ -50,11 +51,15 @@ if [ "$image_type" = "demo2" ]; then
 fi
 
 if [ "$image_type" = "wifipanel" ]; then
-    modprobe 8188eu; if [ $? != 0 ]; then reboot; fi
+    #echo 8 > /proc/sys/kernel/printk
+    modprobe 8188eu #; if [ $? != 0 ]; then reboot; fi
+    modprobe -r 8188eu
+    modprobe 8188eu
+    #insmod /lib/modules/2.6.33-arm1/8188eu.ko
     ifconfig wlan0 up 192.168.1.1
     hostapd /etc/hostapd.conf &
     echo > /var/tmp/udhcpd.leases
     udhcpd /etc/udhcpd.conf
     dnsd -d -c /etc/dnsd.conf
-    main
+    #main
 fi

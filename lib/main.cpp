@@ -1,21 +1,30 @@
 #include <iostream>
 #include <cstdlib>
+#if ALSA_FOUND
 #include <alsa/asoundlib.h>
+#endif
 #include <stdio.h>
 #include <stdint.h>
 #include <getopt.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <unistd.h>
+#include <string.h>
 
 #include "dsp.h"
 
 #include "cJSON.h"
 #include "radio.h"
-#include "soundcard.h"
+//#include "soundcard.h"
 #include "modem.h"
 
 static uint32_t fcw1, fcw2;
 static uint32_t phase1, phase2;
 static int resample = 0;
 static int verbose = 0;
+static int port = 80;
 
 static unsigned int tone1 = 400;
 static unsigned int tone2 = 1900;
@@ -31,6 +40,10 @@ static int16_t audio_ring[AUDIO_RING_SIZE];
 static int audio_ring_head = 0;
 static int audio_ring_tail = 0;
 
+static char* device;
+static int rate;
+static int playback_channels;
+
 int16_t mute_source(void) {
     return 0;
 }
@@ -40,8 +53,7 @@ int16_t tone_source(void) {
     int16_t i, q;
     sincos16(fcw1, &phase1, &i, &q);
     // Apply a CW shaping mask
-    //if (d < (1 << 14) - 1)
-    //    d += 1;
+    //if (d < (1 << 14) - 1) //    d += 1;
     //return (int16_t)(((int32_t)d * (int32_t)i) >> 15);
     return i >> 2; //QUAD_PACK(i >> 1, q >> 1);
 }
@@ -151,7 +163,7 @@ void *server_init() {
         fprintf(stderr, "Can't allocate memory.\n");
         return NULL;
     }
-    if (!server_start()) {
+    if (!server_start(0, port, false)) {
         fprintf(stderr, "Can't start the server.\n");
         free(server);
         return NULL;
@@ -314,30 +326,6 @@ poll_start_fd(libwebsocket_context * context, int fd, int events, int type)
 }
 
 void
-poll_end_fd(int fd)
-{
-  //std::cerr << "poll_end_fd" << std::endl;
-  fprintf(stderr, "poll_end_fd %d\n", fd);
-  for ( unsigned int i = 0; i < fd_count; i++ ) {
-    if ( fds[i].fd == fd ) {
-      fds[i].fd = -1;
-      websocket_contexts[i] = 0;
-      const unsigned int move_count = fd_count - i - 1;
-      if ( move_count > 0 ) {
-        memmove(&fds[i], &fds[i + 1], move_count * sizeof(*fds));
-        memmove(&websocket_contexts[i], &websocket_contexts[i + 1], move_count * sizeof(*websocket_contexts));
-      }
-      fd_count--;
-      poll_debug_fds();
-      return;
-    }
-  }
-  fprintf(stderr, "wtf, removing a FD which doesn't exit! %d\n", fd);
-  poll_debug_fds();
-  exit(-1);
-}
-
-void
 poll_change_fd(int fd, int events)
 {
   fprintf(stderr, "poll_change_fd %d\n", fd);
@@ -350,6 +338,25 @@ poll_change_fd(int fd, int events)
   }
   std::cerr << "fd not found in poll_change_fd()." << std::endl;
   exit(-1);
+}
+
+void
+poll_end_fd(int fd)
+{
+  for ( unsigned int i = 0; i < fd_count; i++ ) {
+    if ( fds[i].fd == fd ) {
+      if ( --fd_count > i ) {
+        fds[i] = fds[fd_count];
+        websocket_contexts[i] = websocket_contexts[fd_count];
+      }
+      memset(&fds[fd_count], 0, sizeof(*fds));
+      memset(&websocket_contexts[fd_count], 0, sizeof(*websocket_contexts));
+      poll_debug_fds();
+      return;
+    }
+  }
+  poll_debug_fds();
+  std::cerr << "fd " << fd << " not found in poll_end_fd(), fd_count is " << fd_count << std::endl;
 }
 
 int transfer_loop(struct resource *resources, int resource_count) {
@@ -423,12 +430,12 @@ int parse_args(int argc, char **argv) {
         { "channels", 1, NULL, 'c' },
         { "tone", 1, NULL, 'f' },
         { "buffer", 1, NULL, 'b' },
-        { "period", 1, NULL, 'p' },
         { "mode", 1, NULL, 'm' },
         { "format", 1, NULL, 'o' },
         { "verbose", 1, NULL, 'v' },
         { "source", 1, NULL, 'u' },
         { "sink", 1, NULL, 'i' },
+        { "port", 1, NULL, 'p' },
         { NULL, 0, NULL, 0 },
     };
 
@@ -456,7 +463,7 @@ int parse_args(int argc, char **argv) {
                 // TODO
                 break;
             case 'p':
-                // TODO
+                port = atoi(optarg);
                 break;
             case 'm':
                 // TODO
@@ -530,6 +537,7 @@ int main(int argc, char **argv) {
         }
     }
 
+#if ALSA_FOUND
     // Create the speaker playback resource
     if (playback_enabled) {
         if (resource_setup(&resources[resource_count++], "playback",
@@ -547,6 +555,7 @@ int main(int argc, char **argv) {
             return -1;
         }
     }
+#endif
 
     // Create the websocket server
     if (server_enabled) {

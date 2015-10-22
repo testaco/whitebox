@@ -1,0 +1,100 @@
+diff -Naur libwebsockets-old/CMakeLists.txt libwebsockets/CMakeLists.txt
+--- libwebsockets-old/CMakeLists.txt	2015-06-10 12:03:56.520870113 -0700
++++ libwebsockets/CMakeLists.txt	2015-06-17 16:04:34.669735014 -0700
+@@ -402,9 +402,9 @@
+                 set(VISIBILITY_FLAG -fvisibility=hidden)
+     endif()
+     if (UNIX)
+-		set(CMAKE_C_FLAGS "-Wall -Werror -O3 ${VISIBILITY_FLAG} ${CMAKE_C_FLAGS}" )
++		set(CMAKE_C_FLAGS "-Wall -Werror ${VISIBILITY_FLAG} ${CMAKE_C_FLAGS}" )
+     else(UNIX)
+-		set(CMAKE_C_FLAGS "-Wall -O3 ${VISIBILITY_FLAG} ${CMAKE_C_FLAGS}" )
++		set(CMAKE_C_FLAGS "-Wall ${VISIBILITY_FLAG} ${CMAKE_C_FLAGS}" )
+     endif(UNIX)
+ endif ()
+ 
+diff -Naur libwebsockets-old/lib/libwebsockets.h libwebsockets/lib/libwebsockets.h
+--- libwebsockets-old/lib/libwebsockets.h	2015-06-10 12:03:56.524870075 -0700
++++ libwebsockets/lib/libwebsockets.h	2015-06-17 21:04:35.559263450 -0700
+@@ -1205,7 +1205,21 @@
+  * the big length style
+  */
+ 
+-#define LWS_SEND_BUFFER_PRE_PADDING (4 + 10 + (2 * MAX_MUX_RECURSION))
++// Pad LWS_SEND_BUFFER_PRE_PADDING to the CPU word size, so that word references
++// to the address immediately after the padding won't cause an unaligned access
++// error. Sometimes the recommended padding is even larger than the size of a void *.
++// For example, for the X86-64 architecture, in Intel's document
++// https://software.intel.com/en-us/articles/data-alignment-when-migrating-to-64-bit-intel-architecture
++// they recommend that structures larger than 16 bytes be aligned to 16-byte
++// boundaries.
++//
++#if __x86_64__
++#define _LWS_PAD_SIZE 16 // Intel recommended for best performance.
++#else
++#define _LWS_PAD_SIZE sizeof(void *) // The pointer size on any unknown arch.
++#endif
++#define _LWS_PAD(n) (((n) % _LWS_PAD_SIZE) ? (n + (_LWS_PAD_SIZE - (n % _LWS_PAD_SIZE))) : (n))
++#define LWS_SEND_BUFFER_PRE_PADDING _LWS_PAD(4 + 10 + (2 * MAX_MUX_RECURSION))
+ #define LWS_SEND_BUFFER_POST_PADDING 4
+ 
+ LWS_VISIBLE LWS_EXTERN int
+diff -Naur libwebsockets-old/lib/service.c libwebsockets/lib/service.c
+--- libwebsockets-old/lib/service.c	2015-06-10 12:03:56.524870075 -0700
++++ libwebsockets/lib/service.c	2015-07-03 10:04:28.796663152 -0700
+@@ -400,8 +400,14 @@
+ 					/* it was the guy we came to service! */
+ 					timed_out = 1;
+ 					/* mark as handled */
+-					if (pollfd)
+-						pollfd->revents = 0;
++					/*
++					 * If libsocket_service_timeout_check()
++					 * returned true, *pollfd is not valid.
++					 * Don't clear pollfd->revents here.
++					 *
++					 * if (pollfd)
++					 *	pollfd->revents = 0;
++                                         */
+ 				}
+ 		}
+ 	}
+@@ -610,7 +616,12 @@
+ 	lwsl_debug("Close and handled\n");
+ 	libwebsocket_close_and_free_session(context, wsi,
+ 						LWS_CLOSE_STATUS_NOSTATUS);
++	/*
++         * *pollfd is no longer valid after the above close
++         * So, don't clear pollfd->revents.
++         */
+ 	n = 1;
++        return n;
+ 
+ handled:
+ 	pollfd->revents = 0;
+diff -Naur libwebsockets-old/lib/ssl.c libwebsockets/lib/ssl.c
+--- libwebsockets-old/lib/ssl.c	2015-06-10 12:03:56.524870075 -0700
++++ libwebsockets/lib/ssl.c	2015-07-03 10:18:13.320720893 -0700
+@@ -154,8 +154,21 @@
+ 
+ 		/* absolutely require the client cert */
+ 
++		/*
++		 * Must set session-id when using a client certificate, or
++		 * ssl fails with a fatal error and the error code isn't
++		 * helpful. It's a session caching issue.
++ 		 * The session ID must be unique per session, that's the only
++		 * constraint on what you set it to. So, just use the context
++		 * address as the session ID.
++		 */
++		SSL_CTX_set_session_id_context(context->ssl_ctx, (const unsigned char *)&context, sizeof(context));
++		/*
++		 * Kludge for Katena: Don't fail if there is no peer cert.
++		 * FIX: Give that an API.
++		 */
+ 		SSL_CTX_set_verify(context->ssl_ctx,
+-		       SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
++		       SSL_VERIFY_PEER /* | SSL_VERIFY_FAIL_IF_NO_PEER_CERT */,
+ 						       OpenSSL_verify_callback);
+ 
+ 		/*

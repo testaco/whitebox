@@ -34,7 +34,7 @@ MODULES_ON	:= $(shell grep CONFIG_MODULES=y $(SAMPLE).$(KERNEL_CONFIG))
 INSTALL_MOD_PATH:= $(INSTALL_ROOT)/linux
 
 ifeq ($(MODULES_ON),)
-_do_modules 	:
+_do_modules 	: _prepare_modules
 else
 _do_modules	: _prepare_modules
 endif

@@ -1,14 +1,17 @@
-#include <iostream>
+#include <cerrno>
 #include <cstdlib>
-#include <string.h>
-#include <cstdio>
-#include <errno.h>
+#include <cstring>
+#include <getopt.h>
+#include <iostream>
+#include <math.h>
+#if OPENSLL_FOUND
+#include <openssl/err.h>
+#endif
 #include <poll.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include <sys/time.h>
 #include "cJSON.h"
-#include "radio.h"
 #include "modem.h"
+#include "radio.h"
 #include "resources.h"
 
 // Add members to radio_context as you wish.
@@ -28,9 +31,10 @@ public:
 void
 radio_data_in(
  radio_context *	/* radio */,
- unsigned char * 	/* type */,
+ const client_info *	/* info */,
+ unsigned int		/* type */,
  const void *		data,
- int			length)
+ size_t		length)
 {
     const int16_t *audio_data = (int16_t *)data;
 
@@ -46,7 +50,7 @@ radio_data_in(
 }
 
 void
-radio_end(radio_context * radio)
+radio_end(radio_context * radio, const client_info *)
 {
   modem_standby();
   std::cerr << "Close client." << std::endl;
@@ -54,7 +58,7 @@ radio_end(radio_context * radio)
 }
 
 void
-radio_get_status(radio_context *, cJSON * json)
+radio_get_status(radio_context *, const client_info *, cJSON * json)
 {
     cJSON_AddNumberToObject(json, "frequency", modem_get_frequency());
     cJSON_AddStringToObject(json, "mode", modem_get_mode());
@@ -71,13 +75,13 @@ radio_get_status(radio_context *, cJSON * json)
 }
 
 void
-radio_receive(radio_context *)
+radio_receive(radio_context *, const client_info *)
 {
     modem_receive();
 }
 
 void
-radio_set(radio_context *, const cJSON * json)
+radio_set(radio_context *, const client_info *, const cJSON * json)
 {
     const cJSON * freq_obj = cJSON_GetObjectItem((cJSON*)json, "frequency");
     if (freq_obj) {
@@ -122,14 +126,13 @@ radio_set(radio_context *, const cJSON * json)
 }
 
 radio_context *
-radio_start(client_context * client)
+radio_start(client_context * client, const client_info *)
 {
   std::cerr << "New client." << std::endl;
   return new radio_context(client);
-}
-
+} 
 void
-radio_transmit(radio_context *)
+radio_transmit(radio_context *, const client_info *)
 {
     modem_transmit();
 }
