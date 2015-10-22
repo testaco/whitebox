@@ -22,12 +22,12 @@ whitebox_config = dict(
         rfe_enable=True,
         duc_enable=True,
         fir_enable=False,
-        cic_enable=True,
+        cic_enable=False,
         cic_order=4,
         cic_delay=1,
         dds_enable=False,
-        conditioning_enable=True,
-        ddc_enable=True)
+        conditioning_enable=False,
+        ddc_enable=False)
 
 class OverrunError(Exception):
     """Thrown when the system experiences an overflow on a FIFO buffer."""

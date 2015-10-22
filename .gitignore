@@ -1,3 +1,6 @@
 build
 *.bz2
 *.pyc
+gnuradio
+util
+Testing

@@ -580,8 +580,9 @@ def interleaver(clearn, dac_clock, dsp_clock,
         elif state == state_t.RUNNING or state == state_t.WAITING_FOR_COMPLETION:
             if (not any_data_sent and frame) or (any_data_sent and edge):
                 if empty:
-                    print '********** UNDERRUN'
-                    raise Exception, "Underrun"
+                    #print '********** UNDERRUN', any_data_sent, frame, edge
+                    #raise Exception, "Underrun"
+                    pass
                 else:
                     any_data_sent.next = True
                     if last_ram[rptr]:
@@ -975,3 +976,205 @@ def duc(clearn, dac_clock, dsp_clock,
             rx_fifo_wdata.next = 0
     
     return (synchronizer, consumer, producer, sampler, ) + duc_chain + ddc_chain
+
+def main():
+    from myhdl import toVerilog
+    from apb3_utils import Apb3Bus
+    from ram import Ram, Ram2
+    from fifo import fifo as FIFO
+
+    from whitebox import whitebox_config
+
+    fifo_depth = 1024
+    fifo_width = 32
+    bus = Apb3Bus()
+    clearn = ResetSignal(0, 0, async=True)
+    dsp_clock = Signal(bool(0))
+    dac_clock = Signal(bool(0))
+    loopen = Signal(bool(False))
+    loopback = Signature("loopback", False, bits=10)
+    txen = Signal(bool(0))
+    txstop = Signal(bool(0))
+    ddsen = Signal(bool(False))
+    txfilteren = Signal(bool(0))
+    interp = Signal(intbv(1)[11:])
+    shift = Signal(intbv(0, min=0, max=21))
+    fcw_bitwidth = 25
+    fcw = Signal(intbv(1)[fcw_bitwidth:])
+    tx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
+    tx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
+    tx_gain_i = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    tx_gain_q = Signal(intbv(int(1.0 * 2**9 + .5))[10:])
+    tx_underrun = Signal(modbv(0, min=0, max=2**16))
+    tx_sample = Signature("tx_sample", True, bits=16)
+    dac_en = Signal(bool(0))
+    dac_data = Signal(intbv(0)[10:])
+    dac_last = Signal(bool(0))
+    firen = Signal(bool(0))
+    fir_bank1 = Signal(bool(0))
+    fir_bank0 = Signal(bool(0))
+    fir_N = Signal(intbv(0, min=0, max=2**7))
+
+    rxen = Signal(bool(0))
+    rxstop = Signal(bool(0))
+    rxfilteren = Signal(bool(0))
+    decim = Signal(intbv(1)[11:])
+    rx_correct_i = Signal(intbv(0, min=-2**9, max=2**9))
+    rx_correct_q = Signal(intbv(0, min=-2**9, max=2**9))
+    rx_overrun = Signal(modbv(0, min=0, max=2**16))
+    rx_sample = Signature("rx_sample", True, bits=16)
+    adc_idata = Signal(intbv(0, min=-2**9, max=2**9))
+    adc_qdata = Signal(intbv(0, min=-2**9, max=2**9))
+    adc_last = Signal(bool(0))
+
+    tx_fifo_re = Signal(bool(False))
+    tx_fifo_rclk = Signal(bool(False))
+    tx_fifo_rdata = Signal(intbv(0)[32:])
+    tx_fifo_we = Signal(bool(False))
+    tx_fifo_wclk = Signal(bool(False))
+    tx_fifo_wdata = Signal(intbv(0)[32:])
+    tx_fifo_full = Signal(bool(False))
+    tx_fifo_afull = Signal(bool(False))
+    tx_fifo_empty = Signal(bool(True))
+    tx_fifo_aempty = Signal(bool(True))
+    tx_fifo_afval = Signal(intbv(fifo_depth - 1)[10:])
+    tx_fifo_aeval = Signal(intbv(0)[10:])
+    tx_fifo_wack = Signal(bool(False))
+    tx_fifo_dvld = Signal(bool(False))
+    tx_fifo_overflow = Signal(bool(False))
+    tx_fifo_underflow = Signal(bool(False))
+    tx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
+    tx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
+    tx_fifo_args = (
+        clearn,
+        tx_fifo_re,
+        tx_fifo_rclk,
+        tx_fifo_rdata,
+        tx_fifo_we,
+        tx_fifo_wclk,
+        tx_fifo_wdata,
+        tx_fifo_full,
+        tx_fifo_afull,
+        tx_fifo_empty,
+        tx_fifo_aempty,
+        tx_fifo_afval,
+        tx_fifo_aeval,
+        tx_fifo_wack,
+        tx_fifo_dvld,
+        tx_fifo_overflow,
+        tx_fifo_underflow,
+        tx_fifo_rdcnt,
+        tx_fifo_wrcnt)
+    tx_fifo = FIFO(*tx_fifo_args,
+        width=fifo_width,
+        depth=fifo_depth)
+
+    rx_fifo_re = Signal(bool(False))
+    rx_fifo_rclk = Signal(bool(False))
+    rx_fifo_rdata = Signal(intbv(0)[32:])
+    rx_fifo_we = Signal(bool(False))
+    rx_fifo_wclk = Signal(bool(False))
+    rx_fifo_wdata = Signal(intbv(0)[32:])
+    rx_fifo_full = Signal(bool(False))
+    rx_fifo_afull = Signal(bool(False))
+    rx_fifo_empty = Signal(bool(True))
+    rx_fifo_aempty = Signal(bool(True))
+    rx_fifo_afval = Signal(intbv(fifo_depth - 1)[10:])
+    rx_fifo_aeval = Signal(intbv(0)[10:])
+    rx_fifo_wack = Signal(bool(False))
+    rx_fifo_dvld = Signal(bool(False))
+    rx_fifo_overflow = Signal(bool(False))
+    rx_fifo_underflow = Signal(bool(False))
+    rx_fifo_rdcnt = Signal(intbv(0, min=0, max=fifo_depth + 1))
+    rx_fifo_wrcnt = Signal(intbv(fifo_depth, min=0, max=fifo_depth + 1))
+
+    rx_fifo_args = (
+        clearn,
+        rx_fifo_re,
+        rx_fifo_rclk,
+        rx_fifo_rdata,
+        rx_fifo_we,
+        rx_fifo_wclk,
+        rx_fifo_wdata,
+        rx_fifo_full,
+        rx_fifo_afull,
+        rx_fifo_empty,
+        rx_fifo_aempty,
+        rx_fifo_afval,
+        rx_fifo_aeval,
+        rx_fifo_wack,
+        rx_fifo_dvld,
+        rx_fifo_overflow,
+        rx_fifo_underflow,
+        rx_fifo_rdcnt,
+        rx_fifo_wrcnt)
+    rx_fifo = FIFO(*rx_fifo_args,
+        width=fifo_width,
+        depth=fifo_depth)
+
+    # The RAMs
+    fir_coeff_ram = Ram(clearn, dsp_clock, bus.pclk, width=18, depth=512)
+    fir_delay_line_i_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
+    fir_delay_line_q_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
+
+    fir_coeff_ram_addr = fir_coeff_ram.port['a'].addr
+    fir_coeff_ram_din = fir_coeff_ram.port['a'].din
+    fir_coeff_ram_blk = fir_coeff_ram.port['a'].blk
+    fir_coeff_ram_wen = fir_coeff_ram.port['a'].wen
+    fir_coeff_ram_dout = fir_coeff_ram.port['a'].dout
+    fir_load_coeff_ram_addr = fir_coeff_ram.port['b'].addr
+    fir_load_coeff_ram_din = fir_coeff_ram.port['b'].din
+    fir_load_coeff_ram_blk = fir_coeff_ram.port['b'].blk
+    fir_load_coeff_ram_wen = fir_coeff_ram.port['b'].wen
+    fir_load_coeff_ram_dout = fir_coeff_ram.port['b'].dout
+    fir_delay_line_i_ram_addr = fir_delay_line_i_ram.port['a'].addr
+    fir_delay_line_i_ram_din = fir_delay_line_i_ram.port['a'].din
+    fir_delay_line_i_ram_blk = fir_delay_line_i_ram.port['a'].blk
+    fir_delay_line_i_ram_wen = fir_delay_line_i_ram.port['a'].wen
+    fir_delay_line_i_ram_dout = fir_delay_line_i_ram.port['a'].dout
+    fir_delay_line_q_ram_addr = fir_delay_line_q_ram.port['a'].addr
+    fir_delay_line_q_ram_din = fir_delay_line_q_ram.port['a'].din
+    fir_delay_line_q_ram_blk = fir_delay_line_q_ram.port['a'].blk
+    fir_delay_line_q_ram_wen = fir_delay_line_q_ram.port['a'].wen
+    fir_delay_line_q_ram_dout = fir_delay_line_q_ram.port['a'].dout
+
+    signals = (
+        clearn, dac_clock, dsp_clock,
+        loopen, loopback,
+        tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
+        txen, txstop,
+        ddsen, txfilteren,
+        interp, shift,
+        fcw,
+        tx_correct_i, tx_correct_q,
+        tx_gain_i, tx_gain_q,
+        tx_underrun, tx_sample,
+        dac_en, dac_data, dac_last,
+
+        rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
+        rxen, rxstop, rxfilteren,
+        decim, rx_correct_i, rx_correct_q,
+        rx_overrun, rx_sample,
+        adc_idata, adc_qdata, adc_last,
+
+        fir_coeff_ram_addr,
+        fir_coeff_ram_din,
+        fir_coeff_ram_blk,
+        fir_coeff_ram_wen,
+        fir_coeff_ram_dout,
+        fir_delay_line_i_ram_addr,
+        fir_delay_line_i_ram_din,
+        fir_delay_line_i_ram_blk,
+        fir_delay_line_i_ram_wen,
+        fir_delay_line_i_ram_dout,
+        fir_delay_line_q_ram_addr,
+        fir_delay_line_q_ram_din,
+        fir_delay_line_q_ram_blk,
+        fir_delay_line_q_ram_wen,
+        fir_delay_line_q_ram_dout,
+        firen, fir_bank1, fir_bank0, fir_N,
+    )
+    toVerilog(duc, *signals, **whitebox_config)
+
+if __name__ == '__main__':
+    main()

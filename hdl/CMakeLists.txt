@@ -37,8 +37,38 @@ add_custom_command(
     DEPENDS whitebox.py apb3_utils.py fifo.py duc.py ddc.py dds.py rfe.py dsp.py ram.py fir.py
 ) 
 
+add_custom_command(
+    OUTPUT duc.v
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/duc.py
+    DEPENDS duc.py fifo.py duc.py ddc.py dds.py dsp.py ram.py fir.py
+) 
+
+set(duc_verilated_sources
+    obj_dir/Vduc.cpp
+    obj_dir/Vduc__Syms.cpp
+    obj_dir/Vduc__Trace.cpp
+    obj_dir/Vduc__Trace__Slow.cpp
+)
+
+add_custom_command(
+    OUTPUT ${duc_verilated_sources}
+    COMMAND verilator -Wall -Wno-fatal --trace -I${CMAKE_CURRENT_SOURCE_DIR} -O3 --cc ${CMAKE_CURRENT_BINARY_DIR}/duc.v
+    DEPENDS duc.v duc_controller.v
+)
+set(duc_controller_sources
+    ${duc_verilated_sources}
+    ${CMAKE_CURRENT_SOURCE_DIR}/duc_controller.cpp
+    /usr/share/verilator/include/verilated.cpp
+    /usr/share/verilator/include/verilated_vcd_c.cpp
+)
+find_library(WebSockets NAMES libwebsockets)
+add_custom_target(duc_controller
+    DEPENDS ${duc_controller_sources}
+    COMMAND g++ -O2 -o duc_controller -I${CMAKE_CURRENT_BINARY_DIR} -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -LWebSockets ${duc_controller_sources}
+)
+
 add_custom_target(hdl
-    DEPENDS whitebox.v
+    DEPENDS whitebox.v duc.v duc_controller
 )
 
 configure_file(cosim_whitebox.v cosim_whitebox.v COPYONLY)
@@ -115,6 +145,10 @@ add_test(NAME test_whitebox_upsampler_impulse_response
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestUpsamplerImpulseResponse
 )
 
+add_test(NAME test_duc_upsampler_impulse_response
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_duc.py TestUpsamplerImpulseResponse
+)
+
 add_test(NAME test_whitebox_upsampler_3x_impulse_response
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestUpsampler3xImpulseResponse
 )
@@ -145,6 +179,14 @@ add_test(NAME test_whitebox_rx_overrun
 
 add_test(NAME test_whitebox_rx_sequence
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.py TestRxSequence
+)
+
+add_test(NAME test_dsp_tx_chain
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/duc_controller --script test_tx_chain
+)
+
+add_test(NAME test_dsp_rx_chain
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/duc_controller --script test_rx_chain
 )
 
 add_subdirectory(constraint)

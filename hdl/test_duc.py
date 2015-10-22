@@ -15,6 +15,8 @@ from test_dsp import figure_continuous_complex
 from test_dsp import figure_discrete_quadrature
 from test_dsp import DSPSim
 
+from whitebox import whitebox_config
+
 class TestCicImpulse(unittest.TestCase):
     def test_cic_impulse(self):
         cic_order = 3
@@ -236,6 +238,64 @@ class TestCicDecimImpulse(unittest.TestCase):
         s.plot_chain("cic_decim_impulse_debug")
 
         plt.savefig("cic_decim_impulse.png")
+
+class VerilatedTestCase(unittest.TestCase):
+    def simulate(self, x, **kwargs):
+        # Step 1, convert input signal into a file object
+        import itertools
+        import os
+        import struct
+        import subprocess
+        x_tuple = [(a.real, a.imag) for a in x]
+        x_flat = [item for sublist in x_tuple for item in sublist]
+        x_bin = struct.pack('hh' * len(x), *x_flat)
+
+        # Step 2, open the subprocess 
+        import subprocess
+        CURRENT_BIN_DIR = '/home/testa/whitebox/build/hdl/'
+        proc = subprocess.Popen(
+            [os.path.join(CURRENT_BIN_DIR, 'duc_controller'), '-t'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE)
+        proc.stdin.write(x_bin)
+        proc.stdin.close()
+
+        y_bin = proc.stdout.read()
+        print len(x_bin), len(y_bin)
+        print y_bin
+        #print 'final', proc.wait()
+
+
+        # Step 3, read back the result
+        y_flat = struct.unpack('hh' * ((len(y_bin) / 4) - 1), y_bin)
+        y = np.array([y_[i] + 1j * y_[i + 1] for i in xrange(len(y_flat / 2))])
+
+        duration = 0
+
+        return y, duration
+
+class TestUpsamplerImpulseResponse(VerilatedTestCase):
+    def test_upsampler_impulse_response(self):
+        duration = 32e-6
+        interp = 1
+        out_sample_rate = whitebox_config['dac_sample_rate']
+
+        # Input signal
+        cnt = math.ceil((out_sample_rate / interp) * duration)
+        n = np.arange(cnt)
+        q = (np.arange(cnt) * (256)) % 2**15
+        x = q + 1j * (q + 128)
+
+        # Expected output signal
+        y = np.array(x) / 128
+
+        # Sumulate
+        actual_y, actual_duration = self.simulate(x,
+            interp=interp, dac_sample_rate=whitebox_config['dac_sample_rate'])
+
+        assert duration == actual_duration 
+
+        assert (y == actual_y).all()
 
 if __name__ == '__main__':
     unittest.main()
