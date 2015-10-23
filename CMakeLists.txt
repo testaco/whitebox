@@ -74,10 +74,6 @@ if (TARGET_BUILD)
     endif()
 endif()
 
-if (RADIOSERVER_ENABLED)
-    message(STATUS "Radioserver is enabled")
-endif()
-
 add_subdirectory(linux-cortexm)
 
 add_subdirectory(hdl)
@@ -85,6 +81,10 @@ add_subdirectory(hdl)
 add_subdirectory(driver)
 
 add_subdirectory(lib)
+
+if (RADIOSERVER_ENABLED)
+    add_subdirectory(radioserver)
+endif()
 
 add_subdirectory(gnuradio)
 
