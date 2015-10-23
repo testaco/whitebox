@@ -360,10 +360,7 @@ poll_end_fd(int fd)
 }
 
 int transfer_loop(struct resource *resources, int resource_count) {
-    signed short *ptr;
-    int status, cptr;
-
-    int i;
+    int status;
 
     if (fd_count <= 0) {
         std::cerr << "no fds to watch" << std::endl;
@@ -395,7 +392,7 @@ int transfer_loop(struct resource *resources, int resource_count) {
                 }
                 if (fds[i].revents & POLLIN) {
                     //fprintf(stderr, "pollin\n");
-                    //modem_read();
+                    modem_read();
                 }
                 if (fds[i].revents & POLLERR) {
                     //fprintf(stderr, "pollerr\n");

@@ -349,9 +349,9 @@ function errorHandler(errorMessage, url, lineNumber, column, errorObject)
     '</dd>';
   }
   if ( errorObject && errorObject.stack ) {
-    page = page + '<dt>Call stack</dt></dd>' +
-    errorObject.stack() +
-    '</dd>';
+    page = page + '<dt>Call stack</dt><dd><pre>' +
+    errorObject.stack +
+    '</pre></dd>';
   }
   document.body.innerHTML = page + '</dl>';
 }
