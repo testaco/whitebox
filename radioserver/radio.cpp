@@ -36,6 +36,7 @@ radio_data_in(
  const void *		data,
  size_t		length)
 {
+#if 0
     const int16_t *audio_data = (int16_t *)data;
 
     // TODO: do this as a block of data
@@ -47,12 +48,15 @@ radio_data_in(
     }
     //std::cerr << std::endl;
     //fprintf(stderr, "\n");
+#endif
 }
 
 void
 radio_end(radio_context * radio, const client_info *)
 {
+#if 0
   modem_standby();
+#endif
   std::cerr << "Close client." << std::endl;
   delete radio;
 }
@@ -60,6 +64,7 @@ radio_end(radio_context * radio, const client_info *)
 void
 radio_get_status(radio_context *, const client_info *, cJSON * json)
 {
+#if 0
     cJSON_AddNumberToObject(json, "frequency", modem_get_frequency());
     cJSON_AddStringToObject(json, "mode", modem_get_mode());
     cJSON_AddBoolToObject(json, "lna", modem_get_lna());
@@ -72,17 +77,21 @@ radio_get_status(radio_context *, const client_info *, cJSON * json)
     cJSON_AddNumberToObject(json, "locked", modem_get_locked_status());
     cJSON_AddBoolToObject(json, "pa", modem_get_pa());
     cJSON_AddBoolToObject(json, "led", modem_get_led());
+#endif
 }
 
 void
 radio_receive(radio_context *, const client_info *)
 {
+#if 0
     modem_receive();
+#endif
 }
 
 void
 radio_set(radio_context *, const client_info *, const cJSON * json)
 {
+#if 0
     const cJSON * freq_obj = cJSON_GetObjectItem((cJSON*)json, "frequency");
     if (freq_obj) {
         float frequency = freq_obj->valuedouble;
@@ -123,6 +132,7 @@ radio_set(radio_context *, const client_info *, const cJSON * json)
         bool led = led_obj->valueint;
         modem_set_led(led);
     }
+ #endif
 }
 
 radio_context *
@@ -134,7 +144,9 @@ radio_start(client_context * client, const client_info *)
 void
 radio_transmit(radio_context *, const client_info *)
 {
+#if 0
     modem_transmit();
+#endif
 }
 
 radio_context::~radio_context()

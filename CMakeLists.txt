@@ -82,9 +82,7 @@ add_subdirectory(driver)
 
 add_subdirectory(lib)
 
-if (RADIOSERVER_ENABLED)
-    add_subdirectory(radioserver)
-endif()
+add_subdirectory(radioserver)
 
 add_subdirectory(gnuradio)
 

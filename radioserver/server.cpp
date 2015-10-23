@@ -638,6 +638,13 @@ command(
   return value;
 }
 
+void
+server_poll_handler(pollfd *fds, void *data)
+{
+  struct libwebsocket_context *context = (libwebsocket_context *)data;
+  server_service_fd(context, fds);
+}
+
 static void
 monitor_poll_fd(
  libwebsocket_context *         context,
@@ -652,7 +659,7 @@ monitor_poll_fd(
   case LWS_CALLBACK_UNLOCK_POLL:
     return;
   case LWS_CALLBACK_ADD_POLL_FD:
-    poll_start_fd(context, args->fd, args->events, -1);
+    poll_start_fd(args->fd, args->events, server_poll_handler, context);
     break;
   case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
     poll_change_fd(args->fd, args->events);

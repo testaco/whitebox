@@ -8,11 +8,6 @@ struct cJSON;
 // from the perspective of the server code.
 class radio_context;
 
-/* Barf with a spoon, Chris! */
-#define WEBSOCKET_FD 0
-#define WHITEBOX_FD 1
-#define FILE_SOURCE_FD 2
-
 class WriteBuffer {
 private:
   unsigned char * const	storage;
@@ -58,7 +53,8 @@ public:
   void		cleanup();
 };
 
-extern void	poll_start_fd(libwebsocket_context *, int fd, int events, int type);
+typedef void (*poll_handler)(pollfd* fds, void *data);
+extern void	poll_start_fd(int fd, int events, poll_handler handler, void* data);
 extern void	poll_change_fd(int fd, int mode);
 extern void	poll_end_fd(int fd);
 
