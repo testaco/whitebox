@@ -48,7 +48,7 @@ set(Main.sources
     server.cpp
     #resources.cpp
     #soundcard.cpp
-    #modem.cpp
+    modem.cpp
     cJSON.c
 )
 set_source_files_properties(${Main.sources} PROPERTIES COMPILE_FLAGS "-DMAJOR_VERSION=${PROJECT_VERSION_MAJOR} -DMINOR_VERSION=${PROJECT_VERSION_MINOR} -DPATCH_VERSION=${PROJECT_VERSION_PATCH} -DCODENAME=\"${PROJECT_VERSION_CODENAME}\" -DSYSTEM=\"${CMAKE_SYSTEM}\" -g")

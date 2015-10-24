@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <getopt.h>
+#include <stdint.h>
 #include <iostream>
 #include <math.h>
 #if OPENSLL_FOUND
@@ -10,54 +11,40 @@
 #include <poll.h>
 #include <sys/time.h>
 #include "cJSON.h"
-#include "modem.h"
+//#include "resources.h"
 #include "radio.h"
-#include "resources.h"
 
+#include "modem.h"
 // Add members to radio_context as you wish.
 class radio_context {
 private:
-  client_context * const client;
 
   radio_context(const radio_context &);
   radio_context &	operator =(const radio_context &);
 
 public:
-    radio_context(client_context * c) : client(c) {
-    };
+  client_context * const client;
+    radio_context(client_context * c) : client(c) { };
     ~radio_context();
 };
 
-void
-radio_data_in(
- radio_context *	/* radio */,
- const client_info *	/* info */,
- unsigned int		/* type */,
- const void *		data,
- size_t		length)
+radio_context::~radio_context()
 {
-#if 0
-    const int16_t *audio_data = (int16_t *)data;
-
-    // TODO: do this as a block of data
-    for (int i = 0; i < length / 2; ++i) {
-        //std::cerr << ' ' << audio_data[i];
-        //fprintf(stderr, " %d", audio_data[i]);
-
-        sink(audio_data[i]);
-    }
-    //std::cerr << std::endl;
-    //fprintf(stderr, "\n");
-#endif
 }
+
+radio_context *
+radio_start(client_context * client, const client_info *)
+{
+  // connect to the modem
+  radio_context * c = new radio_context(client);
+  modem_connection * conn = modem::get_instance().connect(c);
+  return c;
+} 
 
 void
 radio_end(radio_context * radio, const client_info *)
 {
-#if 0
-  modem_standby();
-#endif
-  std::cerr << "Close client." << std::endl;
+  modem::get_instance().disconnect(radio);
   delete radio;
 }
 
@@ -77,14 +64,6 @@ radio_get_status(radio_context *, const client_info *, cJSON * json)
     cJSON_AddNumberToObject(json, "locked", modem_get_locked_status());
     cJSON_AddBoolToObject(json, "pa", modem_get_pa());
     cJSON_AddBoolToObject(json, "led", modem_get_led());
-#endif
-}
-
-void
-radio_receive(radio_context *, const client_info *)
-{
-#if 0
-    modem_receive();
 #endif
 }
 
@@ -135,12 +114,24 @@ radio_set(radio_context *, const client_info *, const cJSON * json)
  #endif
 }
 
-radio_context *
-radio_start(client_context * client, const client_info *)
+void
+radio_receive(radio_context *, const client_info *)
 {
-  std::cerr << "New client." << std::endl;
-  return new radio_context(client);
-} 
+#if 0
+    modem_receive();
+#endif
+    modem::get_instance().start_receive();
+}
+
+void
+radio_data_out(radio_context *, const client_info *)
+{
+    // makes a WriteBuffer
+    // fills it in by calling the source() generator
+    // calls server_data_out 
+}
+
+
 void
 radio_transmit(radio_context *, const client_info *)
 {
@@ -149,7 +140,27 @@ radio_transmit(radio_context *, const client_info *)
 #endif
 }
 
-radio_context::~radio_context()
+void
+radio_data_in(
+ radio_context *	/* radio */,
+ const client_info *	/* info */,
+ unsigned int		/* type */,
+ const void *		data,
+ size_t		length)
 {
-  //modem_standby();
+#if 0
+    const int16_t *audio_data = (int16_t *)data;
+
+    // TODO: do this as a block of data
+    for (int i = 0; i < length / 2; ++i) {
+        //std::cerr << ' ' << audio_data[i];
+        //fprintf(stderr, " %d", audio_data[i]);
+
+        sink(audio_data[i]);
+    }
+    //std::cerr << std::endl;
+    //fprintf(stderr, "\n");
+#endif
 }
+
+

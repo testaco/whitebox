@@ -1,3 +1,6 @@
+#ifndef __RADIO_H__
+#define __RADIO_H__
+
 // These structures are known in the server code and
 // opaque from the perspective of the radio code.
 struct libwebsocket_context;
@@ -53,7 +56,7 @@ public:
   void		cleanup();
 };
 
-typedef void (*poll_handler)(pollfd* fds, void *data);
+typedef void (*poll_handler)(pollfd *, void *);
 extern void	poll_start_fd(int fd, int events, poll_handler handler, void* data);
 extern void	poll_change_fd(int fd, int mode);
 extern void	poll_end_fd(int fd);
@@ -80,3 +83,5 @@ void		server_data_out(
 
 void		server_service_fd(libwebsocket_context *, pollfd * pfd);
 libwebsocket_context * server_start(const char * device, int port, bool use_ssl);
+
+#endif

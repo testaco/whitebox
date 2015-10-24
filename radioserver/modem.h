@@ -1,57 +1,82 @@
 #ifndef __MODEM_H__
 #define __MODEM_H__
 
-#include "resources.h"
+#include <list>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+class radio_context;
+//#include "resources.h"
 
-extern struct resource_ops modem_ops;
+#if 0
+class SignalGenerator // Signal Generator, exposes Iterator interface
+{
+    public:
+        uint32_t next();
+}
 
-void modem_transmit();
-void modem_receive();
-void modem_standby();
 
-void modem_service_fd(short revents);
-void modem_write();
-void modem_read();
-void modem_recover();
-
-float modem_get_frequency();
-void modem_set_frequency(float frequency);
-
-const char* modem_get_mode();
-void modem_set_mode(const char* new_mode);
-
-const bool modem_get_lna();
-void modem_set_lna(const bool lna);
-
-const int modem_get_vga();
-void modem_set_vga(const int vga);
-
-const char* modem_get_if_bw();
-void modem_set_if_bw(const char* if_bw);
-
-const int modem_get_bpf();
-void modem_set_bpf(const int bpf);
-
-const float modem_get_rssi();
-const float modem_get_temp();
-const float modem_get_voltage();
-const bool modem_get_locked_status();
-
-const bool modem_get_pa();
-void modem_set_pa(const bool pa);
-
-const bool modem_get_led();
-void modem_set_led(const bool led);
-
-// modulator_write
-// demodulator_read
-
-#ifdef __cplusplus
+class SignalAnalyzer // Signal Analyzer, exposes Iterator interface
+{
+    public:
+        uint32_t next();
 }
 #endif
+
+class modem_connection;
+class modem // Uses the RF Controller singleton from the HAL
+{
+    public:
+        static modem& get_instance()
+        {
+            static modem instance;
+            return instance;
+        }
+
+        modem_connection * connect(radio_context *);
+        void disconnect(radio_context *client);
+
+        const char* get_mode();
+        void set_mode(const char* new_mode);
+
+        void start_transmit();
+        void set_signal_generator(const char *name);
+        void transmit(unsigned int type, const void * data, size_t length);
+
+        void start_receive();
+        void set_signal_analyzer(const char *name);
+        void receive(WriteBuffer* buffer);
+
+    private:
+        modem() {
+        };
+
+        modem(modem const&); // No copy
+        void operator=(modem const&); // No equals
+
+        std::list<radio_context *> connections;
+
+        void standby();
+
+        void modem_receive_callback();
+
+    #if 0
+        SignalGenerator *signal_generator;
+        SignalAnalyzer *signal_analyzer;
+    #endif
+};
+
+class modem_connection
+{
+    public:
+        modem_connection(radio_context *context) : context(context) {
+        }
+
+        void disconnect() {
+            modem::get_instance().disconnect(context);
+        }
+
+    private:
+        radio_context * context;
+};
+
 
 #endif /* __MODEM_H__ */

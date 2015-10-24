@@ -1,3 +1,48 @@
+#include <cstdlib>
+#include <iostream>
+#include <stdint.h>
+#include <poll.h>
+#include <list>
+
+#include "radio.h"
+#include "modem.h"
+
+modem_connection * modem::connect(radio_context * context) {
+    modem_connection * conn = new modem_connection(context);
+    connections.push_back(context);
+    std::cerr << "New client";
+    std::cerr << " (" << connections.size() << " connections)" << std::endl;
+    return conn;
+}
+
+void modem::disconnect(radio_context * context) {
+    connections.remove(context);
+    std::cerr << "Close client";
+    std::cerr << " (" << connections.size() << " connections)" << std::endl;
+
+    if (connections.size() == 0) {
+        standby();
+    }
+}
+
+void modem::standby() {
+    std::cerr << "Standby" << std::endl;
+}
+
+void modem::start_receive() {
+    std::cerr << "Radio command to receive" << std::endl;
+}
+
+void modem::modem_receive_callback() {
+    std::list<radio_context *>::iterator it;
+    for (it = connections.begin(); it != connections.end(); ++it) {
+        WriteBuffer * buffer = new WriteBuffer(1024, 1);
+        // TODO!!!
+        //server_data_out((*it)->client, buffer);
+    }
+}
+
+#if 0
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
@@ -186,6 +231,13 @@ void modem_receive() {
     rxing = true;
     // Crank the receiver to get things going.
     count = ioctl(whitebox->fd, W_MMAP_READ, &src) >> 2;
+
+    // TODO: I need a modem receiver callback every 20ms
+    
+}
+
+void modem_receiver_callback() {
+    // Should call server_data_out
 }
 
 void modem_standby() {
@@ -431,4 +483,4 @@ struct resource_ops modem_ops = {
     modem_descriptors,
     modem_handler,
 };
-
+#endif
