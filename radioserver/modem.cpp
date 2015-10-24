@@ -5,14 +5,13 @@
 #include <list>
 
 #include "radio.h"
+#include "radio_context.h"
 #include "modem.h"
 
-modem_connection * modem::connect(radio_context * context) {
-    modem_connection * conn = new modem_connection(context);
+void modem::connect(radio_context * context) {
     connections.push_back(context);
     std::cerr << "New client";
     std::cerr << " (" << connections.size() << " connections)" << std::endl;
-    return conn;
 }
 
 void modem::disconnect(radio_context * context) {
@@ -31,15 +30,23 @@ void modem::standby() {
 
 void modem::start_receive() {
     std::cerr << "Radio command to receive" << std::endl;
+    // TODO: schedule a timer here to call modem_receive_callback
 }
 
 void modem::modem_receive_callback() {
     std::list<radio_context *>::iterator it;
     for (it = connections.begin(); it != connections.end(); ++it) {
         WriteBuffer * buffer = new WriteBuffer(1024, 1);
-        // TODO!!!
-        //server_data_out((*it)->client, buffer);
+        server_data_out((*it)->get_client(), buffer);
     }
+}
+
+void modem::start_transmit() {
+    std::cerr << "Radio command to transmit" << std::endl;
+}
+
+void modem::transmit(const void * data, size_t length) {
+    std::cerr << "transmit " << length << " bytes" << std::endl;
 }
 
 #if 0

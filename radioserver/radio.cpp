@@ -13,32 +13,16 @@
 #include "cJSON.h"
 //#include "resources.h"
 #include "radio.h"
-
+#include "radio_context.h"
 #include "modem.h"
-// Add members to radio_context as you wish.
-class radio_context {
-private:
-
-  radio_context(const radio_context &);
-  radio_context &	operator =(const radio_context &);
-
-public:
-  client_context * const client;
-    radio_context(client_context * c) : client(c) { };
-    ~radio_context();
-};
-
-radio_context::~radio_context()
-{
-}
 
 radio_context *
 radio_start(client_context * client, const client_info *)
 {
   // connect to the modem
-  radio_context * c = new radio_context(client);
-  modem_connection * conn = modem::get_instance().connect(c);
-  return c;
+  radio_context * radio = new radio_context(client);
+  modem::get_instance().connect(radio);
+  return radio;
 } 
 
 void
@@ -124,20 +108,12 @@ radio_receive(radio_context *, const client_info *)
 }
 
 void
-radio_data_out(radio_context *, const client_info *)
-{
-    // makes a WriteBuffer
-    // fills it in by calling the source() generator
-    // calls server_data_out 
-}
-
-
-void
 radio_transmit(radio_context *, const client_info *)
 {
 #if 0
     modem_transmit();
 #endif
+    modem::get_instance().start_transmit();
 }
 
 void
@@ -161,6 +137,7 @@ radio_data_in(
     //std::cerr << std::endl;
     //fprintf(stderr, "\n");
 #endif
+    modem::get_instance().transmit(data, length);
 }
 
 

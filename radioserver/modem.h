@@ -31,19 +31,18 @@ class modem // Uses the RF Controller singleton from the HAL
             return instance;
         }
 
-        modem_connection * connect(radio_context *);
-        void disconnect(radio_context *client);
+        void connect(radio_context *);
+        void disconnect(radio_context *);
 
         const char* get_mode();
         void set_mode(const char* new_mode);
 
         void start_transmit();
         void set_signal_generator(const char *name);
-        void transmit(unsigned int type, const void * data, size_t length);
+        void transmit(const void * data, size_t length);
 
         void start_receive();
         void set_signal_analyzer(const char *name);
-        void receive(WriteBuffer* buffer);
 
     private:
         modem() {
@@ -63,20 +62,5 @@ class modem // Uses the RF Controller singleton from the HAL
         SignalAnalyzer *signal_analyzer;
     #endif
 };
-
-class modem_connection
-{
-    public:
-        modem_connection(radio_context *context) : context(context) {
-        }
-
-        void disconnect() {
-            modem::get_instance().disconnect(context);
-        }
-
-    private:
-        radio_context * context;
-};
-
 
 #endif /* __MODEM_H__ */
