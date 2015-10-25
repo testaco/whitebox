@@ -35,6 +35,24 @@ class demodulator {
         uint32_t demodulate() { return 0; }
 };
 
+enum modem_state {
+    power_on,
+    reset,
+    self_test,
+    idle,
+    receive,
+    receive_callback,
+};
+
+static const char * modem_state_strings[] = {
+    "Power On",
+    "Reset",
+    "Self Test",
+    "Idle",
+    "Receive",
+    "Receive Callback",
+};
+
 class modem // Uses the RF Controller singleton from the HAL
 {
     public:
@@ -47,6 +65,7 @@ class modem // Uses the RF Controller singleton from the HAL
         void connect(radio_context *);
         void disconnect(radio_context *);
 
+        const char * get_state_string();
         const char* get_mode();
         void set_mode(const char* new_mode);
 
@@ -54,14 +73,16 @@ class modem // Uses the RF Controller singleton from the HAL
         void transmit(const void * data, size_t length);
 
         void start_receive();
-        void receive_callback();
+        void run_next_task();
+        void run_task(modem_state state);
 
         modulator * get_modulator() { return mod; }
         demodulator * get_demodulator() { return demod; }
 
     private:
         modem() {
-            receive_handler = NULL;
+            curr_state = idle;
+            modem_task = NULL;
         };
 
         modem(modem const&); // No copy
@@ -69,15 +90,19 @@ class modem // Uses the RF Controller singleton from the HAL
 
         std::list<radio_context *> connections;
 
+        void start();
         void standby();
 
+        void receive_cb();
         void end_receive();
         void end_transmit();
 
         modulator * mod;
         demodulator * demod;
 
-        routine_handler *  receive_handler;
+        task_handler *  modem_task;
+        modem_state curr_state;
+
 };
 
 #endif /* __MODEM_H__ */

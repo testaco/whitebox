@@ -125,21 +125,21 @@ poll_end_fd(int fd)
     std::cerr << "fd " << fd << " not found in poll_end_fd(), fd_count is " << fd_count << std::endl;
 }
 
-std::list<routine_handler *> routines;
+std::list<task_handler *> tasks;
 
-extern void poll_start_routine(routine_handler * handler) {
-    routines.push_back(handler);
-    std::cerr << "Poll: start routine (" << routines.size() << ")" << std::endl;
+extern void poll_start_task(task_handler * handler) {
+    tasks.push_back(handler);
+    std::cerr << "Poll: start task (" << tasks.size() << ")" << std::endl;
 }
 
-extern void poll_end_routine(routine_handler * handler) {
-    routines.remove(handler);
-    std::cerr << "Poll: end routine (" << routines.size() << ")" << std::endl;
+extern void poll_end_task(task_handler * handler) {
+    tasks.remove(handler);
+    std::cerr << "Poll: end task (" << tasks.size() << ")" << std::endl;
 }
 
-void poll_run_routines() {
-    std::list<routine_handler *>::const_iterator i;
-    for (i = routines.begin(); i != routines.end(); ++i) {
+void poll_run_tasks() {
+    std::list<task_handler *>::const_iterator i;
+    for (i = tasks.begin(); i != tasks.end(); ++i) {
         (*i)->callback();
     }
 }
@@ -187,8 +187,8 @@ int run_forever() {
 
         // Step 4, Process timer events.
 
-        // Step 5, Run routines.
-        poll_run_routines();
+        // Step 5, Run tasks.
+        poll_run_tasks();
     }
 
     return 0;

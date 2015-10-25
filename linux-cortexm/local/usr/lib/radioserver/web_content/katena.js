@@ -788,6 +788,7 @@ function sendParameters() {
 
   var text = {
     command: 'set',
+    netSampleRate: netSampleRate,
     frequency: frequency,
     mode: mode
   };

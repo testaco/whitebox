@@ -61,12 +61,12 @@ extern void	poll_start_fd(int fd, int events, poll_handler handler, void* data);
 extern void	poll_change_fd(int fd, int mode);
 extern void	poll_end_fd(int fd);
 
-class routine_handler {
+class task_handler {
     public:
         virtual void callback() = 0;
 };
-extern void poll_start_routine(routine_handler * handler);
-extern void poll_end_routine(routine_handler * handler);
+extern void poll_start_task(task_handler * handler);
+extern void poll_end_task(task_handler * handler);
 
 extern void		radio_end(radio_context *, const client_info *);
 extern void		radio_get_status(radio_context *, const client_info *, cJSON * json);
