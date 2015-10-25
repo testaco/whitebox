@@ -721,6 +721,10 @@ function responseArrayBuffer(data) {
     return;
   }
 
+  // FIXME: why does it start with two blocks of 3?
+  if (data.byteLength < 4)
+    return;
+
   var inTypeView = new Uint32Array(data, 0, 1);
 
   switch ( inTypeView[0] ) {

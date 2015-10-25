@@ -25,28 +25,65 @@ void modem::disconnect(radio_context * context) {
 }
 
 void modem::standby() {
-    std::cerr << "Standby" << std::endl;
+    std::cerr << "Modem: standby" << std::endl;
 }
+
+class modem_receive_routine_handler : public routine_handler
+{
+    public:
+        void callback() { modem::get_instance().receive_callback(); }
+};
 
 void modem::start_receive() {
-    std::cerr << "Radio command to receive" << std::endl;
-    // TODO: schedule a timer here to call modem_receive_callback
+    // TODO if half_duplex
+        end_transmit();
+
+    if (!receive_handler) {
+        std::cerr << "Modem: start receive" << std::endl;
+        receive_handler = new modem_receive_routine_handler();
+        poll_start_routine(receive_handler);
+    }
 }
 
-void modem::modem_receive_callback() {
+void modem::end_receive() {
+    if (receive_handler) {
+        std::cerr << "Modem: end receive" << std::endl;
+        poll_end_routine(receive_handler);
+        receive_handler = NULL;
+    }
+}
+
+void modem::receive_callback() {
     std::list<radio_context *>::iterator it;
+    demodulator * demod = modem::get_instance().get_demodulator();
+    size_t length = 1024; //demod->data_available();
+    //std::cerr << "receive " << length << " bytes" << std::endl;
     for (it = connections.begin(); it != connections.end(); ++it) {
-        WriteBuffer * buffer = new WriteBuffer(1024, 1);
+        WriteBuffer * buffer = new WriteBuffer(length, 1);
+        for (int i = 0; i < length / sizeof(uint32_t); ++i) {
+            ((uint32_t*)buffer->data())[i] = demod->demodulate();
+        }
         server_data_out((*it)->get_client(), buffer);
     }
 }
 
 void modem::start_transmit() {
-    std::cerr << "Radio command to transmit" << std::endl;
+    end_receive();
+    std::cerr << "Modem: start transmit" << std::endl;
+}
+
+void modem::end_transmit() {
+    std::cerr << "Modem: end transmit" << std::endl;
 }
 
 void modem::transmit(const void * data, size_t length) {
+    modulator * mod = modem::get_instance().get_modulator();
+    // TODO: bad call
+    size_t available_length = mod->space_available();
     std::cerr << "transmit " << length << " bytes" << std::endl;
+    for (int i = 0; i < length / sizeof(uint32_t); ++i) {
+        mod->modulate(((uint32_t*)data)[i]);
+    }
 }
 
 #if 0

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <list>
 #if ALSA_FOUND
 #include <alsa/asoundlib.h>
 #endif
@@ -124,7 +125,26 @@ poll_end_fd(int fd)
     std::cerr << "fd " << fd << " not found in poll_end_fd(), fd_count is " << fd_count << std::endl;
 }
 
-int transfer_loop() {
+std::list<routine_handler *> routines;
+
+extern void poll_start_routine(routine_handler * handler) {
+    routines.push_back(handler);
+    std::cerr << "Poll: start routine (" << routines.size() << ")" << std::endl;
+}
+
+extern void poll_end_routine(routine_handler * handler) {
+    routines.remove(handler);
+    std::cerr << "Poll: end routine (" << routines.size() << ")" << std::endl;
+}
+
+void poll_run_routines() {
+    std::list<routine_handler *>::const_iterator i;
+    for (i = routines.begin(); i != routines.end(); ++i) {
+        (*i)->callback();
+    }
+}
+
+int run_forever() {
     int status;
 
     if (fd_count <= 0) {
@@ -134,9 +154,13 @@ int transfer_loop() {
 
     // The main loop
     while (1) {
-        // First, poll.
-        status = poll(fds, fd_count, -1);
+        // Step 1, Calculate timeout.
+        int timeout = -1;
 
+        // Step 2, Wait for IO.
+        status = poll(fds, fd_count, timeout);
+
+        // Step 3, Process IO events.
         if (status < 0) {
             perror("poll");
             exit(-1);
@@ -149,7 +173,6 @@ int transfer_loop() {
           for ( unsigned int i = 0; serviced < status && i < fd_count; i++ ) {
             if ( fds[i].revents && fds_handler[i] ) {
               fds_handler[i](&fds[i], fds_data[i]);
-              //server_service_fd(websocket_contexts[i], &fds[i]);
               serviced++;
             } 
           }
@@ -161,6 +184,11 @@ int transfer_loop() {
             //poll_debug_fds();
           }
         }
+
+        // Step 4, Process timer events.
+
+        // Step 5, Run routines.
+        poll_run_routines();
     }
 
     return 0;
@@ -324,7 +352,7 @@ int main(int argc, char **argv) {
 #endif
 
     // Main transfer loop
-    transfer_loop();
+    run_forever();
 
 #if 0
     // Close everything

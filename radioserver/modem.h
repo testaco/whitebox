@@ -21,7 +21,20 @@ class SignalAnalyzer // Signal Analyzer, exposes Iterator interface
 }
 #endif
 
-class modem_connection;
+class modulator {
+    public:
+        size_t space_available() { return 0; }
+        // A single sample
+        void modulate(uint32_t) {}
+};
+
+class demodulator {
+    public:
+        size_t data_available() { return 0; }
+        // A single sample
+        uint32_t demodulate() { return 0; }
+};
+
 class modem // Uses the RF Controller singleton from the HAL
 {
     public:
@@ -38,14 +51,17 @@ class modem // Uses the RF Controller singleton from the HAL
         void set_mode(const char* new_mode);
 
         void start_transmit();
-        void set_signal_generator(const char *name);
         void transmit(const void * data, size_t length);
 
         void start_receive();
-        void set_signal_analyzer(const char *name);
+        void receive_callback();
+
+        modulator * get_modulator() { return mod; }
+        demodulator * get_demodulator() { return demod; }
 
     private:
         modem() {
+            receive_handler = NULL;
         };
 
         modem(modem const&); // No copy
@@ -55,12 +71,13 @@ class modem // Uses the RF Controller singleton from the HAL
 
         void standby();
 
-        void modem_receive_callback();
+        void end_receive();
+        void end_transmit();
 
-    #if 0
-        SignalGenerator *signal_generator;
-        SignalAnalyzer *signal_analyzer;
-    #endif
+        modulator * mod;
+        demodulator * demod;
+
+        routine_handler *  receive_handler;
 };
 
 #endif /* __MODEM_H__ */
