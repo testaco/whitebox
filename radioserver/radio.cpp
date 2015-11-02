@@ -11,24 +11,24 @@
 #include <poll.h>
 #include <sys/time.h>
 #include "cJSON.h"
-//#include "resources.h"
 #include "radio.h"
+#include "repeater.h"
 #include "radio_context.h"
-#include "modem.h"
+#include "controller.h"
 
 radio_context *
-radio_start(client_context * client, const client_info *)
+radio_start(client_context * client, const client_info * info)
 {
-  // connect to the modem
-  radio_context * radio = new radio_context(client);
-  modem::get_instance().connect(radio);
+  radio_context * radio = new radio_context(client, info);
+  repeater::get_instance().connect(radio);
   return radio;
 } 
 
 void
 radio_end(radio_context * radio, const client_info *)
 {
-  modem::get_instance().disconnect(radio);
+  repeater::get_instance().disconnect(radio);
+  //controller_task(idle);
   delete radio;
 }
 
@@ -54,6 +54,7 @@ radio_get_status(radio_context *, const client_info *, cJSON * json)
 void
 radio_set(radio_context *, const client_info *, const cJSON * json)
 {
+    std::cerr << cJSON_Print((cJSON*)json);
 #if 0
     const cJSON * freq_obj = cJSON_GetObjectItem((cJSON*)json, "frequency");
     if (freq_obj) {
@@ -99,45 +100,37 @@ radio_set(radio_context *, const client_info *, const cJSON * json)
 }
 
 void
-radio_receive(radio_context *, const client_info *)
+radio_receive(radio_context * radio, const client_info *)
 {
-#if 0
-    modem_receive();
-#endif
-    modem::get_instance().start_receive();
+    repeater::get_instance().start_receive();
 }
 
 void
-radio_transmit(radio_context *, const client_info *)
+radio_transmit(radio_context * radio, const client_info *)
 {
-#if 0
-    modem_transmit();
-#endif
-    modem::get_instance().start_transmit();
+    repeater::get_instance().start_transmit(radio);
 }
 
 void
 radio_data_in(
  radio_context *	/* radio */,
  const client_info *	/* info */,
- unsigned int		/* type */,
+ unsigned int		type,
  const void *		data,
  size_t		length)
 {
 #if 0
     const int16_t *audio_data = (int16_t *)data;
 
-    // TODO: do this as a block of data
-    for (int i = 0; i < length / 2; ++i) {
-        //std::cerr << ' ' << audio_data[i];
-        //fprintf(stderr, " %d", audio_data[i]);
-
-        sink(audio_data[i]);
-    }
     //std::cerr << std::endl;
     //fprintf(stderr, "\n");
 #endif
-    modem::get_instance().transmit(data, length);
+    //modem::get_instance().transmit(data, length);
+    //radio->repeater->transmit_data(type, data, length);
+    std::cerr << "TRANSMIT DATA type=" << type << " length=" << length << std::endl;
+    // TODO: do this as a block of data
+    for (int i = 0; i < length / 4; ++i) {
+        std::cerr << ' ' << ((uint32_t*)data)[i];
+    }
 }
-
 

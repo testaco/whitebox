@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstdlib>
-#include <list>
 #if ALSA_FOUND
 #include <alsa/asoundlib.h>
 #endif
@@ -18,6 +17,7 @@
 
 #include "cJSON.h"
 #include "radio.h"
+#include "controller.h"
 //#include "soundcard.h"
 //#include "modem.h"
 
@@ -125,27 +125,10 @@ poll_end_fd(int fd)
     std::cerr << "fd " << fd << " not found in poll_end_fd(), fd_count is " << fd_count << std::endl;
 }
 
-std::list<task_handler *> tasks;
-
-extern void poll_start_task(task_handler * handler) {
-    tasks.push_back(handler);
-    std::cerr << "Poll: start task (" << tasks.size() << ")" << std::endl;
-}
-
-extern void poll_end_task(task_handler * handler) {
-    tasks.remove(handler);
-    std::cerr << "Poll: end task (" << tasks.size() << ")" << std::endl;
-}
-
-void poll_run_tasks() {
-    std::list<task_handler *>::const_iterator i;
-    for (i = tasks.begin(); i != tasks.end(); ++i) {
-        (*i)->callback();
-    }
-}
-
 int run_forever() {
     int status;
+
+    controller_init();
 
     if (fd_count <= 0) {
         std::cerr << "no fds to watch" << std::endl;
@@ -155,7 +138,7 @@ int run_forever() {
     // The main loop
     while (1) {
         // Step 1, Calculate timeout.
-        int timeout = -1;
+        int timeout = controller_timeout();
 
         // Step 2, Wait for IO.
         status = poll(fds, fd_count, timeout);
@@ -185,10 +168,8 @@ int run_forever() {
           }
         }
 
-        // Step 4, Process timer events.
-
-        // Step 5, Run tasks.
-        poll_run_tasks();
+        // Step 4, Run tasks.
+        controller_task();
     }
 
     return 0;

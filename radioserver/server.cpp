@@ -623,7 +623,12 @@ command(
     std::cerr << "JSON could not parse command \"" << text << "\"" << std::endl;
     return 1;
   }
-  const char * const command = cJSON_GetObjectItem(json,"command")->valuestring;
+  const cJSON * const command_obj = cJSON_GetObjectItem(json, "command");
+  if (!command_obj) {
+    std::cerr << "JSON could not parse command \"" << text << "\"" << std::endl;
+    return 1;
+  }
+  const char * const command = command_obj->valuestring;
   int value = 0;
 
   std::cerr << "Command: " << command << std::endl;

@@ -46,9 +46,8 @@ set(Main.sources
     main.cpp
     radio.cpp
     server.cpp
-    #resources.cpp
-    #soundcard.cpp
-    modem.cpp
+    repeater.cpp
+    controller.cpp
     cJSON.c
 )
 set_source_files_properties(${Main.sources} PROPERTIES COMPILE_FLAGS "-DMAJOR_VERSION=${PROJECT_VERSION_MAJOR} -DMINOR_VERSION=${PROJECT_VERSION_MINOR} -DPATCH_VERSION=${PROJECT_VERSION_PATCH} -DCODENAME=\"${PROJECT_VERSION_CODENAME}\" -DSYSTEM=\"${CMAKE_SYSTEM}\" -g")
@@ -57,7 +56,7 @@ add_executable(main ${Main.sources})
 include(FindALSA)
 include(FindOpenSSL)
 target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox
-    ${WEBSOCKETS_LIBRARIES} ${ALSA_LIBRARIES} pthread)
+    ${WEBSOCKETS_LIBRARIES} ${ALSA_LIBRARIES} rt)
 
 if (TARGET_BUILD)
     add_custom_command(TARGET main POST_BUILD
@@ -74,3 +73,4 @@ add_custom_target(radioserver
 if(BUILD_WEBSOCKETS_LIBRARIES)
     add_dependencies(radioserver libwebsockets-build)
 endif()
+
