@@ -53,6 +53,7 @@ uint32_t sincos16c(uint32_t fcw, uint32_t *phase);
 extern uint32_t *sincos_lut_addr;
 
 void awgn(int16_t *s);
+void awgn32(uint32_t *s_in);
 
 #ifdef __cplusplus
 }

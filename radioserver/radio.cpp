@@ -28,7 +28,6 @@ void
 radio_end(radio_context * radio, const client_info *)
 {
   repeater::get_instance().disconnect(radio);
-  //controller_task(idle);
   delete radio;
 }
 

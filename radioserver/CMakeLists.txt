@@ -56,7 +56,7 @@ add_executable(main ${Main.sources})
 include(FindALSA)
 include(FindOpenSSL)
 target_link_libraries(main ${CMAKE_REQUIRED_LIBRARIES} whitebox
-    ${WEBSOCKETS_LIBRARIES} ${ALSA_LIBRARIES} rt)
+    ${WEBSOCKETS_LIBRARIES} ${ALSA_LIBRARIES} rt pthread)
 
 if (TARGET_BUILD)
     add_custom_command(TARGET main POST_BUILD

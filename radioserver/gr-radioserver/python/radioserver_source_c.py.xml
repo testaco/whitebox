@@ -1,0 +1,34 @@
+<?xml version='1.0' encoding='ASCII'?>
+<block>
+  <name>RadioServer Complex Source</name>
+  <key>radioserver_source_c</key>
+  <category>/Radioserver</category>
+  <import>execfile("/home/testa/whitebox/radioserver/gr-radioserver/python/radioserver_source_c.py")</import>
+  <make>radioserver_source_c($url, $samp_rate, $center_frequency, $gain)</make>
+  <param>
+    <name>URL</name>
+    <key>url</key>
+    <type>string</type>
+  </param>
+  <param>
+    <name>Sample Rate</name>
+    <key>samp_rate</key>
+    <type>int</type>
+  </param>
+  <param>
+    <name>Center Frequency</name>
+    <key>center_frequency</key>
+    <type>float</type>
+  </param>
+  <param>
+    <name>Gain</name>
+    <key>gain</key>
+    <type>int</type>
+  </param>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+    <vlen>1</vlen>
+  </source>
+  <doc>/home/testa/whitebox/radioserver/gr-radioserver/python/radioserver_source_c.py</doc>
+</block>

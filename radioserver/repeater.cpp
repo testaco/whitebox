@@ -24,7 +24,7 @@ void repeater::disconnect(radio_context * context) {
     std::cerr << " (" << clients.size() << " clients)" << std::endl;
 
     if (clients.size() == 0) {
-        controller_task(idle);
+        controller_task(standby);
     }
 }
 
@@ -36,7 +36,7 @@ void repeater::receive_cb(unsigned int type, const void * data, size_t length) {
     std::list<radio_context *>::iterator it;
     for (it = clients.begin(); it != clients.end(); ++it) {
         // TODO ewww.
-        WriteBuffer * buffer = new WriteBuffer(length, 1);
+        WriteBuffer * buffer = new WriteBuffer(length, type);
         memcpy(buffer->data(), data, length);
         server_data_out((*it)->get_client(), buffer);
     }

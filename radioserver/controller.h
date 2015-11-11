@@ -2,9 +2,9 @@
 #define __CONTROLLER_H__
 
 enum controller_state {
+    standby,
     idle,
     receive,
-    receive_callback,
     transmit,
 };
 
