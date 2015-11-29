@@ -24,8 +24,9 @@ else()
     endif()
     ExternalProject_add(
         libwebsockets-build
-        SOURCE_DIR libwebsockets-build-prefix/src/libwebsockets-build/libwebsockets
-        DOWNLOAD_COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/libwebsockets/ ${CMAKE_CURRENT_BINARY_DIR}/libwebsockets-build-prefix/src/libwebsockets-build
+        #SOURCE_DIR libwebsockets-build-prefix/src/libwebsockets-build/libwebsockets
+        #DOWNLOAD_COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/libwebsockets/ ${CMAKE_CURRENT_BINARY_DIR}/libwebsockets-build-prefix/src/libwebsockets-build
+        GIT_REPOSITORY https://github.com/warmcat/libwebsockets.git
         CMAKE_ARGS ${CMAKE_TOOLCHAIN_ARG} -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr -DZLIB_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include -DLWS_WITH_SSL=0  -DLWS_WITHOUT_EXTENSIONS=1 -DLWS_WITH_STATIC=1 -DLWS_WITH_SHARED=0
         LOG_INSTALL 1
         DEPENDS zlib-build
