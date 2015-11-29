@@ -1492,7 +1492,10 @@ static int whitebox_probe(struct platform_device* pdev) {
         goto fail_spi_init;
     }
 
-	printk(KERN_INFO "Whitebox Charlie mapped to address 0x%08lx\n", (unsigned long)whitebox_exciter_regs->start);
+	printk(KERN_INFO "Whitebox Charlie mapped to address 0x%08lx (devno=%d:%d)\n",
+        (unsigned long)whitebox_exciter_regs->start,
+        MAJOR(whitebox_devno),
+        MINOR(whitebox_devno));
 
     goto done;
 
