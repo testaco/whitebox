@@ -31,7 +31,7 @@ nod /dev/kmem 0600 0 0 c 1 2
 nod /dev/zero 0600 0 0 c 1 5
 nod /dev/random 0600 0 0 c 1 8
 nod /dev/urandom 0600 0 0 c 1 9
-nod /dev/whitebox 0600 0 0 c 254 0
+nod /dev/whitebox 0600 0 0 c 253 0
 
 #nod /dev/snd/controlC0 0660 0 0 c 116 0
 #nod /dev/snd/pcmC0D0p 0660 0 0 c 116 16
@@ -158,7 +158,7 @@ dir /usr/share/alsa/pcm 755 0 0
 #file /usr/bin/speaker-test @INSTALL_ROOT@/A2F/root/usr/bin/speaker-test 755 0 0
 
 @INCLUDE_DEMO1_SAMPLES@file /demo1.samples @CMAKE_SOURCE_DIR@/gnuradio/modem.samples 644 0 0
-file /usr/bin/main @CMAKE_BINARY_DIR@/lib/main 755 0 0
+file /usr/bin/radioserver @CMAKE_BINARY_DIR@/radioserver/main 755 0 0
 file /usr/bin/test_adf4351 @CMAKE_BINARY_DIR@/lib/test_adf4351 755 0 0
 file /usr/bin/test_adf4360 @CMAKE_BINARY_DIR@/lib/test_adf4360 755 0 0
 file /usr/bin/test_cmx991 @CMAKE_BINARY_DIR@/lib/test_cmx991 755 0 0
