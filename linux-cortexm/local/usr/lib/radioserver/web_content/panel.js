@@ -234,6 +234,8 @@ function go(foo)
     element.focus();
     document.getElementById('mode').addEventListener('change', sendParameters, true);
     document.getElementById('lna').addEventListener('change', sendParameters, true);
+    document.getElementById('noise').addEventListener('change', sendParameters, true);
+    document.getElementById('mute_lo').addEventListener('change', sendParameters, true);
     document.getElementById('vga').addEventListener('change', sendParameters, true);
     document.getElementById('if_bw').addEventListener('change', sendParameters, true);
     document.getElementById('bpf').addEventListener('change', sendParameters, true);
@@ -478,6 +480,10 @@ function responseString(data)
     document.getElementById('mode').value = root.mode;
   if ( root.lna )
     document.getElementById('lna').checked = root.lna;
+  if ( root.noise )
+    document.getElementById('noise').checked = root.noise;
+  if ( root.mute_lo )
+    document.getElementById('mute_lo').checked = root.mute_lo;
   if ( root.vga )
     document.getElementById('vga').value = root.vga;
   if ( root.if_bw )
@@ -504,6 +510,8 @@ function sendParameters()
   const frequency = parseFloat(document.getElementById('frequency').value);
   const mode = document.getElementById('mode').value;
   const lna = document.getElementById('lna').checked;
+  const noise = document.getElementById('noise').checked;
+  const mute_lo = document.getElementById('mute_lo').checked;
   const vga = document.getElementById('vga').value;
   const if_bw = document.getElementById('if_bw').value;
   const bpf = Number(document.getElementById('bpf').value);
@@ -513,7 +521,8 @@ function sendParameters()
 
 
   const text = { command: "set", frequency: frequency, mode: mode,
-    lna: lna, vga: vga, if_bw: if_bw, bpf: bpf, pa: pa, led: led };
+    lna: lna, noise: noise, mute_lo: mute_lo, vga: vga,
+    if_bw: if_bw, bpf: bpf, pa: pa, led: led };
   r.soc.send(JSON.stringify(text));
   notice("Settings sent to the radio.");
 }

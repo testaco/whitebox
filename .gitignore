@@ -1,4 +1,4 @@
-build
+build*
 *.bz2
 *.pyc
 gnuradio

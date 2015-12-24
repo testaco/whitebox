@@ -77,6 +77,7 @@ double adf4360_pll_enable(adf4360_t* rf, double ref_freq, double res_freq, doubl
     rf->adf4360_mute_till_lock_detect = ADF4360_MUTE_TILL_LOCK_DETECT_MUTE_DISABLED;
     rf->adf4360_ld_precision = ADF4360_LD_PRECISION_LOW;
     rf->adf4360_muxout = ADF4360_MUXOUT_DLD;
+    rf->adf4360_output_power_level = ADF4360_OUTPUT_POWER_LEVEL_N5DBM;
     //adf4360_load(rf, 0x0001C202);
     //adf4360_load(rf, 0x004FE920);
     //adf4360_load(rf, 0x00300321);

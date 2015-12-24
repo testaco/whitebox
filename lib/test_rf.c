@@ -64,13 +64,15 @@ int test_tx_902_pll(void* data) {
 int _test_rx_pll(float freq) {
     whitebox_t wb;
     whitebox_init(&wb);
+    printf("test_rx_pll %f\n", freq);
     assert(whitebox_open(&wb, "/dev/whitebox", O_RDONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_rx_clear(&wb) == 0);
     assert(whitebox_rx(&wb, freq) == 0);
     whitebox_plls_locked(&wb);
     assert(whitebox_plls_locked(&wb));
-    //assert(ioctl(wb.fd, W_LOCKED));
+    assert(ioctl(wb.fd, W_LOCKED));
+    getchar();
     assert(whitebox_close(&wb) == 0);
 }
 

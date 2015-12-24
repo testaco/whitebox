@@ -236,6 +236,15 @@ void cmx991_rx_config(cmx991_t* rf, mix_out_t mix_out,
     rf->lna = lna;
 }
 
+rx_rf_div_t cmx991_rx_div(unsigned int div) {
+    switch (div) {
+        case 1: return RX_RF_DIV_BY_1;
+        case 2: return RX_RF_DIV_BY_2;
+        case 4: return RX_RF_DIV_BY_4;
+    }
+    return -1;
+}
+
 void cmx991_rx_tune(cmx991_t* rf, rx_rf_div_t div) {
     rf->rx_rf_div = div;
 }

@@ -8,6 +8,8 @@
 
 #include "whitebox.h"
 
+#define IF_LO_FREQ 90e6
+
 long whitebox_tx_bytes_total() {
     char bytes_str[512];
     int fd;
@@ -100,6 +102,7 @@ void whitebox_init(whitebox_t* wb) {
     adf4360_init(&wb->adf4360);
     wb->lna = 0;
     wb->led = 0;
+    wb->noise = 0;
     whitebox_led_init();
 }
 
@@ -289,7 +292,6 @@ int whitebox_tx(whitebox_t* wb, float frequency) {
     whitebox_args_t w;
 
     // Set the IF LO Frequency
-    #define IF_LO_FREQ 90e6
     if ((err = ioctl(wb->fd, WA60_GET, &w)) < 0)
         return err;
     adf4360_ioctl_get(&wb->adf4360, &w);
@@ -393,6 +395,31 @@ int whitebox_tx_fine_tune(whitebox_t *wb, float frequency) {
     whitebox_tx_config(wb); // T/R switch, etc.
 
     return 0;
+}
+
+void whitebox_mute_lo(whitebox_t *wb) {
+    whitebox_args_t w;
+
+    ioctl(wb->fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb->cmx991, &w);
+    wb->cmx991.en_bias = EN_BIAS_POWER_DOWN;
+    wb->cmx991.vco_buf_en = VCO_BUF_EN_POWER_DOWN;
+    wb->cmx991.vco_nr_en = VCO_NR_EN_POWER_DOWN;
+    wb->cmx991.mix_pwr = MIX_PWR_POWER_DOWN;
+    wb->cmx991.iq_pwr = IQ_PWR_POWER_DOWN;
+    wb->cmx991.vbias = VBIAS_POWER_DOWN;
+    wb->cmx991.tx_mix_pwr = TX_MIX_PWR_POWER_DOWN;
+    wb->cmx991.iq_mod_pwr = IQ_MOD_PWR_POWER_DOWN;
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+
+    adf4351_pll_disable(&wb->adf4351);
+    adf4351_ioctl_set(&wb->adf4351, &w);
+    ioctl(wb->fd, WA_SET, &w);
+
+    adf4360_pll_disable(&wb->adf4360);
+    adf4360_ioctl_set(&wb->adf4360, &w);
+    ioctl(wb->fd, WA60_SET, &w);
 }
 
 uint16_t whitebox_cic_shift(uint16_t interp)
@@ -586,36 +613,71 @@ void whitebox_rx_config(whitebox_t* wb) {
     ioctl(wb->fd, WG_SET, &w);
 }
 
-int whitebox_rx(whitebox_t* wb, float frequency) {
+int _rx_div_for_freq(float if_freq, float rf_freq) {
+    unsigned int rf_div;
     float vco_frequency;
+
+    rf_div = 4;
+    vco_frequency = (rf_freq + if_freq) * rf_div;
+    if (vco_frequency >= 35e6 && vco_frequency <= 2e9)
+        return rf_div;
+    
+    rf_div = 2;
+    vco_frequency = (rf_freq + if_freq) * rf_div;
+    if (vco_frequency >= 35e6 && vco_frequency <= 2e9)
+        return rf_div;
+
+    rf_div = 1;
+    vco_frequency = (rf_freq + if_freq) * rf_div;
+    if (vco_frequency >= 35e6 && vco_frequency <= 2e9)
+        return rf_div;
+
+    return -1;
+}
+
+int whitebox_rx(whitebox_t* wb, float frequency) {
+    int err;
+    float vco_frequency;
+    int rx_div = 4;
     whitebox_args_t w;
 
     ioctl(wb->fd, WC_GET, &w);
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_resume(&wb->cmx991);
-#if WC_USE_PLL
-    if (cmx991_pll_enable_m_n(&wb->cmx991, 19.2e6, 192, 1800) < 0) {
-        return -1;
-    }
+
+#if 0
+    // Set the IF LO Frequency
+    if ((err = ioctl(wb->fd, WA60_GET, &w)) < 0)
+        return err;
+    adf4360_ioctl_get(&wb->adf4360, &w);
+    adf4360_pll_enable(&wb->adf4360, WA_CLOCK_RATE, 200e3, IF_LO_FREQ * 4);
+    adf4360_ioctl_set(&wb->adf4360, &w);
+    if ((err = ioctl(wb->fd, WA60_SET, &w)) < 0)
+        return err;
 #endif
 
-    vco_frequency = (frequency + 45.00e6) * 4.0;
-    if (vco_frequency <= 35.00e6) {
+    // Set the RF LO Frequency
+    // TODO: this should be the highest possible frequency below 2GHz so
+    // we can use a couple of small filters on RF oscillator output.
+    rx_div = _rx_div_for_freq(IF_LO_FREQ, frequency);
+    if (rx_div <= 0)
         return -1;
-    }
 
-    //printf("%f %f\n", frequency, vco_frequency);
+    vco_frequency = (frequency + IF_LO_FREQ) * rx_div;
 
-    whitebox_rx_config(wb);
-    cmx991_rx_tune(&wb->cmx991, RX_RF_DIV_BY_4);
-    cmx991_ioctl_set(&wb->cmx991, &w);
-    ioctl(wb->fd, WC_SET, &w);
+    printf("frequency=%f vco_frequency=%f div=%d\n", frequency, vco_frequency, rx_div);
 
     adf4351_init(&wb->adf4351);
-
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+
+    cmx991_rx_tune(&wb->cmx991, cmx991_rx_div(rx_div));
+    whitebox_rx_config(wb);
+
+    cmx991_ioctl_set(&wb->cmx991, &w);
+    ioctl(wb->fd, WC_SET, &w);
+
     return 0;
 }
 
@@ -623,7 +685,7 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
     float vco_frequency;
     whitebox_args_t w;
 
-    vco_frequency = (frequency + 45.00e6) * 4.0;
+    vco_frequency = (frequency + 90.00e6) * 4.0;
     if (vco_frequency <= 35.00e6) {
         return -1;
     }
@@ -631,6 +693,9 @@ int whitebox_rx_fine_tune(whitebox_t *wb, float frequency) {
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+
+    printf("frequency=%f vco_frequency=%f\n", frequency, vco_frequency);
+    wb->frequency = frequency;
 }
 
 int whitebox_rx_standby(whitebox_t *wb)

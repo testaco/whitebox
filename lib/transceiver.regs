@@ -1,0 +1,64 @@
+# Transceiver settings
+power       standby,on,sleep
+band        6m,2m,1_25m,70cm,33cm
+mode        iq,lsb,usb,cw,fm,am,fsk,cwr,tune,fsr
+direction   rx,tx
+
+# Local Oscillator settings
+vfoa    [0,99999999999]
+vfob    [0,99999999999]
+step    [1,100000]
+rx_vfo  vfoa,vfob,mem
+tx_vfo  vfoa,vfob,mem
+
+# Transmitter settings
+ptt          off,on
+tx_inhibit   off,on
+output_power [0,100]
+mic_gain     [0,255]
+vox          off,on
+vox_delay_ms [0,3000]
+vox_gain     [0,9]
+tx_filter_bw 2k0hz, 2k4hz
+
+# Receiver settings
+af_gain [0,255]
+rf_gain [0,100]
+agc     off,slow,fast
+squelch [0,255]
+
+# Meter runtime
+meter       s,pwr,alc,swr,comp
+s_meter     [0,9] readonly
+alc_meter   [0,9] readonly
+swr_meter   [0,9] readonly
+comp        [0,9] readonly
+
+# Channel settings
+busy_lockout    off,on
+ctcss           off,on
+ctcss_freq      [0,41]
+tone            off,on
+tone_freq       [0,42]
+
+# Channel memory settings
+mem_bank         [0,9]
+mem_ch           [0,99]
+mem_vfoa         [0,99999999999]
+mem_vfob         [0,99999999999]
+mem_mode         iq,lsb,usb,cw,fm,am,fsk,cwr,tune,fsr
+mem_busy_lockout off, on
+mem_ch_stuff     off, tone, ctcss
+mem_tone_freq    [0,42]
+mem_ctcss_freq   [0,42]
+mem_name         [A-Za-z0-9\*\+\-\/]8
+mem_step         [0,100000]
+
+# Feature settings
+scan        off,on
+auto_mode   off, on
+cw_break_in_delay   [0,1000]
+cw_keying_speed_wpm [10,60]
+cw_auto_zero_beat off, on
+cw_frequency      400,450,500,550,600,650,700,750,800,850,900,950,1000
+

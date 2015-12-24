@@ -73,8 +73,11 @@ class modem // Uses the RF Controller singleton from the HAL
         void transmit(const void * data, size_t length);
 
         void start_receive();
-        void run_next_task();
-        void run_task(modem_state state);
+
+        int run_next_task();
+        int run_task(modem_state state);
+
+        //void schedule_task(modem_state next_state, int timeout);
 
         modulator * get_modulator() { return mod; }
         demodulator * get_demodulator() { return demod; }
@@ -82,7 +85,8 @@ class modem // Uses the RF Controller singleton from the HAL
     private:
         modem() {
             curr_state = idle;
-            modem_task = NULL;
+            //modem_task = NULL;
+            //modem_taskid = -1;
         };
 
         modem(modem const&); // No copy
@@ -100,9 +104,9 @@ class modem // Uses the RF Controller singleton from the HAL
         modulator * mod;
         demodulator * demod;
 
-        task_handler *  modem_task;
+        //int modem_taskid;
+        //task_handler *  modem_task;
         modem_state curr_state;
-
 };
 
 #endif /* __MODEM_H__ */

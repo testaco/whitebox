@@ -40,6 +40,7 @@ struct whitebox {
     uint8_t vga;
     if_filter_bw_t if_bw;
     uint8_t rxcal; // Set to true in the poll loop to start a calibration
+    uint8_t noise;
 
     // Gateway settings
     uint8_t bpf;
@@ -119,6 +120,8 @@ void whitebox_rx_get_correction(whitebox_t *wb, int16_t *correct_i, int16_t *cor
 uint16_t whitebox_cic_shift(uint16_t interp);
 
 int whitebox_gateway_set(whitebox_t *wb);
+
+void whitebox_mute_lo(whitebox_t * wb); // TODO REMOVE!
 
 #ifdef __cplusplus
 }

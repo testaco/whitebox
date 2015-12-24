@@ -16,28 +16,34 @@ const char * modem::get_state_string() {
 class modem_task_handler : public task_handler
 {
     public:
-        void callback();
+        int callback();
 };
 
-void modem_task_handler::callback() {
-    modem::get_instance().run_next_task();
+int modem_task_handler::callback() {
+    return modem::get_instance().run_next_task();
 }
 
-void modem::run_next_task() {
-    run_task(curr_state);
+int modem::run_next_task() {
+    return run_task(curr_state);
 }
 
-void modem::run_task(modem_state state) {
+int modem::run_task(modem_state state) {
     modem_state next_state = power_on;
+    int timeout;
+    std::cerr << modem_task << std::endl;
     switch(state) {
         case idle:
             next_state = idle;
+            timeout = 999;
             break;
         case receive:
             next_state = receive_callback;
+            timeout = 0;
             break;
         case receive_callback:
+            receive_cb();
             next_state = receive_callback;
+            timeout = 125;
             break;
 #if 0
         case modem::state::receive_start:
@@ -57,22 +63,29 @@ void modem::run_task(modem_state state) {
             break;
     }
     std::cerr << "Modem: run_task [" << modem_state_strings[state]
-        << "] -> [" << modem_state_strings[next_state] << "]" << std::endl;
+        << "] -> [" << modem_state_strings[next_state] << "] timeout="
+        << timeout << std::endl;
     curr_state = next_state;
+    return timeout;
 }
 
 void modem::receive_cb() {
     std::list<radio_context *>::iterator it;
     demodulator * demod = modem::get_instance().get_demodulator();
-    size_t length = 1024; //demod->data_available();
+    size_t length = 1024 * sizeof(uint32_t); //demod->data_available();
     //std::cerr << "receive " << length << " bytes" << std::endl;
+    WriteBuffer * buffer = new WriteBuffer(length, 1);
+    for (int i = 0; i < length / sizeof(uint32_t); ++i) {
+        ((uint32_t*)buffer->data())[i] = demod->demodulate();
+    }
     for (it = connections.begin(); it != connections.end(); ++it) {
-        WriteBuffer * buffer = new WriteBuffer(length, 1);
-        for (int i = 0; i < length / sizeof(uint32_t); ++i) {
-            ((uint32_t*)buffer->data())[i] = demod->demodulate();
-        }
         server_data_out((*it)->get_client(), buffer);
     }
+}
+
+void modem::schedule_task(modem_state next_state, int timeout) {
+    curr_state = next_state;
+    poll_schedule_task(modem_taskid, timeout);
 }
 
 void modem::connect(radio_context * context) {
@@ -96,27 +109,29 @@ void modem::disconnect(radio_context * context) {
 }
 
 void modem::start() {
-    assert(modem_task == NULL);
-    std::cerr << "Modem: start receive" << std::endl;
-    modem_task = new modem_task_handler();
-    poll_start_task(modem_task);
+    if (modem_taskid < 0) {
+        modem_task = new modem_task_handler();
+        modem_taskid = poll_start_task(modem_task);
+        std::cerr << "Modem: startup " << modem_taskid << std::endl;
+    }
 }
 
 void modem::standby() {
-    assert(modem_task);
-    std::cerr << "Modem: end receive" << std::endl;
-    poll_end_task(modem_task);
-    modem_task = NULL;
+    if (modem_taskid >= 0) {
+        std::cerr << "Modem: standby " << modem_taskid << std::endl;
+        poll_end_task(modem_taskid);
+        modem_taskid = -1;
+    }
 }
 
 
 void modem::start_receive() {
-    // TODO if half_duplex
-    //end_transmit();
-    run_task(receive);
+    std::cerr << "Modem: start receive " << modem_taskid << std::endl;
+    schedule_task(receive, 0);
 }
 
 void modem::end_receive() {
+    std::cerr << "Modem: end receive" << std::endl;
 }
 
 void modem::start_transmit() {
