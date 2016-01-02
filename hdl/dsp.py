@@ -1,4 +1,5 @@
 import math
+
 import numpy as np
 from myhdl import Signal, always, always_comb, always_seq, \
                   intbv, enum, concat, modbv, ResetSignal
@@ -13,6 +14,7 @@ class Signature(object):
     :param bits: Bit precision of each channel
     :param min: The minimum value allowed
     :param max: The maximum value allowed
+    :param ready: An already existing boolean ``Signal``
     :param valid: An already existing boolean ``Signal``
     :param last: An already existing boolean ``Signal``
     :param i: An already existing intbv ``Signal``
@@ -41,6 +43,7 @@ class Signature(object):
         else:
             raise AttributeError, "Must give bits or min & max"
 
+        self.ready = kwargs.get('ready', Signal(bool(0)))
         self.valid = kwargs.get('valid', Signal(bool(0)))
         self.last = kwargs.get('last', Signal(bool(0)))
         self.i = kwargs.get('i', Signal(intbv(0, min=self.min, max=self.max)))
@@ -49,6 +52,9 @@ class Signature(object):
     def __repr__(self):
         return '<Signature name=%s bits=%d min=%d max=%d>' % (self.name,
                 self.bits, self.min, self.max)
+
+    def rangetuple(self):
+        return (self.min, self.max)
 
     def myhdl(self, default):
         """Get the signature as an ``intbv``."""
@@ -307,9 +313,9 @@ def binary_offseter(clearn, clock,
 
 def iqmux(clearn, clock,
         channel,
-        in0_sign,
-        in1_sign,
-        out_sign):
+        in0,
+        in1,
+        out):
     """Multiplex between two incoming signals.
 
     :param clearn: The reset signal.
@@ -321,33 +327,18 @@ def iqmux(clearn, clock,
     :returns: A synthesizable MyHDL instance.
     """
 
-    in0_valid = in0_sign.valid
-    in0_i = in0_sign.i
-    in0_q = in0_sign.q
-    in0_last = in0_sign.last
-
-    in1_valid = in1_sign.valid
-    in1_i = in1_sign.i
-    in1_q = in1_sign.q
-    in1_last = in1_sign.last
-
-    out_valid = out_sign.valid
-    out_i = out_sign.i
-    out_q = out_sign.q
-    out_last = out_sign.last
-
     @always_seq(clock.posedge, reset=clearn)
     def mux():
         if channel == 0:
-            out_valid.next = in0_valid
-            out_last.next = in0_last
-            out_i.next = in0_i
-            out_q.next = in0_q
+            out.valid.next = in0.valid
+            out.last.next = in0.last
+            out.i.next = in0.i
+            out.q.next = in0.q
         else:
-            out_valid.next = in1_valid
-            out_last.next = in1_last
-            out_i.next = in1_i
-            out_q.next = in1_q
+            out.valid.next = in1.valid
+            out.last.next = in1.last
+            out.i.next = in1.i
+            out.q.next = in1.q
 
     return mux
 

@@ -43,6 +43,20 @@ class Apb3Bus(object):
         self.args = args
         self.kwargs = kwargs
 
+    def signals():
+        return dict(
+            presetn=self.presetn,
+            pclk=self.pclk,
+            paddr=self.paddr,
+            psel=self.psel,
+            penable=self.penable,
+            pwrite=self.pwrite,
+            pwdata=self.pwdata,
+            pready=self.pready,
+            prdata=self.prdata,
+            pslverr=self.pslverr
+        )
+
     def debug(self, msg):
         if self.kwargs.get('verbose', False):
             print msg

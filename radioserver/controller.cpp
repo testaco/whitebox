@@ -8,12 +8,17 @@
 
 // TODO: linux only
 #include <sys/timerfd.h>
+#include <sys/ioctl.h>
 #include <poll.h>
 
 #include "whitebox.h"
 #include "radio.h"
 #include "controller.h"
 #include "repeater.h"
+
+#define SAMPLE_RATE 8000
+#define FRAMES_PER_SECOND 256
+#define SAMPLE_PERIOD (1000/FRAMES_PER_SECOND)
 
 static timespec millis_ts;
 
@@ -36,16 +41,16 @@ void controller_init() {
     assert(wb == NULL);
     wb = (whitebox*)malloc(sizeof(*wb));
     whitebox_init(wb);
-    if (whitebox_open(wb, "/dev/whitebox", O_RDWR | O_NONBLOCK, 10000) < 0) {
+    if (whitebox_open(wb, "/dev/whitebox", O_RDWR | O_NONBLOCK, SAMPLE_RATE) < 0) {
         std::cerr << "Error: couldn't open the whitebox" << std::endl;
-        free(wb);
-        wb = NULL;
+        //free(wb);
+        //wb = NULL;
         return;
     }
     if (whitebox_mmap(wb) < 0) {
         std::cerr << "Error: couldn't mmap the whitebox" << std::endl;
-        free(wb);
-        wb = NULL;
+        //free(wb);
+        //wb = NULL;
         return;
     }
 }
@@ -67,18 +72,30 @@ int controller_timeout() {
     return controller_cur_timeout;
 }
 
-static void receive_cb(pollfd * pollfd, void * ) {
-    static uint32_t fcw = freq_to_fcw(1440, 8192/2);
+static void receive_timer_cb(pollfd * pollfd, void * ) {
+    static uint32_t fcw = freq_to_fcw(1440, SAMPLE_RATE);
     static uint32_t phase = 0;
     uint64_t count;
     read(pollfd->fd, &count, sizeof(uint64_t));
     // How many times the timer has happened; each one is 125ms, so there's 8 per second.  At 8192sps, that
-    size_t samples_count = 1; // TODO count * (8192 / 8);
+    size_t samples_count = (SAMPLE_RATE / FRAMES_PER_SECOND) * count;
     size_t samples_byte_length = samples_count * sizeof(uint32_t);
     uint32_t * data = new uint32_t[samples_count];
     for (int i = 0; i < samples_count; ++i) {
         data[i] = sincos16c(fcw, &phase);
         //awgn32(&data[i]);
+    }
+    repeater::get_instance().receive_cb(1, data, samples_byte_length + 4);
+}
+
+static void receive_whitebox_cb(pollfd * pollfd, void * ) {
+    unsigned long dest;
+    size_t samples_count = ioctl(pollfd->fd, W_MMAP_READ, &dest) / sizeof(uint32_t);
+    size_t samples_byte_length = samples_count * sizeof(uint32_t);
+    uint32_t * data = new uint32_t[samples_count + 1];
+    if (read(pollfd->fd, &data, samples_byte_length) != samples_byte_length) {
+        std::cerr << "Wirdness" << std::endl;
+        whitebox_debug_to_file(wb, stderr);
     }
     repeater::get_instance().receive_cb(1, data, samples_byte_length + 4);
 }
@@ -97,9 +114,10 @@ void timerfd_periodic(int fd, int ms) {
     std::cerr << spec.it_interval.tv_sec << " " << spec.it_interval.tv_nsec << std::endl;
     if(timerfd_settime(controller_receive_fd, 0, &spec, NULL) < 0) {
         // TODO: error
+        std::cerr << "Couldn't get timer" << std::endl;
         return;
     }
-    poll_start_fd(fd, POLLIN, receive_cb, NULL);
+    poll_start_fd(fd, POLLIN, receive_timer_cb, NULL);
 }
 
 void timerfd_end(int fd) {
@@ -118,20 +136,20 @@ void controller_task() {
 
     switch(controller_cur_state) {
         case receive:
-            if (whitebox_rx(wb, 450e6) < 0) // TODO
+            if (whitebox_rx(wb, 460e6) < 0) {
                 std::cerr << "Receive start failed!" << std::endl;
-            std::cerr << "Setting up the whitebox fd for receive" << std::endl;
-            poll_start_fd(whitebox_fd(wb), POLLIN | POLLERR, receive_cb, NULL);
-            rxing = true;
-            txing = false;
-            next_state = idle;
-            next_timeout = -1;
-            break;
-            // TODO
-            assert(controller_receive_fd == -1);
-            controller_receive_fd = timerfd_create(CLOCK_MONOTONIC, O_NONBLOCK);
-            assert(controller_receive_fd >= 0);
-            timerfd_periodic(controller_receive_fd, 125);
+                assert(controller_receive_fd == -1);
+                controller_receive_fd = timerfd_create(CLOCK_MONOTONIC, O_NONBLOCK);
+                assert(controller_receive_fd >= 0);
+                timerfd_periodic(controller_receive_fd, SAMPLE_PERIOD);
+            } else {
+                std::cerr << "Setting up the whitebox fd for receive" << std::endl;
+                poll_start_fd(whitebox_fd(wb), POLLIN | POLLERR, receive_whitebox_cb, NULL);
+                rxing = true;
+                txing = false;
+                next_state = idle;
+                next_timeout = -1;
+            }
             break;
         case transmit:
             if (whitebox_tx(wb, 450e6) < 0) // TODO

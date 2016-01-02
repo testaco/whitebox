@@ -27,7 +27,8 @@ else()
         #SOURCE_DIR libwebsockets-build-prefix/src/libwebsockets-build/libwebsockets
         #DOWNLOAD_COMMAND cp -r ${CMAKE_CURRENT_SOURCE_DIR}/libwebsockets/ ${CMAKE_CURRENT_BINARY_DIR}/libwebsockets-build-prefix/src/libwebsockets-build
         GIT_REPOSITORY https://github.com/warmcat/libwebsockets.git
-        CMAKE_ARGS ${CMAKE_TOOLCHAIN_ARG} -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr -DZLIB_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include -DLWS_WITH_SSL=0  -DLWS_WITHOUT_EXTENSIONS=1 -DLWS_WITH_STATIC=1 -DLWS_WITH_SHARED=0
+        GIT_TAG v1.5-chrome47-firefox41
+        CMAKE_ARGS ${CMAKE_TOOLCHAIN_ARG} -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr -DZLIB_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/linux-cortexm-1.12.0/A2F/root/usr/include -DLWS_WITH_SSL=0  -DLWS_WITHOUT_EXTENSIONS=1 -DLWS_WITH_STATIC=1 -DLWS_WITH_SHARED=0 -DLWS_WITH_OLD_API_WRAPPERS=1
         LOG_INSTALL 1
         DEPENDS zlib-build
     )
@@ -51,7 +52,7 @@ set(Main.sources
     controller.cpp
     cJSON.c
 )
-set_source_files_properties(${Main.sources} PROPERTIES COMPILE_FLAGS "-DMAJOR_VERSION=${PROJECT_VERSION_MAJOR} -DMINOR_VERSION=${PROJECT_VERSION_MINOR} -DPATCH_VERSION=${PROJECT_VERSION_PATCH} -DCODENAME=\"${PROJECT_VERSION_CODENAME}\" -DSYSTEM=\"${CMAKE_SYSTEM}\" -g")
+set_source_files_properties(${Main.sources} PROPERTIES COMPILE_FLAGS "-DMAJOR_VERSION=${PROJECT_VERSION_MAJOR} -DMINOR_VERSION=${PROJECT_VERSION_MINOR} -DPATCH_VERSION=${PROJECT_VERSION_PATCH} -DCODENAME=\"${PROJECT_VERSION_CODENAME}\" -DSYSTEM=\"${CMAKE_SYSTEM}\" -g -DLWS_WITH_OLD_API_WRAPPERS=1")
 add_executable(main ${Main.sources})
 
 include(FindALSA)

@@ -41,7 +41,7 @@ add_custom_command(
     OUTPUT duc.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/duc.py
     DEPENDS duc.py fifo.py duc.py ddc.py dds.py dsp.py ram.py fir.py
-) 
+)
 
 set(duc_verilated_sources
     obj_dir/Vduc.cpp
@@ -62,13 +62,80 @@ set(duc_controller_sources
     /usr/share/verilator/include/verilated_vcd_c.cpp
 )
 find_library(WebSockets NAMES libwebsockets)
+
 add_custom_target(duc_controller
     DEPENDS ${duc_controller_sources}
     COMMAND g++ -O2 -o duc_controller -I${CMAKE_CURRENT_BINARY_DIR} -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -LWebSockets ${duc_controller_sources}
 )
 
+
+# MODEM
+
+add_custom_command(
+    OUTPUT modem.v
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/modem.py
+    DEPENDS modem.py
+)
+
+set(modem_verilated_sources
+    obj_dir/Vmodem.cpp
+    obj_dir/Vmodem__Syms.cpp
+    obj_dir/Vmodem__Trace.cpp
+    obj_dir/Vmodem__Trace__Slow.cpp
+)
+
+add_custom_command(
+    OUTPUT ${modem_verilated_sources}
+    COMMAND verilator -Wall -Wno-fatal --trace -I${CMAKE_CURRENT_SOURCE_DIR} -O3 --cc ${CMAKE_CURRENT_BINARY_DIR}/modem.v
+    DEPENDS modem.v # modem_controller.v
+)
+
+add_custom_target(test_modem
+    DEPENDS ${modem_verilated_sources}
+)
+
+# TUNER
+
+add_custom_command(
+    OUTPUT tuner.v
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tuner.py
+    DEPENDS tuner.py apb3_utils.py dsp.py dds.py cic.py
+)
+
+set(tuner_verilated_sources
+    obj_dir/Vtuner.cpp
+    obj_dir/Vtuner__Syms.cpp
+    obj_dir/Vtuner__Trace.cpp
+    obj_dir/Vtuner__Trace__Slow.cpp
+)
+
+add_custom_command(
+    OUTPUT ${tuner_verilated_sources}
+    COMMAND verilator -Wall -Wno-fatal --trace -I${CMAKE_CURRENT_SOURCE_DIR} -O3 --cc ${CMAKE_CURRENT_BINARY_DIR}/tuner.v
+    DEPENDS tuner.v # tuner_controller.v
+)
+
+set(test_tuner_sources
+    ${tuner_verilated_sources}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_tuner.cpp
+    /usr/share/verilator/include/verilated.cpp
+    /usr/share/verilator/include/verilated_vcd_c.cpp
+)
+
+add_custom_target(test_tuner
+    DEPENDS ${test_tuner_sources}
+    COMMAND g++ -O2 -o test_tuner -I${CMAKE_CURRENT_BINARY_DIR} -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -LWebSockets ${test_tuner_sources}
+)
+
+# STREAMER
+add_custom_command(
+    OUTPUT streamer.v
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/streamer.py
+    DEPENDS streamer.py apb3_utils.py dsp.py ram.py
+)
+
 add_custom_target(hdl
-    DEPENDS whitebox.v duc.v duc_controller
+    DEPENDS whitebox.v duc.v duc_controller modem.v tuner.v streamer.v test_modem test_tuner
 )
 
 configure_file(cosim_whitebox.v cosim_whitebox.v COPYONLY)

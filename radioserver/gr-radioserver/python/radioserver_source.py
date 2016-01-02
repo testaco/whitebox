@@ -52,6 +52,7 @@ class radioserver_source(gr.sync_block):
 
     def work(self, input_items, output_items):
         out = output_items[0]
+        #print "work"
         return self.client.receive_ishort(out)
 
     def get_url(self):

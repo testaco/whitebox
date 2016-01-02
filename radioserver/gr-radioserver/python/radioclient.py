@@ -63,19 +63,22 @@ class radio_client(object):
         if not self._cur_data:
             self._cur_data = self.ws.recv()
             # Convert from bytes to shorts
-            if len(self._cur_data) <= 4:
+            if len(self._cur_data) < 4:
                 self._cur_data = None
                 return 0
-            assert len(self._cur_data) % 4 == 0
+            if len(self._cur_data) % 4 != 0:
+                print "WTF", self._cur_data
+                self._cur_data = None
+                return 0
             self._cur_data = struct.unpack('hh' * (len(self._cur_data) / 4),
                                            self._cur_data)
             self._cur_data = self._cur_data[2:]
-            print "Getting some data...", len(self._cur_data)
-            print self._cur_data
+            #print "Getting some data...", len(self._cur_data)
+            #print self._cur_data
 
             self._cur_index = 0
         length = min(len(out), len(self._cur_data) - self._cur_index)
-        print "Working with", length, self._cur_index
+        #print "Working with", length, self._cur_index
         for i in xrange(length):
             #print 'in_index=%d out_index=%d data=%d' % (self._cur_index, i, self._cur_data[self._cur_index])
             out[i] = self._cur_data[self._cur_index]
