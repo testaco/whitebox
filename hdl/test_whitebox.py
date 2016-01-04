@@ -499,7 +499,9 @@ def whitebox_clear(bus):
 
 class TestApb3Transaction(unittest.TestCase):
     def test_apb3_transaction(self):
-        bus = Apb3Bus(duration=APB3_DURATION)
+        bus = Apb3Bus(duration=APB3_DURATION,
+                      slaves=['rfe', 'sampler', 'modem', 'tuner', 'converter']
+                      )
 
         s = WhiteboxSim(bus)
 

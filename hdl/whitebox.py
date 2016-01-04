@@ -291,7 +291,7 @@ def whitebox(
     data_in_i = data_in.i
     data_in_q = data_in.q
 
-    streamer_bus = bus.for_slave(psel_streamer, prdata_streamer, pready_streamer)
+    streamer_bus = bus.for_slave('streamer')
     streamer_args = (streamer_bus,
             clearn, dsp_clock,
             tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata,
@@ -317,7 +317,7 @@ def whitebox(
     bb_in_i = bb_in.i
     bb_in_q = bb_in.q
 
-    modem_bus = bus.for_slave(psel_modem, prdata_modem, pready_modem)
+    modem_bus = bus.for_slave('modem')
     modem_args = (modem_bus,
         clearn, dsp_clock,
         bb_in, bb_out,
@@ -340,7 +340,7 @@ def whitebox(
     rf_in_i = rf_in.i
     rf_in_q = rf_in.q
 
-    tuner_bus = bus.for_slave(psel_tuner, prdata_tuner, pready_tuner)
+    tuner_bus = bus.for_slave('tuner')
     tuner_args = (tuner_bus,
         clearn, dsp_clock,
         bb_in, bb_out,
@@ -348,7 +348,7 @@ def whitebox(
     tuner_kwargs = {}
     tuner_0 = tuner(*tuner_args, **tuner_kwargs)
 
-    converter_bus = bus.for_slave(psel_converter, prdata_converter, pready_converter)
+    converter_bus = bus.for_slave('converter')
     converter_args = (converter_bus,
             clearn, dsp_clock, dac_clock,
             rf_out, dac_en, dac_data,
@@ -428,7 +428,7 @@ if __name__ == '__main__':
     rx_status_led = Signal(bool(0))
     rx_dmaready = Signal(bool(1))
 
-    bus = Apb3Bus()
+    bus = Apb3Bus(slaves=['streamer', 'modem', 'tuner', 'converter'])
     bus_presetn = bus.presetn
     bus_pclk = bus.pclk
     bus_paddr = bus.paddr

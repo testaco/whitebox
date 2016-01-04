@@ -42,11 +42,22 @@ class Apb3Bus(object):
         self.pslverr = kwargs.pop('pslverr', Signal(bool(0)))
         self.args = args
         self.kwargs = kwargs
+        self.slaves = kwargs.pop('slaves', [])
 
-    def for_slave(self, psel, prdata, pready, pslverr=None):
+        for slave in self.slaves:
+            setattr(self, 'psel_%s' % slave, Signal(bool(0)))
+            setattr(self, 'pready_%s' % slave, Signal(bool(0)))
+            setattr(self, 'prdata_%s' % slave, Signal(intbv(0, 0, 2**32)))
+            
+
+    def for_slave(self, slave):
+        assert slave in self.slaves
         sig = self.signals()
-        sig.update({'psel': psel,
-                    'prdata': prdata, 'pready': pready, 'pslverr': pslverr})
+        sig.update({'psel': getattr(self, 'psel_%s' % slave),
+                    'prdata': getattr(self, 'prdata_%s' % slave),
+                    'pready': getattr(self, 'pready_%s' % slave),
+                    'pslverr': getattr(self, 'pslverr_%s' % pslverr)
+                  })
         return Apb3Bus(**sig)
 
     def signals(self):
