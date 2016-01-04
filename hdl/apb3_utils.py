@@ -48,6 +48,7 @@ class Apb3Bus(object):
             setattr(self, 'psel_%s' % slave, Signal(bool(0)))
             setattr(self, 'pready_%s' % slave, Signal(bool(0)))
             setattr(self, 'prdata_%s' % slave, Signal(intbv(0, 0, 2**32)))
+            setattr(self, 'pslverr_%s' % slave, Signal(bool(0)))
             
 
     def for_slave(self, slave):
@@ -56,7 +57,7 @@ class Apb3Bus(object):
         sig.update({'psel': getattr(self, 'psel_%s' % slave),
                     'prdata': getattr(self, 'prdata_%s' % slave),
                     'pready': getattr(self, 'pready_%s' % slave),
-                    'pslverr': getattr(self, 'pslverr_%s' % pslverr)
+                    'pslverr': getattr(self, 'pslverr_%s' % slave)
                   })
         return Apb3Bus(**sig)
 
