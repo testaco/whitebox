@@ -31,43 +31,38 @@ find_python_module(matplotlib REQUIRED)
 find_python_module(numpy REQUIRED)
 find_python_module(scipy REQUIRED)
 
+# WHITEBOX
+
 add_custom_command(
     OUTPUT whitebox.v
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/whitebox.py
-    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py ddc.py dds.py rfe.py dsp.py ram.py fir.py
+    DEPENDS whitebox.py apb3_utils.py fifo.py duc.py ddc.py dds.py rfe.py dsp.py ram.py fir.py streamer.py tuner.py modem.py converter.py
 ) 
 
-add_custom_command(
-    OUTPUT duc.v
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/duc.py
-    DEPENDS duc.py fifo.py duc.py ddc.py dds.py dsp.py ram.py fir.py
-)
-
-set(duc_verilated_sources
-    obj_dir/Vduc.cpp
-    obj_dir/Vduc__Syms.cpp
-    obj_dir/Vduc__Trace.cpp
-    obj_dir/Vduc__Trace__Slow.cpp
+set(whitebox_verilated_sources
+    obj_dir/Vwhitebox.cpp
+    obj_dir/Vwhitebox__Syms.cpp
+    obj_dir/Vwhitebox__Trace.cpp
+    obj_dir/Vwhitebox__Trace__Slow.cpp
 )
 
 add_custom_command(
-    OUTPUT ${duc_verilated_sources}
-    COMMAND verilator -Wall -Wno-fatal --trace -I${CMAKE_CURRENT_SOURCE_DIR} -O3 --cc ${CMAKE_CURRENT_BINARY_DIR}/duc.v
-    DEPENDS duc.v duc_controller.v
+    OUTPUT ${whitebox_verilated_sources}
+    COMMAND verilator -Wall -Wno-fatal --trace -I${CMAKE_CURRENT_SOURCE_DIR} -O3 --cc ${CMAKE_CURRENT_BINARY_DIR}/whitebox.v
+    DEPENDS whitebox.v
 )
-set(duc_controller_sources
-    ${duc_verilated_sources}
-    ${CMAKE_CURRENT_SOURCE_DIR}/duc_controller.cpp
+
+set(test_whitebox_sources
+    ${whitebox_verilated_sources}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_whitebox.cpp
     /usr/share/verilator/include/verilated.cpp
     /usr/share/verilator/include/verilated_vcd_c.cpp
 )
-find_library(WebSockets NAMES libwebsockets)
 
-add_custom_target(duc_controller
-    DEPENDS ${duc_controller_sources}
-    COMMAND g++ -O2 -o duc_controller -I${CMAKE_CURRENT_BINARY_DIR} -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -LWebSockets ${duc_controller_sources}
+add_custom_target(test_whitebox
+    DEPENDS ${test_whitebox_sources}
+    #COMMAND g++ -O2 -o test_whitebox -I${CMAKE_CURRENT_BINARY_DIR} -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd ${test_whitebox_sources}
 )
-
 
 # MODEM
 
@@ -135,7 +130,7 @@ add_custom_command(
 )
 
 add_custom_target(hdl
-    DEPENDS whitebox.v duc.v duc_controller modem.v tuner.v streamer.v test_modem test_tuner
+    DEPENDS whitebox.v modem.v tuner.v streamer.v test_modem test_tuner test_whitebox
 )
 
 configure_file(cosim_whitebox.v cosim_whitebox.v COPYONLY)

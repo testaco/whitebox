@@ -98,7 +98,6 @@ def tuner(bus,       # System bus
           dclk,      # Data clock (40MHz)
           bb_in,     # Baseband transmit signal
           bb_out,    # Baseband receive signal
-          sclk,      # Sampling clock (10MHz)
           rf_in,     # RX RF signal
           rf_out,    # TX RF signal
           **config):
@@ -158,7 +157,7 @@ def tuner(bus,       # System bus
                     fcw.next = bus.pwdata[fcw_bitwidth:]
                 else:
                     bus.prdata.next = concat(
-                        intbv(0)[len(bus.prdata)-fcw_bitwidth:], fcw)
+                        intbv(0)[:len(bus.prdata)-fcw_bitwidth], fcw)
             elif bus.paddr == 2: # CIC_INTERP
                 if bus.pwrite:
                     cic_interp.next = bus.pwdata[len(cic_interp):]
@@ -189,16 +188,14 @@ def tuner(bus,       # System bus
     mix_out = rf_in.copy('mix_out')
 
     # Blocks
-    sync_rf_in_to_dclk = sync(sclk, rf_in, clearn, dclk, rfd_in)
     cic0 = resampler(clearn, dclk, cic_in, cic_out, cic_interp, trx)
     qmix0 = qmixer(clearn, dclk, mix_in, lo, mix_out)
     dds0 = dds(clearn, dclk, ddsen, lo, fcw)
 
-
     # Interconnect
-    cic_in_mux = iqmux(clearn, dclk, trx, rx_sig, bb_in, cic_in)
-    cic_out_demux = iqdemux(clearn, dclk, trx, cic_out, bb_out, tx_sig)
-    mix_in_mux = iqmux(clearn, dclk, trx, rfd_in, tx_sig, mix_in)
+    cic_in_mux = iqmux(clearn, dclk, trx, rx_sig, bb_out, cic_in)
+    cic_out_demux = iqdemux(clearn, dclk, trx, cic_out, bb_in, tx_sig)
+    mix_in_mux = iqmux(clearn, dclk, trx, rf_in, tx_sig, mix_in)
     mix_out_demux = iqdemux(clearn, dclk, trx, mix_out, rx_sig, rf_out)
 
     return instances()
@@ -212,14 +209,13 @@ def main():
     dclk = Signal(bool(0))
     bb_in  = Signature("bb_in", True, bits=16)
     bb_out = Signature("bb_out", True, bits=16)
-    sclk = Signal(bool(0))
     rf_in  = Signature("rf_in", True, bits=16)
     rf_out = Signature("rf_out", True, bits=16)
     signals = (
         bus,
         clearn,
         dclk, bb_in, bb_out,
-        sclk, rf_in, rf_out,
+        rf_in, rf_out,
     )
 
     toVerilog(tuner, *signals, **tuner_config)

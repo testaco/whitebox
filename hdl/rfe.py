@@ -281,7 +281,7 @@ def rfe(resetn,
                         interp.next = pwdata[len(interp):]
                         shift.next = pwdata[len(shift)+16:16]
                     elif addr == WE_FCW_ADDR:
-                        fcw.next = pwdata
+                        fcw.next = pwdata[len(fcw):]
                     elif addr == WE_THRESHOLD_ADDR:
                         tx_fifo_afval.next = pwdata[26:16]
                         tx_fifo_aeval.next = pwdata[10:]
@@ -294,7 +294,7 @@ def rfe(resetn,
                     elif addr == W_FIR_ADDR:
                         fir_bank1.next = pwdata[len_fir_N+2]
                         fir_bank0.next = pwdata[len_fir_N+1]
-                        fir_N.next = pwdata[len_fir_N+1:]
+                        fir_N.next = pwdata[len_fir_N:]
                         #fir_accessing.next = pwdata[WF_ACCESS_COEFFS]
                         fir_accessing_next.next = pwdata[WF_ACCESS_COEFFS]
                         fir_load_coeff_k.next = 0
@@ -339,7 +339,7 @@ def rfe(resetn,
                             intbv(0)[16-len(shift):], shift,
                             intbv(0)[16-len(interp):], interp)
                     elif addr == WE_FCW_ADDR:
-                        prdata.next = fcw
+                        prdata.next = concat(intbv(0)[32-len(fcw):], fcw)
                     elif addr == WE_RUNS_ADDR:
                         prdata.next = concat(tx_underrun, overrun)
                     elif addr == WE_THRESHOLD_ADDR:

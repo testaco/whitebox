@@ -29,17 +29,17 @@ def modem(bus,
 
     @always_seq(dclk.posedge, reset=clearn)
     def modulator():
-        bb_out_valid.next = data_in_valid
-        bb_out_last.next = data_in_last
-        bb_out_i.next = data_in_i
-        bb_out_q.next = data_in_q
+        bb_out_valid.next = data_out_valid
+        bb_out_last.next = data_out_last
+        bb_out_i.next = data_out_i
+        bb_out_q.next = data_out_q
 
     @always_seq(dclk.posedge, reset=clearn)
     def demodulator():
-        bb_in_valid.next = data_out_valid
-        bb_in_last.next = data_out_last
-        bb_in_i.next = data_out_i
-        bb_in_q.next = data_out_q
+        data_in_valid.next = bb_in_valid
+        data_in_last.next = bb_in_last
+        data_in_i.next = bb_in_i
+        data_in_q.next = bb_in_q
 
     return modulator, demodulator
 

@@ -5,11 +5,23 @@ reg dsp_clock;
 reg pclk;
 reg [31:0] paddr;
 reg psel;
+reg psel_streamer;
+reg psel_converter;
+reg psel_modem;
+reg psel_tuner;
 reg penable;
 reg pwrite;
 reg [31:0] pwdata;
 wire pready;
+wire pready_streamer;
+wire pready_converter;
+wire pready_modem;
+wire pready_tuner;
 wire [31:0] prdata;
+wire [31:0] prdata_streamer;
+wire [31:0] prdata_converter;
+wire [31:0] prdata_modem;
+wire [31:0] prdata_tuner;
 //reg pslverr;
 reg dac_clock;
 wire [9:0] dac_data;
@@ -66,6 +78,7 @@ initial begin
     $from_myhdl(resetn,
             dsp_clock, dac_clock,
             pclk, paddr, psel, penable, pwrite, pwdata,
+            psel_streamer, psel_modem, psel_converter, psel_tuner,
             tx_fifo_rdata, tx_fifo_full, tx_fifo_afull, tx_fifo_empty, tx_fifo_aempty,
             tx_fifo_wack, tx_fifo_dvld, tx_fifo_overflow, tx_fifo_underflow,
             tx_fifo_rdcnt, tx_fifo_wrcnt,
@@ -76,6 +89,8 @@ initial begin
             rx_fifo_rclk, rx_fifo_wclk,
             adc_idata, adc_qdata);
     $to_myhdl(pready, prdata, //pslverr,
+            pready_streamer, pready_modem, pready_converter, pready_tuner,
+            prdata_streamer, prdata_modem, prdata_converter, prdata_tuner,
             dac_data, dac_en,
             tx_status_led, tx_dmaready,
             rx_status_led, rx_dmaready,
@@ -98,11 +113,23 @@ whitebox whitebox_0 (
     .pclk(pclk),
     .paddr(paddr),
     .psel(psel),
+    .psel_streamer(psel_streamer),
+    .psel_modem(psel_modem),
+    .psel_tuner(psel_tuner),
+    .psel_converter(psel_converter),
     .penable(penable),
     .pwrite(pwrite),
     .pwdata(pwdata),
     .pready(pready),
+    .pready_streamer(pready_streamer),
+    .pready_modem(pready_modem),
+    .pready_tuner(pready_tuner),
+    .pready_converter(pready_converter),
     .prdata(prdata),
+    .prdata_streamer(prdata_streamer),
+    .prdata_modem(prdata_modem),
+    .prdata_tuner(prdata_tuner),
+    .prdata_converter(prdata_converter),
     //.pslverr(pslverr),
 
     .clearn(clearn),

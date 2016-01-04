@@ -62,6 +62,18 @@ class WhiteboxSim(object):
         self.tx_i = []
         self.tx_n = []
         pclk = self.bus.pclk
+        self.pready_streamer = Signal(bool(0))
+        self.pready_modem = Signal(bool(0))
+        self.pready_tuner = Signal(bool(0))
+        self.pready_converter = Signal(bool(0))
+        self.psel_streamer = Signal(bool(0))
+        self.psel_modem = Signal(bool(0))
+        self.psel_tuner = Signal(bool(0))
+        self.psel_converter = Signal(bool(0))
+        self.prdata_streamer = Signal(intbv(0)[32:])
+        self.prdata_modem = Signal(intbv(0)[32:])
+        self.prdata_tuner = Signal(intbv(0)[32:])
+        self.prdata_converter = Signal(intbv(0)[32:])
 
     def simulate(self, stimulus, whitebox, **kwargs):
         """Acturally run the cosimulation with iverilog.
@@ -401,19 +413,32 @@ class WhiteboxSim(object):
         config_file.close()
 
         cmd = 'iverilog -o %s.v -c %s whitebox.v whitebox_reset.v cosim_whitebox.v' % (cosim_name, config_file.name)
-        os.system(cmd)
+        print cmd
+        print os.system(cmd)
 
         whitebox_test = Cosimulation(
-                    'vvp -m ./myhdl.vpi %s.v' % (cosim_name, ),
+                    'vvp -v -m ./myhdl.vpi %s.v' % (cosim_name, ),
                     resetn=self.bus.presetn,
                     pclk=self.bus.pclk,
                     paddr=self.bus.paddr,
                     psel=self.bus.psel,
+                    psel_streamer=self.psel_streamer,
+                    psel_modem=self.psel_modem,
+                    psel_tuner=self.psel_tuner,
+                    psel_converter=self.psel_converter,
                     penable=self.bus.penable,
                     pwrite=self.bus.pwrite,
                     pwdata=self.bus.pwdata,
                     pready=self.bus.pready,
+                    pready_streamer=self.pready_streamer,
+                    pready_modem=self.pready_modem,
+                    pready_tuner=self.pready_tuner,
+                    pready_converter=self.pready_converter,
                     prdata=self.bus.prdata,
+                    prdata_streamer=self.prdata_streamer,
+                    prdata_modem=self.prdata_modem,
+                    prdata_tuner=self.prdata_tuner,
+                    prdata_converter=self.prdata_converter,
                     #pslverr=self.bus.pslverr,
                     clearn=clearn,
                     clear_enable=self.clear_enable,
@@ -493,13 +518,13 @@ class TestApb3Transaction(unittest.TestCase):
             yield bus.receive(WE_FCW_ADDR)
             assert bus.rdata == 100
             yield bus.receive(WE_GAIN_ADDR)
-            gain_i, gain_q = bus.rdata & 0x3ff, (bus.rdata & 0x03ff0000) >> 16
+            gain_i, gain_q = float(bus.rdata & 0x3ff), float((bus.rdata & 0x03ff0000) >> 16)
             assert (gain_i / 2.**9) == 1.  # Default is 1
             assert (gain_q / 2.**9) == 1.  # Default is 1
             gain_word = lambda i: intbv(((intbv(int(i[1]*2.**9))[32:] << 16) & 0x03ff0000) | (intbv(int(i[0]*2.**9))[32:] & 0x3ff))[32:]
             yield bus.transmit(WE_GAIN_ADDR, gain_word((0.75, 1.25)))
             yield bus.receive(WE_GAIN_ADDR)
-            gain_i, gain_q = bus.rdata & 0x3ff, (bus.rdata & 0x03ff0000) >> 16
+            gain_i, gain_q = float(bus.rdata & 0x3ff), float((bus.rdata & 0x03ff0000) >> 16)
             assert (gain_i / 2.**9) == 0.75
             assert (gain_q / 2.**9) == 1.25
             raise StopSimulation

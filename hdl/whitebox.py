@@ -14,13 +14,18 @@ from rfe import rfe as RFE
 from rfe import print_rfe_ioctl
 from ram import Ram, Ram2
 
+from streamer import streamer
+from modem import modem
+from tuner import tuner
+from converter import converter
+
 whitebox_config = dict(
         dsp_clock_rate=40e6,
         dac_sample_rate=10e6,
         default_sample_rate=200e3,
         #interp=50,
         rfe_enable=True,
-        duc_enable=True,
+        duc_enable=False,
         fir_enable=False,
         cic_enable=False,
         cic_order=4,
@@ -75,11 +80,23 @@ def whitebox(
         pclk,
         paddr,
         psel,
+        psel_streamer,
+        psel_tuner,
+        psel_modem,
+        psel_converter,
         penable,
         pwrite,
         pwdata,
         pready,
+        pready_streamer,
+        pready_tuner,
+        pready_modem,
+        pready_converter,
         prdata,
+        prdata_streamer,
+        prdata_tuner,
+        prdata_modem,
+        prdata_converter,
         #pslverr,
         clearn,
         clear_enable,
@@ -233,53 +250,112 @@ def whitebox(
     rx_sample_i = rx_sample.i
     rx_sample_q = rx_sample.q
 
-    duc_args = (clearn, dac_clock, dsp_clock,
-            loopen, loopback,
-            tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
-            txen, txstop,
-            ddsen, txfilteren,
-            interp, shift,
-            fcw,
-            tx_correct_i, tx_correct_q,
-            tx_gain_i, tx_gain_q,
-            duc_underrun, tx_sample,
-            dac_en, dac_data, dac_last,
+    #duc_args = (clearn, dac_clock, dsp_clock,
+    #        loopen, loopback,
+    #        tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata, tx_fifo_underflow,
+    #        txen, txstop,
+    #        #ddsen, txfilteren,
+    #        #interp, shift,
+    #        #fcw,
+    #        #tx_correct_i, tx_correct_q,
+    #        #tx_gain_i, tx_gain_q,
+    #        duc_underrun, tx_sample,
+    #        dac_en, dac_data, dac_last,
 
+    #        #rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
+    #        rxen, rxstop, rxfilteren,
+    #        decim, rx_correct_i, rx_correct_q,
+    #        ddc_overrun, rx_sample,
+    #        adc_idata, adc_qdata, adc_last,
+
+    #duc_kwargs = dict(dspsim=dspsim,
+    #                interp=interp_default,
+    #                cic_enable=kwargs.get('cic_enable', True),
+    #                cic_order=kwargs.get('cic_order', 4),
+    #                cic_delay=kwargs.get('cic_delay', 1),
+    #                fir_enable=kwargs.get('fir_enable', True),
+    #                dds_enable=kwargs.get('dds_enable', True),
+    #                conditioning_enable=kwargs.get('conditioning_enable', True))
+
+    data_out = Signature("data_out", True, bits=16)
+    data_out_valid = data_out.valid
+    data_out_last = data_out.last
+    data_out_ready = data_out.ready
+    data_out_i = data_out.i
+    data_out_q = data_out.q
+
+    data_in = Signature("data_in", True, bits=16)
+    data_in_valid = data_in.valid
+    data_in_last = data_in.last
+    data_in_ready = data_in.ready
+    data_in_i = data_in.i
+    data_in_q = data_in.q
+
+    streamer_bus = bus.for_slave(psel_streamer, prdata_streamer, pready_streamer)
+    streamer_args = (streamer_bus,
+            clearn, dsp_clock,
+            tx_fifo_empty, tx_fifo_re, tx_fifo_dvld, tx_fifo_rdata,
+            tx_fifo_underflow,
+            data_out,
             rx_fifo_full, rx_fifo_we, rx_fifo_wdata,
-            rxen, rxstop, rxfilteren,
-            decim, rx_correct_i, rx_correct_q,
-            ddc_overrun, rx_sample,
-            adc_idata, adc_qdata, adc_last,
+            data_in,
+    )
+    streamer_kwargs = {}
+    streamer_0 = streamer(*streamer_args, **streamer_kwargs)
 
-            fir_coeff_ram_addr,
-            fir_coeff_ram_din,
-            fir_coeff_ram_blk,
-            fir_coeff_ram_wen,
-            fir_coeff_ram_dout,
-            fir_delay_line_i_ram_addr,
-            fir_delay_line_i_ram_din,
-            fir_delay_line_i_ram_blk,
-            fir_delay_line_i_ram_wen,
-            fir_delay_line_i_ram_dout,
-            fir_delay_line_q_ram_addr,
-            fir_delay_line_q_ram_din,
-            fir_delay_line_q_ram_blk,
-            fir_delay_line_q_ram_wen,
-            fir_delay_line_q_ram_dout,
-            firen, fir_bank1, fir_bank0, fir_N,)
+    bb_out = Signature("bb_out", True, bits=16)
+    bb_out_valid = bb_out.valid
+    bb_out_last = bb_out.last
+    bb_out_ready = bb_out.ready
+    bb_out_i = bb_out.i
+    bb_out_q = bb_out.q
 
-    duc_kwargs = dict(dspsim=dspsim,
-                    interp=interp_default,
-                    cic_enable=kwargs.get('cic_enable', True),
-                    cic_order=kwargs.get('cic_order', 4),
-                    cic_delay=kwargs.get('cic_delay', 1),
-                    fir_enable=kwargs.get('fir_enable', True),
-                    dds_enable=kwargs.get('dds_enable', True),
-                    conditioning_enable=kwargs.get('conditioning_enable', True))
-    if kwargs.get("duc_enable", True):
-        duc = DUC(*duc_args, **duc_kwargs)
-    else:
-        duc = None
+    bb_in = Signature("bb_in", True, bits=16)
+    bb_in_valid = bb_in.valid
+    bb_in_last = bb_in.last
+    bb_in_ready = bb_in.ready
+    bb_in_i = bb_in.i
+    bb_in_q = bb_in.q
+
+    modem_bus = bus.for_slave(psel_modem, prdata_modem, pready_modem)
+    modem_args = (modem_bus,
+        clearn, dsp_clock,
+        bb_in, bb_out,
+        data_in, data_out,
+    )
+    modem_kwargs = {}
+    modem_0 = modem(*modem_args, **modem_kwargs)
+
+    rf_out = Signature("rf_out", True, bits=16)
+    rf_out_valid = rf_out.valid
+    rf_out_last = rf_out.last
+    rf_out_ready = rf_out.ready
+    rf_out_i = rf_out.i
+    rf_out_q = rf_out.q
+
+    rf_in = Signature("rf_in", True, bits=16)
+    rf_in_valid = rf_in.valid
+    rf_in_last = rf_in.last
+    rf_in_ready = rf_in.ready
+    rf_in_i = rf_in.i
+    rf_in_q = rf_in.q
+
+    tuner_bus = bus.for_slave(psel_tuner, prdata_tuner, pready_tuner)
+    tuner_args = (tuner_bus,
+        clearn, dsp_clock,
+        bb_in, bb_out,
+        rf_in, rf_out)
+    tuner_kwargs = {}
+    tuner_0 = tuner(*tuner_args, **tuner_kwargs)
+
+    converter_bus = bus.for_slave(psel_converter, prdata_converter, pready_converter)
+    converter_args = (converter_bus,
+            clearn, dsp_clock, dac_clock,
+            rf_out, dac_en, dac_data,
+            rf_in, adc_idata, adc_qdata,
+    )
+    converter_kwargs = {}
+    converter_0 = converter(*converter_args, **converter_kwargs)
 
     ########### RADIO FRONT END ##############
     rfe_args = (resetn,
@@ -320,7 +396,7 @@ def whitebox(
 
     rfe = RFE(*rfe_args)
 
-    instances = (rfe, duc)
+    instances = (rfe,streamer_0,modem_0,tuner_0,converter_0)
 
     if kwargs.get('fir_enable', True):
         fir_coeff_ram_inst = fir_coeff_ram.instance_type()(**fir_coeff_ram.instance_signals())
@@ -339,7 +415,7 @@ if __name__ == '__main__':
     #duc_enable = True
     #rfe_enable = True
 
-    clearn = ResetSignal(0, 0, async=True)
+    clearn = ResetSignal(0, 0, async=False)
     clear_enable = Signal(bool(0))
     dsp_clock = Signal(bool(0))
     dac_clock = Signal(bool(0))
@@ -357,12 +433,24 @@ if __name__ == '__main__':
     bus_pclk = bus.pclk
     bus_paddr = bus.paddr
     bus_psel = bus.psel
+    psel_streamer = Signal(bool(0))
+    psel_modem = Signal(bool(0))
+    psel_tuner = Signal(bool(0))
+    psel_converter = Signal(bool(0))
     bus_penable = bus.penable
     bus_pwrite = bus.pwrite
     bus_pwdata = bus.pwdata
     bus_pslverr = bus.pslverr
     bus_pready = bus.pready
+    pready_streamer = Signal(bool(0))
+    pready_modem = Signal(bool(0))
+    pready_tuner = Signal(bool(0))
+    pready_converter = Signal(bool(0))
     bus_prdata = bus.prdata
+    prdata_streamer = Signal(intbv(0)[32:])
+    prdata_modem = Signal(intbv(0)[32:])
+    prdata_tuner = Signal(intbv(0)[32:])
+    prdata_converter = Signal(intbv(0)[32:])
 
     tx_fifo_re = Signal(bool(False))
     tx_fifo_rclk = Signal(bool(False))
@@ -454,11 +542,23 @@ if __name__ == '__main__':
                 bus_pclk,
                 bus_paddr,
                 bus_psel,
+                psel_streamer,
+                psel_modem,
+                psel_tuner,
+                psel_converter,
                 bus_penable,
                 bus_pwrite,
                 bus_pwdata,
                 bus_pready,
+                pready_streamer,
+                pready_modem,
+                pready_tuner,
+                pready_converter,
                 bus_prdata,
+                prdata_streamer,
+                prdata_modem,
+                prdata_tuner,
+                prdata_converter,
                 #bus_pslverr,
 
                 clearn,

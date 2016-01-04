@@ -30,20 +30,26 @@ class Apb3Bus(object):
         :param duration: Clock period in ns
         :param timeout: Period to wait before timeout in ns
         """
-        self.presetn = ResetSignal(0, 0, async=True)
-        self.pclk = Signal(bool(0))
-        self.paddr = Signal(intbv(0, 0, 2**32))
-        self.psel = Signal(bool(0))
-        self.penable = Signal(bool(0))
-        self.pwrite = Signal(bool(1))
-        self.pwdata = Signal(intbv(0, 0, 2**32))
-        self.pready = Signal(bool(1))
-        self.prdata = Signal(intbv(0, 0, 2**32))
-        self.pslverr = Signal(bool(0))
+        self.presetn = kwargs.pop('presetn', ResetSignal(0, 0, async=False))
+        self.pclk = kwargs.pop('pclk', Signal(bool(0)))
+        self.paddr = kwargs.pop('paddr', Signal(intbv(0, 0, 2**32)))
+        self.psel = kwargs.pop('psel', Signal(bool(0)))
+        self.penable = kwargs.pop('penable', Signal(bool(0)))
+        self.pwrite = kwargs.pop('pwrite', Signal(bool(1)))
+        self.pwdata = kwargs.pop('pwdata', Signal(intbv(0, 0, 2**32)))
+        self.pready = kwargs.pop('pready', Signal(bool(1)))
+        self.prdata = kwargs.pop('prdata', Signal(intbv(0, 0, 2**32)))
+        self.pslverr = kwargs.pop('pslverr', Signal(bool(0)))
         self.args = args
         self.kwargs = kwargs
 
-    def signals():
+    def for_slave(self, psel, prdata, pready, pslverr=None):
+        sig = self.signals()
+        sig.update({'psel': psel,
+                    'prdata': prdata, 'pready': pready, 'pslverr': pslverr})
+        return Apb3Bus(**sig)
+
+    def signals(self):
         return dict(
             presetn=self.presetn,
             pclk=self.pclk,

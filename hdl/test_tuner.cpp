@@ -254,7 +254,7 @@ int main(int argc, char** argv) {
     parse(argc, argv); 
 
     ReadableFileFifo * rf_in_fifo = new ReadableFileFifo("/dev/stdin");
-    WriteableFileFifo * bb_out_fifo = new WriteableFileFifo("/dev/stdout");
+    WriteableFileFifo * bb_in_fifo = new WriteableFileFifo("/dev/stdout");
 
     Verilated::commandArgs(argc, argv);   // Remember args
     Vtuner* top = new Vtuner;             // Create instance
@@ -281,6 +281,7 @@ int main(int argc, char** argv) {
     bool done = false;
     bool pclk_posedge = false;
     bool dclk_posedge = false;
+    bool sclk = false;
     bool sclk_posedge = false;
     bool sclk_negedge = false;
 
@@ -310,9 +311,9 @@ int main(int argc, char** argv) {
                 dclk_posedge = false;
             }
             if (main_time % 50 == 0) { // 10MHz
-                sclk_posedge = !top->sclk;
+                sclk_posedge = !sclk;
                 sclk_negedge = !sclk_posedge;
-                top->sclk = !top->sclk;
+                sclk = !sclk;
             } else {
                 sclk_posedge = false;
                 sclk_negedge = false;
@@ -339,11 +340,11 @@ int main(int argc, char** argv) {
             top->eval();
 
             // Baseband Output, end of Receive chain
-            if (dclk_posedge && top->bb_out_valid) {
+            if (dclk_posedge && top->bb_in_valid) {
                 uint32_t sample =
-                    (top->bb_out_i & 0x0000ffff) |
-                    ((top->bb_out_q & 0x0000ffff) << 16);
-                bb_out_fifo->write_next(sample);
+                    (top->bb_in_i & 0x0000ffff) |
+                    ((top->bb_in_q & 0x0000ffff) << 16);
+                bb_in_fifo->write_next(sample);
             }
 
             // RF Output to Transmitter
@@ -369,7 +370,7 @@ int main(int argc, char** argv) {
     delete bus_controller;
     delete top;
 
-    delete bb_out_fifo;
+    delete bb_in_fifo;
     delete rf_in_fifo;
 
     return 0;
