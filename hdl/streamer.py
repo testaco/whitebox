@@ -28,12 +28,15 @@ def streamer(bus,       # System bus
     state_t = enum('IDLE', 'DONE',)
     state = Signal(state_t.IDLE)
 
+    rx_overrun = Signal(bool(False))
+    tx_underrun = Signal(bool(False))
+
     @always_seq(bus.pclk.posedge, reset=bus.presetn)
-    def controller():
+    def dma_controller():
         if state == state_t.IDLE:
             if bus.penable and bus.psel:
+                bus.pready.next = False
                 if bus.paddr[8:] == 0x00: # SAMPLE
-                    bus.pready.next = False
                     state.next = state_t.DONE
                     if bus.pwrite:
                         # WRITE TO FIFO
@@ -41,11 +44,47 @@ def streamer(bus,       # System bus
                     else:
                         # READ FROM FIFO
                         pass
+                elif bus.paddr[8:] == 0x04: # Status
+                    state.next = state_t.DONE
+                    bus.prdata.next = concat(intbv(0)[30:], #
+                                             tx_underrun, rx_overrun)
                 else:
                     state.next = state_t.IDLE
         elif state == state_t.DONE:
             bus.pready.next = True
             state.next = state_t.IDLE
+
+    @always_comb
+    def assignments():
+        data_out.valid.next = tx_fifo_dvld
+        data_out.i.next = tx_fifo_rdata[15:]
+        data_out.q.next = tx_fifo_rdata[31:16]
+
+    txen = Signal(bool(0))
+    txcnt = Signal(intbv(0, min=0, max=16))
+    txinterp = Signal(intbv(1, min=1, max=16))
+
+    @always_seq(dclk.posedge, reset=clearn)
+    def dsp_controller():
+        if data_in.valid:
+            if rx_fifo_full:
+                rx_overrun.next = True
+            else:
+                rx_fifo_we.next = True
+                rx_fifo_wdata.next = concat(data_in.q, data_in.i)
+        else:
+            rx_fifo_we.next = False
+
+        if txen:
+            if txcnt == 0:
+                txcnt.next = txinterp - 1
+                if tx_fifo_empty:
+                    tx_underrun.next = True
+                else:
+                    tx_fifo_re.next = True
+            else:
+                tx_fifo_re.next = False
+                txcnt.next = txcnt - 1
 
     return instances()
 
@@ -53,7 +92,7 @@ def main():
     streamer_config = {
     }
 
-    bus = Apb3Bus()
+    bus = Apb3Bus(duration=10)
     clearn = ResetSignal(0, 0, async=False)
     dclk = Signal(bool(0))
     tx_fifo_empty = Signal(bool(0))

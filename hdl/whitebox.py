@@ -5,7 +5,7 @@ Whitebox SoC Peripheral
 from myhdl import \
         Signal, ResetSignal, intbv, modbv, enum, concat, \
         instance, always, always_comb, always_seq, \
-        toVerilog
+        toVerilog, instances
 
 from fir import fir as FIR
 from dsp import Signature
@@ -81,21 +81,21 @@ def whitebox(
         paddr,
         psel,
         psel_streamer,
-        psel_tuner,
         psel_modem,
+        psel_tuner,
         psel_converter,
         penable,
         pwrite,
         pwdata,
         pready,
         pready_streamer,
-        pready_tuner,
         pready_modem,
+        pready_tuner,
         pready_converter,
         prdata,
         prdata_streamer,
-        prdata_tuner,
         prdata_modem,
+        prdata_tuner,
         prdata_converter,
         #pslverr,
         clearn,
@@ -165,6 +165,7 @@ def whitebox(
     :param txirq: Almost empty interrupt to CPU
     :param clear_enable: To reset controller, set this high for reset
     """
+    bus = kwargs.get('bus')
     dspsim = kwargs.get('dspsim', None)
     dsp_clock_rate = kwargs.get('dsp_clock_rate', 40e6)
     dac_sample_rate = kwargs.get('dac_sample_rate', 10e6)
@@ -205,29 +206,29 @@ def whitebox(
 
     # The RAMs
     fir_coeff_ram = Ram(clearn, dsp_clock, bus.pclk, width=18, depth=512)
-    fir_delay_line_i_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
-    fir_delay_line_q_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
+    #fir_delay_line_i_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
+    #fir_delay_line_q_ram = Ram(clearn, dsp_clock, dsp_clock, width=9, depth=512)
 
-    fir_coeff_ram_addr = fir_coeff_ram.port['a'].addr
-    fir_coeff_ram_din = fir_coeff_ram.port['a'].din
-    fir_coeff_ram_blk = fir_coeff_ram.port['a'].blk
-    fir_coeff_ram_wen = fir_coeff_ram.port['a'].wen
-    fir_coeff_ram_dout = fir_coeff_ram.port['a'].dout
+    #fir_coeff_ram_addr = fir_coeff_ram.port['a'].addr
+    #fir_coeff_ram_din = fir_coeff_ram.port['a'].din
+    #fir_coeff_ram_blk = fir_coeff_ram.port['a'].blk
+    #fir_coeff_ram_wen = fir_coeff_ram.port['a'].wen
+    #fir_coeff_ram_dout = fir_coeff_ram.port['a'].dout
     fir_load_coeff_ram_addr = fir_coeff_ram.port['b'].addr
-    fir_load_coeff_ram_din = fir_coeff_ram.port['b'].din
-    fir_load_coeff_ram_blk = fir_coeff_ram.port['b'].blk
-    fir_load_coeff_ram_wen = fir_coeff_ram.port['b'].wen
+    fir_load_coeff_ram_din =  fir_coeff_ram.port['b'].din
+    fir_load_coeff_ram_blk =  fir_coeff_ram.port['b'].blk
+    fir_load_coeff_ram_wen =  fir_coeff_ram.port['b'].wen
     fir_load_coeff_ram_dout = fir_coeff_ram.port['b'].dout
-    fir_delay_line_i_ram_addr = fir_delay_line_i_ram.port['a'].addr
-    fir_delay_line_i_ram_din = fir_delay_line_i_ram.port['a'].din
-    fir_delay_line_i_ram_blk = fir_delay_line_i_ram.port['a'].blk
-    fir_delay_line_i_ram_wen = fir_delay_line_i_ram.port['a'].wen
-    fir_delay_line_i_ram_dout = fir_delay_line_i_ram.port['a'].dout
-    fir_delay_line_q_ram_addr = fir_delay_line_q_ram.port['a'].addr
-    fir_delay_line_q_ram_din = fir_delay_line_q_ram.port['a'].din
-    fir_delay_line_q_ram_blk = fir_delay_line_q_ram.port['a'].blk
-    fir_delay_line_q_ram_wen = fir_delay_line_q_ram.port['a'].wen
-    fir_delay_line_q_ram_dout = fir_delay_line_q_ram.port['a'].dout
+    #fir_delay_line_i_ram_addr = fir_delay_line_i_ram.port['a'].addr
+    #fir_delay_line_i_ram_din = fir_delay_line_i_ram.port['a'].din
+    #fir_delay_line_i_ram_blk = fir_delay_line_i_ram.port['a'].blk
+    #fir_delay_line_i_ram_wen = fir_delay_line_i_ram.port['a'].wen
+    #fir_delay_line_i_ram_dout = fir_delay_line_i_ram.port['a'].dout
+    #fir_delay_line_q_ram_addr = fir_delay_line_q_ram.port['a'].addr
+    #fir_delay_line_q_ram_din = fir_delay_line_q_ram.port['a'].din
+    #fir_delay_line_q_ram_blk = fir_delay_line_q_ram.port['a'].blk
+    #fir_delay_line_q_ram_wen = fir_delay_line_q_ram.port['a'].wen
+    #fir_delay_line_q_ram_dout = fir_delay_line_q_ram.port['a'].dout
 
     ########### DIGITAL SIGNAL PROCESSING #######
     loopback = Signature("loopback", False, bits=10)
@@ -396,18 +397,18 @@ def whitebox(
 
     rfe = RFE(*rfe_args)
 
-    instances = (rfe,streamer_0,modem_0,tuner_0,converter_0)
+    #instances = (rfe,streamer_0,modem_0,tuner_0,converter_0)
 
-    if kwargs.get('fir_enable', True):
-        fir_coeff_ram_inst = fir_coeff_ram.instance_type()(**fir_coeff_ram.instance_signals())
-        fir_delay_line_i_ram_inst = fir_delay_line_i_ram.instance_type()(**fir_delay_line_i_ram.instance_signals())
-        fir_delay_line_q_ram_inst = fir_delay_line_q_ram.instance_type()(**fir_delay_line_q_ram.instance_signals())
-        instances += (fir_coeff_ram_inst, fir_delay_line_i_ram_inst, fir_delay_line_q_ram_inst)
+    #if kwargs.get('fir_enable', True):
+    #    fir_coeff_ram_inst = fir_coeff_ram.instance_type()(**fir_coeff_ram.instance_signals())
+    #    fir_delay_line_i_ram_inst = fir_delay_line_i_ram.instance_type()(**fir_delay_line_i_ram.instance_signals())
+    #    fir_delay_line_q_ram_inst = fir_delay_line_q_ram.instance_type()(**fir_delay_line_q_ram.instance_signals())
+    #    instances += (fir_coeff_ram_inst, fir_delay_line_i_ram_inst, fir_delay_line_q_ram_inst)
 
 
-    return instances
+    return instances()
 
-if __name__ == '__main__':
+def main():
     from apb3_utils import Apb3Bus
     from fifo import fifo as FIFO
     fifo_depth = 1024
@@ -428,29 +429,34 @@ if __name__ == '__main__':
     rx_status_led = Signal(bool(0))
     rx_dmaready = Signal(bool(1))
 
-    bus = Apb3Bus(slaves=['streamer', 'modem', 'tuner', 'converter'])
+    bus = Apb3Bus(duration=10,
+                  slaves=['streamer', 'modem', 'tuner', 'converter'])
     bus_presetn = bus.presetn
     bus_pclk = bus.pclk
     bus_paddr = bus.paddr
     bus_psel = bus.psel
-    psel_streamer = Signal(bool(0))
-    psel_modem = Signal(bool(0))
-    psel_tuner = Signal(bool(0))
-    psel_converter = Signal(bool(0))
+    streamer_bus = bus.for_slave('streamer')
+    modem_bus = bus.for_slave('modem')
+    tuner_bus = bus.for_slave('tuner')
+    converter_bus = bus.for_slave('converter')
+    psel_streamer = streamer_bus.psel
+    psel_modem = modem_bus.psel
+    psel_tuner = tuner_bus.psel
+    psel_converter = converter_bus.psel
     bus_penable = bus.penable
     bus_pwrite = bus.pwrite
     bus_pwdata = bus.pwdata
     bus_pslverr = bus.pslverr
     bus_pready = bus.pready
-    pready_streamer = Signal(bool(0))
-    pready_modem = Signal(bool(0))
-    pready_tuner = Signal(bool(0))
-    pready_converter = Signal(bool(0))
+    pready_streamer = streamer_bus.pready
+    pready_modem = modem_bus.pready
+    pready_tuner = tuner_bus.pready
+    pready_converter = converter_bus.pready
     bus_prdata = bus.prdata
-    prdata_streamer = Signal(intbv(0)[32:])
-    prdata_modem = Signal(intbv(0)[32:])
-    prdata_tuner = Signal(intbv(0)[32:])
-    prdata_converter = Signal(intbv(0)[32:])
+    prdata_streamer = streamer_bus.prdata
+    prdata_modem = modem_bus.prdata
+    prdata_tuner = tuner_bus.prdata
+    prdata_converter = converter_bus.prdata
 
     tx_fifo_re = Signal(bool(False))
     tx_fifo_rclk = Signal(bool(False))
@@ -609,9 +615,14 @@ if __name__ == '__main__':
                 rx_fifo_wrcnt,
     )
 
+    whitebox_config['bus'] = bus
+
     toVerilog(whitebox, *signals, **whitebox_config)
 
     toVerilog(whitebox_reset, bus_presetn,
             dsp_clock, clear_enable, clearn)
 
     print_rfe_ioctl()
+
+if __name__ == '__main__':
+    main()

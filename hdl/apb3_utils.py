@@ -40,9 +40,11 @@ class Apb3Bus(object):
         self.pready = kwargs.pop('pready', Signal(bool(1)))
         self.prdata = kwargs.pop('prdata', Signal(intbv(0, 0, 2**32)))
         self.pslverr = kwargs.pop('pslverr', Signal(bool(0)))
-        self.args = args
-        self.kwargs = kwargs
         self.slaves = kwargs.pop('slaves', [])
+        self.verbose = kwargs.get('verbose', False)
+        self.duration = kwargs.get('duration')
+        self.timeout = kwargs.get('timeout', 5 * self.duration)
+        self.name = kwargs.get('name', 'bus')
 
         for slave in self.slaves:
             setattr(self, 'psel_%s' % slave, Signal(bool(0)))
@@ -54,10 +56,12 @@ class Apb3Bus(object):
     def for_slave(self, slave):
         assert slave in self.slaves
         sig = self.signals()
+        sig.update(self.configuration())
         sig.update({'psel': getattr(self, 'psel_%s' % slave),
                     'prdata': getattr(self, 'prdata_%s' % slave),
                     'pready': getattr(self, 'pready_%s' % slave),
-                    'pslverr': getattr(self, 'pslverr_%s' % slave)
+                    'pslverr': getattr(self, 'pslverr_%s' % slave),
+                    'name': self.name + '_' + slave
                   })
         return Apb3Bus(**sig)
 
@@ -75,13 +79,20 @@ class Apb3Bus(object):
             pslverr=self.pslverr
         )
 
+    def configuration(self):
+        return dict(
+            verbose=self.verbose,
+            duration=self.duration,
+            timeout=self.timeout
+        )
+
     def debug(self, msg):
-        if self.kwargs.get('verbose', False):
+        if self.verbose:
             print msg
         
     def reset(self):
         """Reset the bus."""
-        duration = self.kwargs['duration']
+        duration = self.duration
 
         self.debug('-- Resetting --')
         self.presetn.next = True
@@ -101,10 +112,10 @@ class Apb3Bus(object):
         """
         assert not addr & 3  # Must be word aligned
 
-        duration = self.kwargs['duration']
-        timeout = self.kwargs.get('timeout') or 5 * duration
+        duration = self.duration
+        timeout = self.timeout
 
-        self.debug('-- Transmitting addr=%s data=%s --' % (hex(addr), hex(data)))
+        self.debug('-- Transmitting (%s) addr=%s data=%s --' % (self.name, hex(addr), hex(data)))
         self.debug('TX: start')
         self.pclk.next = True
         self.paddr.next = intbv(addr)
@@ -153,10 +164,10 @@ class Apb3Bus(object):
         :raises Apb3TimeoutError: If slave doesn't set ``pready`` in time
         """
         assert not addr & 3  # Must be word aligned
-        duration = self.kwargs['duration']
-        timeout = self.kwargs.get('timeout') or 5 * duration
+        duration = self.duration
+        timeout = self.timeout
 
-        self.debug('-- Receiving addr=%s --' % (hex(addr),))
+        self.debug('-- Receiving (%s) addr=%s --' % (self.name, hex(addr),))
         self.debug('RX: start')
         self.pclk.next = True
         self.paddr.next = intbv(addr)
@@ -213,7 +224,7 @@ class Apb3Bus(object):
 
     def delay(self, cycles):
         """Delay the bus a number of cycles."""
-        duration = self.kwargs['duration']
+        duration = self.duration
         for i in xrange(cycles):
             self.pclk.next = True
             yield delay(duration // 2)

@@ -1,5 +1,6 @@
 from myhdl import Signal, always, always_comb, always_seq, \
-                  intbv, enum, concat, modbv, ResetSignal, toVerilog
+                  intbv, enum, concat, modbv, ResetSignal, toVerilog, \
+                  instances
 
 from apb3_utils import Apb3Bus
 from dsp import Signature
@@ -41,13 +42,18 @@ def modem(bus,
         data_in_i.next = bb_in_i
         data_in_q.next = bb_in_q
 
-    return modulator, demodulator
+    @always_seq(bus.pclk.posedge, reset=bus.presetn)
+    def controller():
+        bus.pready.next = True
+        bus.prdata.next = 0
+
+    return instances()
 
 def main():
     modem_config = {
     }
 
-    bus = Apb3Bus()
+    bus = Apb3Bus(duration=10)
     clearn = ResetSignal(0, 0, async=False)
     dclk = Signal(bool(0))
     bb_in  = Signature("bb_in", True, bits=16)

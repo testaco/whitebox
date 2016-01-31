@@ -89,12 +89,17 @@ def dds(resetn,
                 pa_bitwidth:pa_bitwidth-lgsamples]]
             output_q.next = q_samples[phase_accumulator[
                 pa_bitwidth:pa_bitwidth-lgsamples]]
-            output_valid.next = 1
-            output_last.next = 0
+            output_valid.next = True
+            output_last.next = False
+        elif output.ready:
+            output_i.next = 2**(len(output_i) - 1) - 1
+            output_q.next = 2**(len(output_q) - 1) - 1
+            output_valid.next = True
+            output_last.next = False
         else:
             output_i.next = 0
             output_q.next = 0
-            output_valid.next = 0
-            output_last.next = 0
+            output_valid.next = False
+            output_last.next = False
 
     return synthesizer

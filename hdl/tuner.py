@@ -56,8 +56,17 @@ def resampler(clearn, dclk, insig, outsig, rate, mode):
 
 def qmixer(clearn, dclk, insig, losig, outsig):
     insig1 = insig.copy('insig1')
-    state_t = enum('IDLE', 'PROCESSING')
+    state_t = enum('IDLE', 'PROCESSING1', 'PROCESSING2')
     state = Signal(state_t.IDLE)
+
+    ia = Signal(intbv(0, min=-2**(len(insig.i) + len(losig.i) - 1),
+                         max=2**(len(insig.i) + len(losig.i) - 1)))
+    ib = Signal(intbv(0, min=-2**(len(insig.i) + len(losig.i) - 1),
+                         max=2**(len(insig.i) + len(losig.i) - 1)))
+    qa = Signal(intbv(0, min=-2**(len(insig.q) + len(losig.q) - 1),
+                         max=2**(len(insig.q) + len(losig.q) - 1)))
+    qb = Signal(intbv(0, min=-2**(len(insig.q) + len(losig.q) - 1),
+                         max=2**(len(insig.q) + len(losig.q) - 1)))
 
     i = Signal(intbv(0, min=-2**(len(insig.i) + len(outsig.i) - 1),
                         max=2**(len(insig.i) + len(outsig.i) - 1)))
@@ -68,6 +77,7 @@ def qmixer(clearn, dclk, insig, losig, outsig):
     def assignments():
         insig.ready.next = (state == state_t.IDLE)
         losig.ready.next = insig.valid
+
         outsig.i.next = i[:len(i)-len(outsig.i)]
         outsig.q.next = q[:len(q)-len(outsig.q)]
 
@@ -76,7 +86,7 @@ def qmixer(clearn, dclk, insig, losig, outsig):
         if state == state_t.IDLE:
             outsig.valid.next = False
             if insig.valid:
-                state.next = state_t.PROCESSING
+                state.next = state_t.PROCESSING1
                 # Delay the in signal to processing step
                 insig1.i.next = insig.i
                 insig1.q.next = insig.q
@@ -84,10 +94,16 @@ def qmixer(clearn, dclk, insig, losig, outsig):
                 state.next = state_t.IDLE
                 insig1.i.next = 0
                 insig1.q.next = 0
-        elif state == state_t.PROCESSING:
+        elif state == state_t.PROCESSING1:
+            ia.next = insig1.i.signed() * losig.i.signed()
+            ib.next = insig1.q.signed() * losig.q.signed()
+            qa.next = insig1.i.signed() * losig.q.signed()
+            qb.next = insig1.q.signed() * losig.i.signed()
+            state.next = state_t.PROCESSING2
+        elif state == state_t.PROCESSING2:
             outsig.valid.next = True
-            i.next = (insig1.i * losig.i) - (insig1.q * losig.q)
-            q.next = (insig1.i * losig.q) + (insig1.q * losig.i)
+            i.next = ia.signed() - ib.signed()
+            q.next = qa.signed() + qb.signed()
             state.next = state_t.IDLE
 
     return instances()
@@ -157,7 +173,7 @@ def tuner(bus,       # System bus
                     fcw.next = bus.pwdata[fcw_bitwidth:]
                 else:
                     bus.prdata.next = concat(
-                        intbv(0)[:len(bus.prdata)-fcw_bitwidth], fcw)
+                        intbv(0)[len(bus.prdata)-fcw_bitwidth:], fcw)
             elif bus.paddr == 2: # CIC_INTERP
                 if bus.pwrite:
                     cic_interp.next = bus.pwdata[len(cic_interp):]
@@ -204,7 +220,7 @@ def main():
     tuner_config = {
     }
 
-    bus = Apb3Bus()
+    bus = Apb3Bus(duration=10)
     clearn = ResetSignal(0, 0, async=False)
     dclk = Signal(bool(0))
     bb_in  = Signature("bb_in", True, bits=16)

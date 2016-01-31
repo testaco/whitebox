@@ -3,11 +3,23 @@ module whitebox_toplevel(
     pclk,
     paddr,
     psel,
+    psel_streamer,
+    psel_modem,
+    psel_tuner,
+    psel_converter,
     penable,
     pwrite,
     pwdata,
     pready,
+    pready_streamer,
+    pready_modem,
+    pready_tuner,
+    pready_converter,
     prdata,
+    prdata_streamer,
+    prdata_modem,
+    prdata_tuner,
+    prdata_converter,
     dac_clock,
     dsp_clock,
     dac_en,
@@ -25,13 +37,25 @@ module whitebox_toplevel(
     input pclk;
     input [31:0] paddr;
     input psel;
+    input psel_streamer;
+    input psel_modem;
+    input psel_tuner;
+    input psel_converter;
     input penable;
     input pwrite;
     input [31:0] pwdata;
     input [9:0] adc_idata;
     input [9:0] adc_qdata;
     output pready;
+    output pready_streamer;
+    output pready_modem;
+    output pready_tuner;
+    output pready_converter;
     output [31:0] prdata;
+    output [31:0] prdata_streamer;
+    output [31:0] prdata_modem;
+    output [31:0] prdata_tuner;
+    output [31:0] prdata_converter;
     output [9:0] dac_data;
     output dac_en;
     output tx_status_led;
@@ -127,11 +151,23 @@ module whitebox_toplevel(
         .pclk(pclk),
         .paddr(paddr),
         .psel(psel),
+        .psel_streamer(psel_streamer),
+        .psel_modem(psel_modem),
+        .psel_tuner(psel_tuner),
+        .psel_converter(psel_converter),
         .penable(penable),
         .pwrite(pwrite),
         .pwdata(pwdata),
         .pready(pready),
+        .pready_streamer(pready_streamer),
+        .pready_modem(pready_modem),
+        .pready_tuner(pready_tuner),
+        .pready_converter(pready_converter),
         .prdata(prdata),
+        .prdata_streamer(prdata_streamer),
+        .prdata_modem(prdata_modem),
+        .prdata_tuner(prdata_tuner),
+        .prdata_converter(prdata_converter),
         .clearn(clearn),
         .clear_enable(clear_enable),
         .dac_clock(dac_clock),
