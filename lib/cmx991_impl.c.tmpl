@@ -226,8 +226,10 @@ void cmx991_rx_config(cmx991_t* rf, mix_out_t mix_out,
 
     rf->mix_pwr = MIX_PWR_POWER_UP;
     rf->iq_pwr = IQ_PWR_POWER_UP;
-    rf->vbias = VBIAS_POWER_UP;
-    rf->sli_pwr = SLI_PWR_POWER_UP;
+    rf->amp_pwr = AMP_PWR_POWER_DOWN;
+    rf->ifh = IFH_GT_75MHZ;
+    rf->vbias = VBIAS_POWER_DOWN;
+    rf->sli_pwr = SLI_PWR_POWER_DOWN;
 
     rf->if_in = if_in;
     rf->mix_out = mix_out;

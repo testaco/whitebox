@@ -254,7 +254,7 @@ void whitebox_gpio_adf4360_write(struct whitebox_platform_data_t* platform_data,
     for (i = 0; i < 24; ++i) {
         // Write Data
         gpio_set_value(platform_data->mosi_pin,
-                ((data << i) & 0x00800000) ? 1: 0); // TODO: I think this is it!
+                ((data << i) & 0x00800000) ? 1: 0);
         // Bring clock high
         gpio_set_value(platform_data->sclk_pin, 1);
         // Bring clock low

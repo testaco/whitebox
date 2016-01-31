@@ -347,10 +347,15 @@ static int whitebox_release(struct inode* inode, struct file* filp) {
             cpu_relax();
     }
 
-    // Turn off LO
+    // Turn off VFO
     whitebox_device->adf4351_regs[2] |= WA_PD_MASK;
     whitebox_gpio_adf4351_write(whitebox_device->platform_data,
         whitebox_device->adf4351_regs[2]);
+
+    // Turn off IF LO
+    whitebox_device->adf4360_regs[0] |= WA60_PD_MASK;
+    whitebox_gpio_adf4360_write(whitebox_device->platform_data,
+        whitebox_device->adf4360_regs[0]);
 
     // Disable analog stuff
     whitebox_gpio_dac_disable(whitebox_device->platform_data);

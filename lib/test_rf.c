@@ -62,16 +62,31 @@ int test_tx_902_pll(void* data) {
 }
 
 int _test_rx_pll(float freq) {
+    char temp[1024];
+    whitebox_args_t w;
     whitebox_t wb;
     whitebox_init(&wb);
+    wb.if_bw = MHZ_1;
     printf("test_rx_pll %f\n", freq);
     assert(whitebox_open(&wb, "/dev/whitebox", O_RDONLY, SAMPLE_RATE) > 0);
     assert(whitebox_reset(&wb) == 0);
     assert(whitebox_rx_clear(&wb) == 0);
+    //getchar();
     assert(whitebox_rx(&wb, freq) == 0);
     whitebox_plls_locked(&wb);
-    assert(whitebox_plls_locked(&wb));
-    assert(ioctl(wb.fd, W_LOCKED));
+    adf4351_ioctl_get(&wb.adf4351, &w);
+    //fprintf(stderr, "########## ADF4351\n");
+    //adf4351_print_regs(&wb.adf4351, stderr);
+    //adf4351_print_to_file(&wb.adf4351, stderr);
+    //getchar();
+    //assert(whitebox_plls_locked(&wb));
+    //assert(ioctl(wb.fd, W_LOCKED));
+    ioctl(wb.fd, WC_GET, &w);
+    cmx991_ioctl_get(&wb.cmx991, &w);
+    fprintf(stderr, "########## CMX991\n");
+    cmx991_print_to_file(&wb.cmx991, stderr);
+    //getchar();
+    read(wb.fd, temp, 1024);
     getchar();
     assert(whitebox_close(&wb) == 0);
 }
@@ -89,7 +104,7 @@ int test_rx_222_pll(void* data) {
 }
 
 int test_rx_420_pll(void* data) {
-    return _test_rx_pll(420e6);
+    return _test_rx_pll(420.036e6);
 }
 
 int test_rx_902_pll(void* data) {
@@ -98,16 +113,16 @@ int test_rx_902_pll(void* data) {
 
 int main(int argc, char **argv) {
     whitebox_test_t tests[] = {
-        WHITEBOX_TEST(test_tx_50_pll),
-        WHITEBOX_TEST(test_tx_144_pll),
-        WHITEBOX_TEST(test_tx_222_pll),
-        WHITEBOX_TEST(test_tx_420_pll),
-        WHITEBOX_TEST(test_tx_902_pll),
-        WHITEBOX_TEST(test_rx_50_pll),
-        WHITEBOX_TEST(test_rx_144_pll),
-        WHITEBOX_TEST(test_rx_222_pll),
+        //WHITEBOX_TEST(test_rx_50_pll),
+        //WHITEBOX_TEST(test_rx_144_pll),
+        //WHITEBOX_TEST(test_rx_222_pll),
         WHITEBOX_TEST(test_rx_420_pll),
-        WHITEBOX_TEST(test_rx_902_pll),
+        //WHITEBOX_TEST(test_rx_902_pll),
+        //WHITEBOX_TEST(test_tx_50_pll),
+        //WHITEBOX_TEST(test_tx_144_pll),
+        //WHITEBOX_TEST(test_tx_222_pll),
+        //WHITEBOX_TEST(test_tx_420_pll),
+        //WHITEBOX_TEST(test_tx_902_pll),
         WHITEBOX_TEST(0),
     };
     return whitebox_test_main(tests, NULL, argc, argv);

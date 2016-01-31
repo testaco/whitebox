@@ -27,6 +27,12 @@ void adf4351_load(adf4351_t* rf, uint32_t data) {
     }
 }
 
+void adf4351_print_regs(adf4351_t * rf, FILE * f) {
+    #for $addr in range(5+1)
+    fprintf(f, "$addr = %08x\n", adf4351_pack(rf, $addr));
+    #end for
+}
+
 \#include "whitebox_ioctl.h"
 
 void adf4351_ioctl_get(adf4351_t* rf, whitebox_args_t* w) {
@@ -52,11 +58,11 @@ rf_divider_select_t get_divider_select(int div) {
 }
 
 double _actual_frequency(double FRAC, double N, double MOD, int DIV, int R, int T, int D, double ref_freq) {
-    //printf("INT=%f, FRAC=%f, MOD=%f, DIV=%d, D=%d, R=%d, T=%d\n", N, FRAC, MOD, DIV, D, R, T);
+    printf("INT=%f, FRAC=%f, MOD=%f, DIV=%d, D=%d, R=%d, T=%d\n", N, FRAC, MOD, DIV, D, R, T);
     double pfd_freq = ref_freq * (((double)( 1 + D )) / (double)( R * ( 1 + T ) ));
-    //printf("pdf_freq=%f\n", pfd_freq);
+    printf("pdf_freq=%f\n", pfd_freq);
     double rf_out = (N + (FRAC / MOD)) * (pfd_freq / DIV);
-    //printf("rf_out=%f\n", rf_out);
+    printf("rf_out=%f\n", rf_out);
     return rf_out;
 }
 
@@ -114,6 +120,7 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
 
     // use a smaller loop filter bandwidth to reduce spurs
     rf->int_16_bit = N;
+    printf("rf_int_16_bit=%d\n", rf->int_16_bit);
     rf->frac_12_bit = FRAC;
     rf->prescaler = prescaler;
     rf->phase_adjust = PHASE_ADJUST_OFF;
@@ -127,17 +134,17 @@ double adf4351_pll_enable(adf4351_t* rf, double ref_freq, double res_freq, doubl
     rf->band_select_clock_div = BS;
 
     rf->rf_output_enable = RF_OUTPUT_ENABLE_ENABLED;
-    rf->output_power = OUTPUT_POWER_2DBM;
-    rf->aux_output_power = AUX_OUTPUT_POWER_2DBM;
+    rf->output_power = OUTPUT_POWER_M4DBM;
+    rf->aux_output_power = AUX_OUTPUT_POWER_M4DBM;
     rf->aux_output_enable = AUX_OUTPUT_ENABLE_ENABLED;
     rf->aux_output_select = AUX_OUTPUT_SELECT_DIVIDED;
     rf->charge_pump_current = CHARGE_PUMP_CURRENT_2_50MA;
     rf->cp_three_state = CP_THREE_STATE_DISABLED;
-    rf->muxout = MUXOUT_3STATE;
+    rf->muxout = MUXOUT_RDIV;
     rf->ld_pin_mode = LD_PIN_MODE_DLD;
     rf->mute_till_lock_detect = MUTE_TILL_LOCK_DETECT_MUTE_ENABLED;
     rf->clock_div_mode = CLOCK_DIV_MODE_CLOCK_DIVIDER_OFF;
-    rf->low_noise_and_spur = LOW_NOISE_AND_SPUR_LOW_SPUR;
+    rf->low_noise_and_spur = LOW_NOISE_AND_SPUR_LOW_NOISE;
     rf->feedback_select = FEEDBACK_SELECT_FUNDAMENTAL;
 
     //printf("Band select=%d\n", rf->band_select_clock_div);

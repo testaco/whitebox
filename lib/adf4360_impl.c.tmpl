@@ -85,9 +85,7 @@ double adf4360_pll_enable(adf4360_t* rf, double ref_freq, double res_freq, doubl
 }
 
 void adf4360_pll_disable(adf4360_t* rf) {
-    // TODO
-    /*rf->rf_output_enable = RF_OUTPUT_ENABLE_DISABLED;
-    rf->aux_output_enable = AUX_OUTPUT_ENABLE_DISABLED;*/
+    rf->adf4360_power_down = ADF4360_POWER_DOWN_SYNC_PD;
 }
 
 /*int get_divider(adf4360_t* rf) {

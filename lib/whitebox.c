@@ -645,7 +645,11 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
     cmx991_ioctl_get(&wb->cmx991, &w);
     cmx991_resume(&wb->cmx991);
 
-#if 0
+    fprintf(stderr, "STARTING RECEIVE...\n");
+    //getchar();
+
+#if 1
+    fprintf(stderr, "** IF LO ENABLE\n");
     // Set the IF LO Frequency
     if ((err = ioctl(wb->fd, WA60_GET, &w)) < 0)
         return err;
@@ -654,6 +658,7 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
     adf4360_ioctl_set(&wb->adf4360, &w);
     if ((err = ioctl(wb->fd, WA60_SET, &w)) < 0)
         return err;
+    //getchar();
 #endif
 
     // Set the RF LO Frequency
@@ -665,19 +670,28 @@ int whitebox_rx(whitebox_t* wb, float frequency) {
 
     vco_frequency = (frequency + IF_LO_FREQ) * rx_div;
 
+    vco_frequency = 1010e6;
     printf("frequency=%f vco_frequency=%f div=%d\n", frequency, vco_frequency, rx_div);
 
+#if 0
+    fprintf(stderr, "** VFO ENABLE\n");
     adf4351_init(&wb->adf4351);
     adf4351_pll_enable(&wb->adf4351, WA_CLOCK_RATE, 8e3, vco_frequency);
     adf4351_ioctl_set(&wb->adf4351, &w);
     ioctl(wb->fd, WA_SET, &w);
+    //getchar();
+#endif
 
-    cmx991_rx_tune(&wb->cmx991, cmx991_rx_div(rx_div));
+#if 1
+    fprintf(stderr, "** CMX991 RX ENABLE\n");
+    cmx991_rx_tune(&wb->cmx991, cmx991_rx_div(2));
+    wb->if_bw = KHZ_30;
+    //wb->lna = 1;
     whitebox_rx_config(wb);
 
     cmx991_ioctl_set(&wb->cmx991, &w);
     ioctl(wb->fd, WC_SET, &w);
-
+#endif
     return 0;
 }
 
